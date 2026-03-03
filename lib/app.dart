@@ -6,6 +6,8 @@ import 'screens/name_setup_screen.dart';
 import 'services/progress_service.dart';
 import 'services/audio_service.dart';
 import 'services/player_settings_service.dart';
+import 'services/review_service.dart';
+import 'services/streak_service.dart';
 import 'widgets/floating_hearts_bg.dart';
 
 class SightWordsApp extends StatefulWidget {
@@ -16,9 +18,12 @@ class SightWordsApp extends StatefulWidget {
 }
 
 class _SightWordsAppState extends State<SightWordsApp> {
+  final _navigatorKey = GlobalKey<NavigatorState>();
   late final ProgressService _progressService;
   late final AudioService _audioService;
   late final PlayerSettingsService _settingsService;
+  late final ReviewService _reviewService;
+  late final StreakService _streakService;
   bool _initialized = false;
 
   @override
@@ -31,10 +36,40 @@ class _SightWordsAppState extends State<SightWordsApp> {
     _progressService = ProgressService();
     _audioService = AudioService();
     _settingsService = PlayerSettingsService();
-    await _progressService.init();
-    await _audioService.init();
-    await _settingsService.init();
-    setState(() => _initialized = true);
+    _reviewService = ReviewService();
+    _streakService = StreakService();
+
+    try {
+      await _progressService.init();
+    } catch (e) {
+      debugPrint('ProgressService init failed: $e');
+    }
+
+    try {
+      await _audioService.init();
+    } catch (e) {
+      debugPrint('AudioService init failed (audio will be unavailable): $e');
+    }
+
+    try {
+      await _settingsService.init();
+    } catch (e) {
+      debugPrint('PlayerSettingsService init failed: $e');
+    }
+
+    try {
+      await _reviewService.init();
+    } catch (e) {
+      debugPrint('ReviewService init failed: $e');
+    }
+
+    try {
+      await _streakService.init();
+    } catch (e) {
+      debugPrint('StreakService init failed: $e');
+    }
+
+    if (mounted) setState(() => _initialized = true);
   }
 
   void _onNameSubmitted(String name) async {
@@ -43,14 +78,16 @@ class _SightWordsAppState extends State<SightWordsApp> {
   }
 
   void _onChangeName() {
-    // Show the name setup screen again
-    Navigator.of(context).push(
+    final nav = _navigatorKey.currentState;
+    if (nav == null) return;
+    nav.push(
       MaterialPageRoute(
         builder: (_) => NameSetupScreen(
           onNameSubmitted: (name) {
             _onNameSubmitted(name);
-            Navigator.of(context).pop();
+            nav.pop();
           },
+          onBack: () => nav.pop(),
         ),
       ),
     );
@@ -65,7 +102,8 @@ class _SightWordsAppState extends State<SightWordsApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'Sight Words',
+      navigatorKey: _navigatorKey,
+      title: 'ReadSprout',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.darkTheme,
       home: _buildHome(),
@@ -85,6 +123,7 @@ class _SightWordsAppState extends State<SightWordsApp> {
     return HomeScreen(
       progressService: _progressService,
       audioService: _audioService,
+      streakService: _streakService,
       playerName: _settingsService.playerName,
       onChangeName: _onChangeName,
     );
@@ -115,41 +154,34 @@ class _SplashScreen extends StatelessWidget {
             child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
           ),
 
-          // Loading indicator
+          // Loading indicator with logo
           Center(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface.withValues(alpha: 0.8),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(
-                      color: AppColors.border.withValues(alpha: 0.5),
-                    ),
-                  ),
-                  child: const Center(
-                    child: SizedBox(
-                      width: 32,
-                      height: 32,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 3,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          AppColors.electricBlue,
-                        ),
-                      ),
-                    ),
+                Image.asset(
+                  'assets/images/logo.png',
+                  width: 140,
+                  height: 140,
+                ),
+                const SizedBox(height: 24),
+                Text(
+                  'ReadSprout',
+                  style: GoogleFonts.fredoka(
+                    fontSize: 32,
+                    color: AppColors.primaryText,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 16),
-                Text(
-                  'Loading...',
-                  style: GoogleFonts.fredoka(
-                    fontSize: 24,
-                    color: AppColors.primaryText,
-                    fontWeight: FontWeight.w500,
+                const SizedBox(
+                  width: 32,
+                  height: 32,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 3,
+                    valueColor: AlwaysStoppedAnimation<Color>(
+                      AppColors.electricBlue,
+                    ),
                   ),
                 ),
               ],

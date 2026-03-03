@@ -4,13 +4,16 @@ import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/progress_service.dart';
 import '../services/audio_service.dart';
+import '../services/streak_service.dart';
 import '../widgets/floating_hearts_bg.dart';
+import '../widgets/streak_badge.dart';
 import 'level_select_screen.dart';
 import 'word_editor_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final ProgressService progressService;
   final AudioService audioService;
+  final StreakService streakService;
   final String playerName;
   final VoidCallback? onChangeName;
 
@@ -18,6 +21,7 @@ class HomeScreen extends StatefulWidget {
     super.key,
     required this.progressService,
     required this.audioService,
+    required this.streakService,
     this.playerName = '',
     this.onChangeName,
   });
@@ -32,6 +36,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    // Check streak status on app open
+    widget.streakService.checkStreak();
     // Play welcome phrase on first load
     if (widget.playerName.isNotEmpty && !_hasPlayedWelcome) {
       _hasPlayedWelcome = true;
@@ -41,6 +47,48 @@ class _HomeScreenState extends State<HomeScreen> {
         }
       });
     }
+  }
+
+  void _showMilestone(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.local_fire_department_rounded,
+              color: AppColors.starGold,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              message,
+              style: GoogleFonts.fredoka(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+        backgroundColor: AppColors.surface,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: BorderSide(
+            color: AppColors.starGold.withValues(alpha: 0.5),
+          ),
+        ),
+        duration: const Duration(seconds: 4),
+      ),
+    );
+  }
+
+  /// Called externally (e.g. from app.dart) when a streak milestone is reached.
+  void showStreakMilestone(String message) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showMilestone(message);
+    });
   }
 
   @override
@@ -83,12 +131,29 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     const Spacer(flex: 3),
 
+                    // ── Logo ─────────────────────────────────
+                    Image.asset(
+                      'assets/images/logo.png',
+                      width: 180,
+                      height: 180,
+                    )
+                        .animate()
+                        .fadeIn(duration: 600.ms)
+                        .scale(
+                          begin: const Offset(0.8, 0.8),
+                          end: const Offset(1.0, 1.0),
+                          curve: Curves.easeOutCubic,
+                          duration: 600.ms,
+                        ),
+
+                    const SizedBox(height: 12),
+
                     // ── Hero: Player name ─────────────────────
                     if (hasName)
                       Text(
                         widget.playerName,
                         style: GoogleFonts.fredoka(
-                          fontSize: 58,
+                          fontSize: 52,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                           letterSpacing: 2,
@@ -123,43 +188,6 @@ class _HomeScreenState extends State<HomeScreen> {
                             color: AppColors.electricBlue.withValues(alpha: 0.3),
                           ),
 
-                    SizedBox(height: hasName ? 4 : 0),
-
-                    // ── App title ─────────────────────────────
-                    Text(
-                      'Sight Words',
-                      style: GoogleFonts.fredoka(
-                        fontSize: hasName ? 26 : 44,
-                        fontWeight: hasName ? FontWeight.w500 : FontWeight.w600,
-                        color: hasName
-                            ? AppColors.secondaryText
-                            : AppColors.primaryText,
-                        shadows: [
-                          if (!hasName)
-                            Shadow(
-                              color: AppColors.electricBlue
-                                  .withValues(alpha: 0.6),
-                              blurRadius: 24,
-                            ),
-                          if (!hasName)
-                            Shadow(
-                              color: AppColors.violet.withValues(alpha: 0.4),
-                              blurRadius: 48,
-                            ),
-                        ],
-                      ),
-                    )
-                        .animate()
-                        .fadeIn(
-                          delay: hasName ? 300.ms : 200.ms,
-                          duration: 600.ms,
-                        )
-                        .slideY(
-                          begin: 0.3,
-                          end: 0,
-                          curve: Curves.easeOutCubic,
-                        ),
-
                     const SizedBox(height: 6),
 
                     // ── Tagline ───────────────────────────────
@@ -181,23 +209,31 @@ class _HomeScreenState extends State<HomeScreen> {
                     const SizedBox(height: 20),
 
                     // ── Stat badges ───────────────────────────
-                    if (totalWords > 0)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
+                    if (totalWords > 0 || widget.streakService.hasStreak)
+                      Wrap(
+                        alignment: WrapAlignment.center,
+                        spacing: 12,
+                        runSpacing: 8,
                         children: [
-                          _StatBadge(
-                            icon: Icons.star_rounded,
-                            iconColor: AppColors.starGold,
-                            value: '$totalStars',
-                            label: 'Mastered',
-                          ),
-                          const SizedBox(width: 16),
-                          _StatBadge(
-                            icon: Icons.check_circle_rounded,
-                            iconColor: AppColors.success,
-                            value: '$totalWords',
-                            label: 'Words',
-                          ),
+                          if (totalWords > 0) ...[
+                            _StatBadge(
+                              icon: Icons.star_rounded,
+                              iconColor: AppColors.starGold,
+                              value: '$totalStars',
+                              label: 'Mastered',
+                            ),
+                            _StatBadge(
+                              icon: Icons.check_circle_rounded,
+                              iconColor: AppColors.success,
+                              value: '$totalWords',
+                              label: 'Words',
+                            ),
+                          ],
+                          if (widget.streakService.hasStreak)
+                            StreakBadge(
+                              currentStreak:
+                                  widget.streakService.currentStreak,
+                            ),
                         ],
                       )
                           .animate()

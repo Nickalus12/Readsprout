@@ -180,7 +180,7 @@ PHRASE_TEMPLATES = {
 
 LETTER_PHONETIC_PROMPTS = {
     'a': 'ah',
-    'b': 'b, buh, ball',
+    'b': 'Say the phonetic sound of the letter B. It sounds like buh, as in the word ball. Just make the sound, not the word.',
     'c': 'kuh',
     'd': 'duh',
     'e': 'eh',
@@ -188,15 +188,15 @@ LETTER_PHONETIC_PROMPTS = {
     'g': 'guh',
     'h': 'huh',
     'i': 'ih',
-    'j': 'The letter J says juh, like in juice.',
+    'j': 'juh',
     'k': 'kuh',
     'l': 'luh',
     'm': 'muh',
-    'n': 'n, nuh, nose',
+    'n': 'Say the phonetic sound of the letter N. It sounds like nnn, as in the word net. Just make the sound, not the word.',
     'o': 'oh',
     'p': 'puh',
     'q': 'kwuh',
-    'r': 'ruh',
+    'r': 'Say the phonetic sound of the letter R. It sounds like rrr, as in the word run. Just make the sound, not the word.',
     's': 'sss',
     't': 'tuh',
     'u': 'uh',
@@ -204,7 +204,7 @@ LETTER_PHONETIC_PROMPTS = {
     'w': 'wuh',
     'x': 'ks',
     'y': 'yuh',
-    'z': 'z, zzz, zebra',
+    'z': 'zzz',
 }
 
 # Special word prompts for short/ambiguous words that TTS may misinterpret.

@@ -20,6 +20,11 @@ class AppColors {
   static const Color error = Color(0xFFFF4757);
   static const Color starGold = Color(0xFFFFD700);
 
+  // Tier colors
+  static const Color bronze = Color(0xFFCD7F32);
+  static const Color silver = Color(0xFFC0C0C0);
+  // Gold is starGold above
+
   // Glow accents
   static const Color electricBlue = Color(0xFF00D4FF);
   static const Color violet = Color(0xFF8B5CF6);

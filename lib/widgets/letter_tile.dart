@@ -9,12 +9,17 @@ class LetterTile extends StatelessWidget {
   final bool isActive;
   final bool isError;
 
+  /// When non-null, overrides the default green success tint for revealed tiles.
+  /// Used for Tier 2's pre-revealed first letter (silver tint).
+  final Color? revealedColor;
+
   const LetterTile({
     super.key,
     required this.letter,
     required this.isRevealed,
     required this.isActive,
     this.isError = false,
+    this.revealedColor,
   });
 
   @override
@@ -36,7 +41,7 @@ class LetterTile extends StatelessWidget {
         boxShadow: [
           if (isRevealed)
             BoxShadow(
-              color: AppColors.success.withValues(alpha: 0.15),
+              color: (revealedColor ?? AppColors.success).withValues(alpha: 0.15),
               blurRadius: 8,
             ),
         ],
@@ -67,16 +72,17 @@ class LetterTile extends StatelessWidget {
 
   Widget _buildContent() {
     if (isRevealed) {
+      final color = revealedColor ?? AppColors.success;
       return Text(
         letter.toUpperCase(),
         key: ValueKey('revealed_$letter'),
         style: GoogleFonts.fredoka(
           fontSize: 30,
           fontWeight: FontWeight.w600,
-          color: AppColors.success,
+          color: color,
           shadows: [
             Shadow(
-              color: AppColors.success.withValues(alpha: 0.5),
+              color: color.withValues(alpha: 0.5),
               blurRadius: 8,
             ),
           ],
@@ -108,14 +114,20 @@ class LetterTile extends StatelessWidget {
 
   Color get _backgroundColor {
     if (isError) return AppColors.error.withValues(alpha: 0.1);
-    if (isRevealed) return AppColors.success.withValues(alpha: 0.08);
+    if (isRevealed) {
+      final color = revealedColor ?? AppColors.success;
+      return color.withValues(alpha: 0.08);
+    }
     if (isActive) return AppColors.surface.withValues(alpha: 0.8);
     return AppColors.surface.withValues(alpha: 0.5);
   }
 
   Color get _borderColor {
     if (isError) return AppColors.error;
-    if (isRevealed) return AppColors.success.withValues(alpha: 0.3);
+    if (isRevealed) {
+      final color = revealedColor ?? AppColors.success;
+      return color.withValues(alpha: 0.3);
+    }
     return AppColors.border.withValues(alpha: 0.4);
   }
 }

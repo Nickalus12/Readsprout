@@ -1,5 +1,24 @@
 import '../models/word.dart';
 
+/// A themed zone grouping several levels together.
+class Zone {
+  final String name;
+  final String icon;
+  final int startLevel; // 1-based inclusive
+  final int endLevel; // 1-based inclusive
+
+  const Zone({
+    required this.name,
+    required this.icon,
+    required this.startLevel,
+    required this.endLevel,
+  });
+
+  int get levelCount => endLevel - startLevel + 1;
+
+  bool containsLevel(int level) => level >= startLevel && level <= endLevel;
+}
+
 /// The 220 Dolch sight words, organized into 22 levels of 10 words.
 /// Ordered roughly by difficulty: Pre-Primer → Primer → 1st → 2nd → 3rd grade.
 class DolchWords {
@@ -83,13 +102,55 @@ class DolchWords {
 
   static int get totalLevels => _wordsByLevel.length;
 
-  /// Level display names
+  // ── Zones ──────────────────────────────────────────────────────────
+
+  static const List<Zone> zones = [
+    Zone(name: 'Whispering Woods', icon: '🌲', startLevel: 1, endLevel: 5),
+    Zone(name: 'Shimmer Shore', icon: '🏖️', startLevel: 6, endLevel: 10),
+    Zone(name: 'Crystal Peaks', icon: '🏔️', startLevel: 11, endLevel: 15),
+    Zone(name: 'Skyward Kingdom', icon: '🏰', startLevel: 16, endLevel: 19),
+    Zone(name: 'Celestial Crown', icon: '👑', startLevel: 20, endLevel: 22),
+  ];
+
+  /// Returns the zone that contains the given level (1-based).
+  static Zone zoneForLevel(int level) {
+    return zones.firstWhere(
+      (z) => z.containsLevel(level),
+      orElse: () => zones.last,
+    );
+  }
+
+  // ── Level names ───────────────────────────────────────────────────
+
+  static const List<String> levelNames = [
+    'Firefly Field', // 1
+    'Mushroom Hollow', // 2
+    'Dewdrop Glen', // 3
+    'Moonpetal Pond', // 4
+    "Owl's Perch", // 5
+    'Starfish Cove', // 6
+    'Coral Grotto', // 7
+    'Mermaid Lagoon', // 8
+    'Seahorse Bay', // 9
+    'Lighthouse Point', // 10
+    'Snowflake Summit', // 11
+    'Crystal Cavern', // 12
+    'Aurora Ridge', // 13
+    'Gemstone Gorge', // 14
+    "Eagle's Nest", // 15
+    'Cloud Castle', // 16
+    'Rainbow Bridge', // 17
+    'Stardust Tower', // 18
+    'Comet Trail', // 19
+    "Dragon's Keep", // 20
+    'Phoenix Peak', // 21
+    "Dreamweaver's Throne", // 22
+  ];
+
+  /// Level display name (1-based). Returns the themed name.
   static String levelName(int level) {
-    if (level <= 5) return 'Pre-Primer $level';
-    if (level <= 10) return 'Primer ${level - 5}';
-    if (level <= 15) return 'First Grade ${level - 10}';
-    if (level <= 19) return 'Second Grade ${level - 15}';
-    return 'Third Grade ${level - 19}';
+    if (level < 1 || level > levelNames.length) return 'Level $level';
+    return levelNames[level - 1];
   }
 
   /// All unique words (for TTS generation script)

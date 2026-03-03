@@ -3,29 +3,15 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../data/dolch_words.dart';
+import '../models/progress.dart';
 import '../services/progress_service.dart';
 import '../services/audio_service.dart';
 import '../widgets/floating_hearts_bg.dart';
+import '../widgets/tier_stars_display.dart';
+import '../widgets/tier_selection_sheet.dart';
 import 'game_screen.dart';
 
-/// Tier definitions — groups of levels with a label and icon.
-class _Tier {
-  final String name;
-  final IconData icon;
-  final int startLevel;
-  final int endLevel; // inclusive
-  const _Tier(this.name, this.icon, this.startLevel, this.endLevel);
-}
-
-const _tiers = [
-  _Tier('Pre-Primer', Icons.child_care_rounded, 1, 5),
-  _Tier('Primer', Icons.menu_book_rounded, 6, 10),
-  _Tier('First Grade', Icons.auto_stories_rounded, 11, 15),
-  _Tier('Second Grade', Icons.school_rounded, 16, 19),
-  _Tier('Third Grade', Icons.emoji_events_rounded, 20, 22),
-];
-
-class LevelSelectScreen extends StatelessWidget {
+class LevelSelectScreen extends StatefulWidget {
   final ProgressService progressService;
   final AudioService audioService;
   final String playerName;
@@ -38,11 +24,35 @@ class LevelSelectScreen extends StatelessWidget {
   });
 
   @override
+  State<LevelSelectScreen> createState() => _LevelSelectScreenState();
+}
+
+class _LevelSelectScreenState extends State<LevelSelectScreen> {
+  // Track which zones are expanded. Default: expand the zone containing the
+  // highest unlocked level, collapse others.
+  late final Map<int, bool> _expanded;
+
+  @override
+  void initState() {
+    super.initState();
+    final highestUnlocked = widget.progressService.highestUnlockedLevel;
+    _expanded = {};
+    for (int i = 0; i < DolchWords.zones.length; i++) {
+      final zone = DolchWords.zones[i];
+      _expanded[i] = zone.containsLevel(highestUnlocked);
+    }
+    // If nothing matched (shouldn't happen), open the first zone.
+    if (!_expanded.values.any((v) => v)) {
+      _expanded[0] = true;
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Stack(
         children: [
-          // ── Background gradient ──────────────────────────────
+          // Background gradient
           Container(
             decoration: const BoxDecoration(
               gradient: LinearGradient(
@@ -53,12 +63,12 @@ class LevelSelectScreen extends StatelessWidget {
             ),
           ),
 
-          // ── Floating hearts ──────────────────────────────────
+          // Floating hearts
           const Positioned.fill(
             child: FloatingHeartsBackground(cloudZoneHeight: 0.12),
           ),
 
-          // ── Content ──────────────────────────────────────────
+          // Content
           SafeArea(
             child: Column(
               children: [
@@ -91,28 +101,23 @@ class LevelSelectScreen extends StatelessWidget {
                         ),
                       ),
                       const Spacer(),
-                      // Total stars
                       _TotalStarsBadge(
-                        stars: progressService.totalStars,
+                        stars: widget.progressService.totalStars,
+                        maxStars: DolchWords.totalLevels * 3,
                       ),
                     ],
                   ),
                 ),
                 const SizedBox(height: 8),
 
-                // Scrollable tier list
+                // Scrollable zone list
                 Expanded(
                   child: ListView.builder(
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
-                    itemCount: _tiers.length,
-                    itemBuilder: (context, tierIndex) {
-                      final tier = _tiers[tierIndex];
-                      return _buildTierSection(
-                        context,
-                        tier,
-                        tierIndex,
-                      );
+                    itemCount: DolchWords.zones.length,
+                    itemBuilder: (context, zoneIndex) {
+                      return _buildZoneSection(context, zoneIndex);
                     },
                   ),
                 ),
@@ -124,116 +129,208 @@ class LevelSelectScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildTierSection(
-    BuildContext context,
-    _Tier tier,
-    int tierIndex,
-  ) {
-    final levelCount = tier.endLevel - tier.startLevel + 1;
+  // ── Zone section (header + collapsible level list) ───────────────────
 
-    // Check if entire tier is locked (first level of tier is locked)
-    final tierUnlocked = progressService.isLevelUnlocked(tier.startLevel);
+  Widget _buildZoneSection(BuildContext context, int zoneIndex) {
+    final zone = DolchWords.zones[zoneIndex];
+    final isExpanded = _expanded[zoneIndex] ?? false;
 
-    // Count completed levels in tier
-    int completedInTier = 0;
-    for (int l = tier.startLevel; l <= tier.endLevel; l++) {
-      if (progressService.getLevel(l).isComplete) completedInTier++;
+    // Compute zone stats
+    int zoneStars = 0;
+    int zonePossibleStars = zone.levelCount * 3;
+    bool zoneUnlocked = false;
+
+    for (int l = zone.startLevel; l <= zone.endLevel; l++) {
+      final lp = widget.progressService.getLevel(l);
+      zoneStars += lp.starsEarned;
+      if (widget.progressService.isLevelUnlocked(l)) zoneUnlocked = true;
     }
-    final tierComplete = completedInTier == levelCount;
 
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // ── Tier header ────────────────────────────────────
-        Padding(
-          padding: const EdgeInsets.only(top: 16, bottom: 10, left: 4),
-          child: Row(
-            children: [
-              Container(
-                width: 36,
-                height: 36,
+    final zoneComplete = zoneStars == zonePossibleStars;
+    final zoneProgress = zonePossibleStars > 0
+        ? zoneStars / zonePossibleStars
+        : 0.0;
+
+    // Determine previous zone name for locked-zone hint
+    String? previousZoneName;
+    if (!zoneUnlocked && zoneIndex > 0) {
+      previousZoneName = DolchWords.zones[zoneIndex - 1].name;
+    }
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 6),
+      child: Column(
+        children: [
+          // Zone header (tappable to expand/collapse)
+          GestureDetector(
+            onTap: () => setState(() {
+              _expanded[zoneIndex] = !isExpanded;
+            }),
+            child: AnimatedOpacity(
+              opacity: zoneUnlocked ? 1.0 : 0.55,
+              duration: const Duration(milliseconds: 250),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
                 decoration: BoxDecoration(
-                  color: tierComplete
-                      ? AppColors.starGold.withValues(alpha: 0.15)
-                      : tierUnlocked
-                          ? AppColors.electricBlue.withValues(alpha: 0.1)
-                          : AppColors.surface,
-                  borderRadius: BorderRadius.circular(10),
+                  color: zoneComplete
+                      ? AppColors.starGold.withValues(alpha: 0.06)
+                      : zoneUnlocked
+                          ? AppColors.surface.withValues(alpha: 0.8)
+                          : AppColors.surface.withValues(alpha: 0.4),
+                  borderRadius: BorderRadius.circular(14),
                   border: Border.all(
-                    color: tierComplete
-                        ? AppColors.starGold.withValues(alpha: 0.3)
-                        : tierUnlocked
-                            ? AppColors.electricBlue.withValues(alpha: 0.2)
-                            : AppColors.border,
+                    color: zoneComplete
+                        ? AppColors.starGold.withValues(alpha: 0.25)
+                        : zoneUnlocked
+                            ? AppColors.border
+                            : AppColors.border.withValues(alpha: 0.35),
                   ),
                 ),
-                child: Icon(
-                  tierComplete ? Icons.star_rounded : tier.icon,
-                  size: 20,
-                  color: tierComplete
-                      ? AppColors.starGold
-                      : tierUnlocked
-                          ? AppColors.electricBlue
-                          : AppColors.secondaryText,
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                child: Row(
                   children: [
-                    Text(
-                      tier.name,
-                      style: GoogleFonts.fredoka(
-                        fontSize: 18,
-                        fontWeight: FontWeight.w600,
-                        color: tierUnlocked
-                            ? AppColors.primaryText
-                            : AppColors.secondaryText,
+                    // Zone icon
+                    Container(
+                      width: 38,
+                      height: 38,
+                      decoration: BoxDecoration(
+                        color: zoneComplete
+                            ? AppColors.starGold.withValues(alpha: 0.15)
+                            : zoneUnlocked
+                                ? AppColors.electricBlue.withValues(alpha: 0.1)
+                                : AppColors.surface.withValues(alpha: 0.5),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      alignment: Alignment.center,
+                      child: zoneUnlocked
+                          ? Text(
+                              zone.icon,
+                              style: const TextStyle(fontSize: 20),
+                            )
+                          : Icon(
+                              Icons.lock_rounded,
+                              color:
+                                  AppColors.secondaryText.withValues(alpha: 0.4),
+                              size: 18,
+                            ),
+                    ),
+                    const SizedBox(width: 12),
+
+                    // Zone name + star count / locked message
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            zone.name,
+                            style: GoogleFonts.fredoka(
+                              fontSize: 17,
+                              fontWeight: FontWeight.w600,
+                              color: zoneUnlocked
+                                  ? AppColors.primaryText
+                                  : AppColors.secondaryText
+                                      .withValues(alpha: 0.7),
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          if (zoneUnlocked)
+                            Row(
+                              children: [
+                                const Icon(Icons.star_rounded,
+                                    size: 13, color: AppColors.starGold),
+                                const SizedBox(width: 3),
+                                Text(
+                                  '$zoneStars / $zonePossibleStars',
+                                  style: GoogleFonts.nunito(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppColors.secondaryText,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                // Progress bar
+                                Expanded(
+                                  child: ClipRRect(
+                                    borderRadius: BorderRadius.circular(2),
+                                    child: SizedBox(
+                                      height: 4,
+                                      child: LinearProgressIndicator(
+                                        value: zoneProgress,
+                                        backgroundColor: AppColors.background,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          zoneComplete
+                                              ? AppColors.starGold
+                                              : AppColors.electricBlue,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            Text(
+                              previousZoneName != null
+                                  ? 'Master all tiers in $previousZoneName to unlock'
+                                  : 'Locked',
+                              style: GoogleFonts.nunito(
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.secondaryText
+                                    .withValues(alpha: 0.5),
+                                fontStyle: FontStyle.italic,
+                              ),
+                            ),
+                        ],
                       ),
                     ),
-                    Text(
-                      '$completedInTier / $levelCount levels',
-                      style: GoogleFonts.nunito(
-                        fontSize: 12,
-                        color: AppColors.secondaryText
-                            .withValues(alpha: 0.7),
+                    const SizedBox(width: 8),
+
+                    // Expand/collapse chevron
+                    AnimatedRotation(
+                      turns: isExpanded ? 0.5 : 0.0,
+                      duration: const Duration(milliseconds: 250),
+                      curve: Curves.easeInOut,
+                      child: Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: AppColors.secondaryText.withValues(alpha: 0.6),
+                        size: 24,
                       ),
                     ),
                   ],
                 ),
               ),
-              // Tier progress mini bar
-              SizedBox(
-                width: 60,
-                height: 4,
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(2),
-                  child: LinearProgressIndicator(
-                    value: completedInTier / levelCount,
-                    backgroundColor: AppColors.surface,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      tierComplete
-                          ? AppColors.starGold
-                          : AppColors.electricBlue,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        )
-            .animate()
-            .fadeIn(
-              delay: Duration(milliseconds: tierIndex * 80),
-              duration: 400.ms,
             ),
+          )
+              .animate()
+              .fadeIn(
+                delay: Duration(milliseconds: zoneIndex * 80),
+                duration: 400.ms,
+              ),
 
-        // ── Level cards ────────────────────────────────────
-        ...List.generate(levelCount, (i) {
-          final level = tier.startLevel + i;
-          final lp = progressService.getLevel(level);
-          final unlocked = progressService.isLevelUnlocked(level);
+          // Level cards (collapsible)
+          AnimatedCrossFade(
+            firstChild: const SizedBox(width: double.infinity, height: 0),
+            secondChild: _buildLevelCards(zone, zoneIndex),
+            crossFadeState: isExpanded
+                ? CrossFadeState.showSecond
+                : CrossFadeState.showFirst,
+            duration: const Duration(milliseconds: 300),
+            sizeCurve: Curves.easeInOut,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLevelCards(Zone zone, int zoneIndex) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 6),
+      child: Column(
+        children: List.generate(zone.levelCount, (i) {
+          final level = zone.startLevel + i;
+          final lp = widget.progressService.getLevel(level);
+          final unlocked = widget.progressService.isLevelUnlocked(level);
           final gradientIndex =
               (level - 1) % AppColors.levelGradients.length;
           final colors = AppColors.levelGradients[gradientIndex];
@@ -243,85 +340,111 @@ class LevelSelectScreen extends StatelessWidget {
             level: level,
             name: DolchWords.levelName(level),
             unlocked: unlocked,
-            completionPercent: lp.completionPercent,
-            isComplete: lp.isComplete,
+            levelProgress: lp,
             accentColor: colors.first,
-            wordsCompleted: lp.wordsCompleted,
-            totalWords: words.length,
-            wordPreview: words.take(5).map((w) => w.text).join(', '),
+            wordPreview:
+                words.take(5).map((w) => w.text).join(', '),
+            isTier2Unlocked:
+                widget.progressService.isTierUnlocked(level, 2),
+            isTier3Unlocked:
+                widget.progressService.isTierUnlocked(level, 3),
             onTap: unlocked
-                ? () => Navigator.push(
-                      context,
-                      PageRouteBuilder(
-                        pageBuilder: (_, __, ___) => GameScreen(
-                          level: level,
-                          progressService: progressService,
-                          audioService: audioService,
-                          playerName: playerName,
-                        ),
-                        transitionsBuilder: (_, animation, __, child) {
-                          return FadeTransition(
-                            opacity: CurvedAnimation(
-                              parent: animation,
-                              curve: Curves.easeInOut,
-                            ),
-                            child: child,
-                          );
-                        },
-                        transitionDuration:
-                            const Duration(milliseconds: 350),
-                      ),
-                    )
+                ? () => _onLevelTapped(context, level)
                 : null,
           )
               .animate()
               .fadeIn(
                 delay: Duration(
-                    milliseconds: tierIndex * 80 + (i + 1) * 40),
+                    milliseconds: zoneIndex * 80 + (i + 1) * 40),
                 duration: 350.ms,
               )
               .slideX(
                 begin: 0.05,
                 end: 0,
                 delay: Duration(
-                    milliseconds: tierIndex * 80 + (i + 1) * 40),
+                    milliseconds: zoneIndex * 80 + (i + 1) * 40),
                 curve: Curves.easeOutCubic,
               );
         }),
-      ],
+      ),
+    );
+  }
+
+  // ── Level tap → show TierSelectionSheet → navigate to game ──────────
+
+  Future<void> _onLevelTapped(BuildContext context, int level) async {
+    final zoneName =
+        DolchWords.zoneForLevel(level).name;
+    final suggestedTier =
+        widget.progressService.suggestedTierForLevel(level);
+
+    final selectedTier = await TierSelectionSheet.show(
+      context: context,
+      level: level,
+      levelName: DolchWords.levelName(level),
+      zoneName: zoneName,
+      progressService: widget.progressService,
+      suggestedTier: suggestedTier,
+    );
+
+    if (selectedTier == null || !context.mounted) return;
+
+    Navigator.push(
+      context,
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => GameScreen(
+          level: level,
+          progressService: widget.progressService,
+          audioService: widget.audioService,
+          playerName: widget.playerName,
+          tier: selectedTier.value,
+        ),
+        transitionsBuilder: (_, animation, __, child) {
+          return FadeTransition(
+            opacity: CurvedAnimation(
+              parent: animation,
+              curve: Curves.easeInOut,
+            ),
+            child: child,
+          );
+        },
+        transitionDuration: const Duration(milliseconds: 350),
+      ),
     );
   }
 }
 
-// ── Level Card ──────────────────────────────────────────────────────
+// ── Level Card ──────────────────────────────────────────────────────────
 
 class _LevelCard extends StatelessWidget {
   final int level;
   final String name;
   final bool unlocked;
-  final double completionPercent;
-  final bool isComplete;
+  final LevelProgress levelProgress;
   final Color accentColor;
-  final int wordsCompleted;
-  final int totalWords;
   final String wordPreview;
+  final bool isTier2Unlocked;
+  final bool isTier3Unlocked;
   final VoidCallback? onTap;
 
   const _LevelCard({
     required this.level,
     required this.name,
     required this.unlocked,
-    required this.completionPercent,
-    required this.isComplete,
+    required this.levelProgress,
     required this.accentColor,
-    required this.wordsCompleted,
-    required this.totalWords,
     required this.wordPreview,
+    required this.isTier2Unlocked,
+    required this.isTier3Unlocked,
     this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
+    final isComplete = levelProgress.isComplete;
+    final starsEarned = levelProgress.starsEarned;
+    final hasAnyStars = starsEarned > 0;
+
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: GestureDetector(
@@ -332,22 +455,22 @@ class _LevelCard extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: isComplete
+              color: hasAnyStars
                   ? accentColor.withValues(alpha: 0.06)
                   : AppColors.surface.withValues(alpha: 0.75),
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
-                color: isComplete
-                    ? AppColors.success.withValues(alpha: 0.3)
+                color: hasAnyStars
+                    ? accentColor.withValues(alpha: 0.25)
                     : unlocked
-                        ? accentColor.withValues(alpha: 0.2)
+                        ? accentColor.withValues(alpha: 0.15)
                         : AppColors.border.withValues(alpha: 0.5),
                 width: 1.5,
               ),
               boxShadow: isComplete
                   ? [
                       BoxShadow(
-                        color: AppColors.success.withValues(alpha: 0.08),
+                        color: accentColor.withValues(alpha: 0.06),
                         blurRadius: 12,
                       ),
                     ]
@@ -355,45 +478,32 @@ class _LevelCard extends StatelessWidget {
             ),
             child: Row(
               children: [
-                // ── Left: Level number / star ─────────────
+                // Left: Level number badge
                 _LevelBadge(
                   level: level,
-                  isComplete: isComplete,
                   unlocked: unlocked,
                   accentColor: accentColor,
-                  completionPercent: completionPercent,
+                  overallProgress: levelProgress.overallProgress,
+                  starsEarned: starsEarned,
                 ),
                 const SizedBox(width: 14),
 
-                // ── Center: Info ──────────────────────────
+                // Center: Level name + word preview
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Text(
-                            name,
-                            style: GoogleFonts.fredoka(
-                              fontSize: 16,
-                              fontWeight: FontWeight.w600,
-                              color: unlocked
-                                  ? AppColors.primaryText
-                                  : AppColors.secondaryText,
-                            ),
-                          ),
-                          if (isComplete) ...[
-                            const SizedBox(width: 6),
-                            Icon(
-                              Icons.check_circle_rounded,
-                              size: 16,
-                              color: AppColors.success,
-                            ),
-                          ],
-                        ],
+                      Text(
+                        name,
+                        style: GoogleFonts.fredoka(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          color: unlocked
+                              ? AppColors.primaryText
+                              : AppColors.secondaryText,
+                        ),
                       ),
                       const SizedBox(height: 4),
-                      // Word preview
                       Text(
                         wordPreview,
                         style: GoogleFonts.nunito(
@@ -405,70 +515,25 @@ class _LevelCard extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                       ),
-                      const SizedBox(height: 6),
-                      // Progress bar
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(2),
-                        child: SizedBox(
-                          height: 4,
-                          child: LinearProgressIndicator(
-                            value: completionPercent,
-                            backgroundColor:
-                                AppColors.surface.withValues(alpha: 0.5),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              isComplete ? AppColors.success : accentColor,
-                            ),
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 10),
 
-                // ── Right: Status ────────────────────────
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
-                  children: [
-                    Text(
-                      '$wordsCompleted/$totalWords',
-                      style: GoogleFonts.fredoka(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: isComplete
-                            ? AppColors.success
-                            : unlocked
-                                ? AppColors.primaryText
-                                : AppColors.secondaryText,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'words',
-                      style: GoogleFonts.nunito(
-                        fontSize: 11,
-                        color: AppColors.secondaryText
-                            .withValues(alpha: 0.6),
-                      ),
-                    ),
-                  ],
-                ),
-                if (unlocked && !isComplete) ...[
-                  const SizedBox(width: 8),
-                  Icon(
-                    Icons.chevron_right_rounded,
-                    color: accentColor.withValues(alpha: 0.5),
-                    size: 22,
-                  ),
-                ],
-                if (!unlocked) ...[
-                  const SizedBox(width: 8),
+                // Right: 3-star tier display or lock icon
+                if (unlocked)
+                  TierStarsDisplay(
+                    levelProgress: levelProgress,
+                    isTier2Unlocked: isTier2Unlocked,
+                    isTier3Unlocked: isTier3Unlocked,
+                    starSize: 18,
+                  )
+                else
                   Icon(
                     Icons.lock_rounded,
                     color: AppColors.secondaryText.withValues(alpha: 0.4),
                     size: 18,
                   ),
-                ],
               ],
             ),
           ),
@@ -478,26 +543,36 @@ class _LevelCard extends StatelessWidget {
   }
 }
 
-// ── Level Badge (circular progress + number) ────────────────────────
+// ── Level Badge (circular + number) ─────────────────────────────────────
 
 class _LevelBadge extends StatelessWidget {
   final int level;
-  final bool isComplete;
   final bool unlocked;
   final Color accentColor;
-  final double completionPercent;
+  final double overallProgress;
+  final int starsEarned;
 
   const _LevelBadge({
     required this.level,
-    required this.isComplete,
     required this.unlocked,
     required this.accentColor,
-    required this.completionPercent,
+    required this.overallProgress,
+    required this.starsEarned,
   });
 
   @override
   Widget build(BuildContext context) {
-    final ringColor = isComplete ? AppColors.success : accentColor;
+    // Ring color reflects highest tier completed
+    final Color ringColor;
+    if (starsEarned >= 3) {
+      ringColor = AppColors.starGold;
+    } else if (starsEarned >= 2) {
+      ringColor = AppColors.silver;
+    } else if (starsEarned >= 1) {
+      ringColor = AppColors.bronze;
+    } else {
+      ringColor = accentColor;
+    }
 
     return SizedBox(
       width: 44,
@@ -510,47 +585,38 @@ class _LevelBadge extends StatelessWidget {
             height: 44,
             child: CircularProgressIndicator(
               strokeWidth: 3,
-              value: unlocked
-                  ? (isComplete ? 1.0 : completionPercent)
-                  : 0.0,
+              value: unlocked ? overallProgress : 0.0,
               backgroundColor: unlocked
                   ? ringColor.withValues(alpha: 0.12)
                   : AppColors.border.withValues(alpha: 0.3),
               valueColor: AlwaysStoppedAnimation<Color>(ringColor),
             ),
           ),
-          if (isComplete)
-            Icon(
-              Icons.star_rounded,
-              color: AppColors.starGold,
-              size: 22,
-            )
-          else
-            Text(
-              '$level',
-              style: GoogleFonts.fredoka(
-                fontSize: 17,
-                fontWeight: FontWeight.w700,
-                color: unlocked
-                    ? AppColors.primaryText
-                    : AppColors.secondaryText,
-              ),
+          Text(
+            '$level',
+            style: GoogleFonts.fredoka(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: unlocked
+                  ? AppColors.primaryText
+                  : AppColors.secondaryText,
             ),
+          ),
         ],
       ),
     );
   }
 }
 
-// ── Total Stars Badge ───────────────────────────────────────────────
+// ── Total Stars Badge ───────────────────────────────────────────────────
 
 class _TotalStarsBadge extends StatelessWidget {
   final int stars;
-  const _TotalStarsBadge({required this.stars});
+  final int maxStars;
+  const _TotalStarsBadge({required this.stars, required this.maxStars});
 
   @override
   Widget build(BuildContext context) {
-    if (stars == 0) return const SizedBox.shrink();
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
@@ -567,7 +633,7 @@ class _TotalStarsBadge extends StatelessWidget {
               color: AppColors.starGold, size: 16),
           const SizedBox(width: 4),
           Text(
-            '$stars',
+            '$stars/$maxStars',
             style: GoogleFonts.fredoka(
               fontSize: 14,
               fontWeight: FontWeight.w600,

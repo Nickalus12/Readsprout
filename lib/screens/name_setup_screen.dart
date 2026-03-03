@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
@@ -10,10 +11,12 @@ import '../widgets/floating_hearts_bg.dart';
 /// the app (e.g., "Great job, Emma!", "Welcome, Emma!").
 class NameSetupScreen extends StatefulWidget {
   final void Function(String name) onNameSubmitted;
+  final VoidCallback? onBack;
 
   const NameSetupScreen({
     super.key,
     required this.onNameSubmitted,
+    this.onBack,
   });
 
   @override
@@ -54,9 +57,21 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
     }
   }
 
+  KeyEventResult _onKey(FocusNode node, KeyEvent event) {
+    if (event is KeyDownEvent &&
+        event.logicalKey == LogicalKeyboardKey.escape &&
+        widget.onBack != null) {
+      widget.onBack!();
+      return KeyEventResult.handled;
+    }
+    return KeyEventResult.ignored;
+  }
+
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return Focus(
+      onKeyEvent: _onKey,
+      child: Scaffold(
       body: Stack(
         children: [
           // ── Background gradient ──────────────────────────────
@@ -87,22 +102,11 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                   children: [
                     const Spacer(flex: 3),
 
-                    // Star icon
-                    Container(
-                      decoration: BoxDecoration(
-                        boxShadow: [
-                          BoxShadow(
-                            color: AppColors.starGold.withValues(alpha: 0.3),
-                            blurRadius: 30,
-                            spreadRadius: 5,
-                          ),
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.star_rounded,
-                        color: AppColors.starGold,
-                        size: 64,
-                      ),
+                    // Logo
+                    Image.asset(
+                      'assets/images/logo.png',
+                      width: 120,
+                      height: 120,
                     ).animate().scale(
                           begin: const Offset(0.5, 0.5),
                           end: const Offset(1.0, 1.0),
@@ -114,7 +118,7 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
 
                     // Title
                     Text(
-                      'Sight Words',
+                      'ReadSprout',
                       style: GoogleFonts.fredoka(
                         fontSize: 40,
                         fontWeight: FontWeight.w600,
@@ -246,6 +250,22 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                       ),
                     ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
 
+                    // Back button (only when changing name, not first launch)
+                    if (widget.onBack != null) ...[
+                      const SizedBox(height: 12),
+                      GestureDetector(
+                        onTap: widget.onBack,
+                        child: Text(
+                          'Back',
+                          style: GoogleFonts.nunito(
+                            fontSize: 14,
+                            color: AppColors.secondaryText
+                                .withValues(alpha: 0.5),
+                          ),
+                        ),
+                      ).animate().fadeIn(delay: 800.ms, duration: 400.ms),
+                    ],
+
                     const Spacer(flex: 4),
                   ],
                 ),
@@ -254,6 +274,6 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
           ),
         ],
       ),
-    );
+    ));
   }
 }

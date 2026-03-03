@@ -26,11 +26,11 @@ class AudioService {
   bool _initialized = false;
 
   Future<void> init() async {
-    // Pre-configure players for low-latency playback
-    await _wordPlayer.setReleaseMode(ReleaseMode.stop);
-    await _letterPlayer.setReleaseMode(ReleaseMode.stop);
-    await _effectPlayer.setReleaseMode(ReleaseMode.stop);
-    await _phrasePlayer.setReleaseMode(ReleaseMode.stop);
+    // setReleaseMode hangs on Windows — configure non-blocking instead
+    _wordPlayer.setReleaseMode(ReleaseMode.stop);
+    _letterPlayer.setReleaseMode(ReleaseMode.stop);
+    _effectPlayer.setReleaseMode(ReleaseMode.stop);
+    _phrasePlayer.setReleaseMode(ReleaseMode.stop);
     _initialized = true;
   }
 

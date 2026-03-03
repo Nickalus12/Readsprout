@@ -8,6 +8,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../data/dolch_words.dart';
+import '../models/progress.dart';
 import '../models/word.dart';
 import '../data/phrase_templates.dart';
 import '../services/audio_service.dart';
@@ -19,6 +20,7 @@ import '../widgets/floating_hearts_bg.dart';
 
 class GameScreen extends StatefulWidget {
   final int level;
+  final int tier;
   final ProgressService progressService;
   final AudioService audioService;
   final String playerName;
@@ -28,6 +30,7 @@ class GameScreen extends StatefulWidget {
     required this.level,
     required this.progressService,
     required this.audioService,
+    this.tier = 1,
     this.playerName = '',
   });
 
@@ -51,18 +54,48 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   // Track which letters have been correctly typed
   final List<bool> _revealedLetters = [];
 
-  // Animation controllers
+  // ── Tier-specific state ──────────────────────────────────────────
+
+  /// Tier 2 (Adventurer): consecutive wrong guesses at the current position.
+  int _wrongCountAtPosition = 0;
+
+  /// Tier 2 (Adventurer): the letter key currently being nudged (pulsed).
+  String? _nudgeKey;
+
+  /// Tier 3 (Champion): consecutive words with 0 mistakes.
+  int _perfectStreak = 0;
+
+  /// Whether the current champion word was "not passed" (2+ mistakes).
+  bool _championWordFailed = false;
+
+  // ── Animation controllers ────────────────────────────────────────
+
   late AnimationController _shakeController;
   late Animation<double> _shakeAnimation;
   late ConfettiController _confettiController;
   late ConfettiController _levelConfettiController;
 
+  /// Tier 2: nudge pulse animation for the correct key after 2 wrong guesses.
+  late AnimationController _nudgeController;
+
+  /// Tier 3: perfect streak badge scale-pop.
+  late AnimationController _streakPopController;
+
+  /// Extra golden confetti controller for champion perfect words.
+  late ConfettiController _goldenConfettiController;
+
   // Focus node for keyboard input
   final FocusNode _focusNode = FocusNode();
+
+  // ── Convenience getters ──────────────────────────────────────────
 
   Word get _currentWord => _words[_currentWordIndex];
   String get _targetText => _currentWord.text.toLowerCase();
   bool get _isLastWord => _currentWordIndex >= _words.length - 1;
+  WordTier get _wordTier => WordTier.fromValue(widget.tier) ?? WordTier.explorer;
+  bool get _isExplorer => widget.tier == 1;
+  bool get _isAdventurer => widget.tier == 2;
+  bool get _isChampion => widget.tier == 3;
 
   GlowState get _screenGlowState {
     if (_levelComplete) return GlowState.celebrate;
@@ -95,11 +128,31 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       }
     });
 
+    // Nudge controller (Tier 2) — pulse correct key for ~1 second
+    _nudgeController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1000),
+    );
+    _nudgeController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        setState(() => _nudgeKey = null);
+        _nudgeController.reset();
+      }
+    });
+
+    // Streak pop controller (Tier 3) — quick scale pop
+    _streakPopController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 400),
+    );
+
     // Confetti
     _confettiController =
         ConfettiController(duration: const Duration(seconds: 1));
     _levelConfettiController =
         ConfettiController(duration: const Duration(seconds: 3));
+    _goldenConfettiController =
+        ConfettiController(duration: const Duration(milliseconds: 800));
 
     // Announce the first word after a brief delay
     Future.delayed(const Duration(milliseconds: 600), _announceCurrentWord);
@@ -108,8 +161,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   void _initRevealedLetters() {
     _revealedLetters.clear();
     _revealedLetters.addAll(List.filled(_targetText.length, false));
-    _currentLetterIndex = 0;
+    _wrongCountAtPosition = 0;
+    _nudgeKey = null;
+    _championWordFailed = false;
     _mistakesThisWord = 0;
+
+    if (_isAdventurer && _targetText.isNotEmpty) {
+      // Tier 2: pre-reveal first letter, start typing at index 1
+      _revealedLetters[0] = true;
+      _currentLetterIndex = 1;
+    } else {
+      _currentLetterIndex = 0;
+    }
   }
 
   Future<void> _announceCurrentWord() async {
@@ -120,7 +183,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       if (!ok) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Audio not available — tap "Hear Word" to try again'),
+            content: Text('Audio not available \u2014 tap "Hear Word" to try again'),
             duration: Duration(seconds: 2),
             behavior: SnackBarBehavior.floating,
           ),
@@ -139,14 +202,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       setState(() {
         _revealedLetters[_currentLetterIndex] = true;
         _currentLetterIndex++;
+        _wrongCountAtPosition = 0; // reset for next position
+        _nudgeKey = null;
       });
 
       // Play the phonetic sound for this letter
       widget.audioService.playLetter(expectedLetter);
 
-      // Check if word is complete
+      // Check if word is complete — delay so last letter sound plays
       if (_currentLetterIndex >= _targetText.length) {
-        _onWordComplete();
+        Future.delayed(const Duration(milliseconds: 500), _onWordComplete);
       }
     } else {
       // Wrong letter — shake and retry
@@ -158,40 +223,68 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     setState(() {
       _shaking = true;
       _mistakesThisWord++;
+      _wrongCountAtPosition++;
     });
     _shakeController.forward();
     widget.audioService.playError();
     if (Platform.isAndroid || Platform.isIOS) HapticFeedback.mediumImpact();
+
+    // Tier 2 nudge: after 2 consecutive wrong guesses at same position,
+    // briefly pulse the correct key.
+    if (_isAdventurer && _wrongCountAtPosition >= 2) {
+      final expected = _targetText[_currentLetterIndex];
+      setState(() => _nudgeKey = expected);
+      _nudgeController.forward(from: 0);
+    }
   }
 
   Future<void> _onWordComplete() async {
     // Track perfect words
     if (_mistakesThisWord == 0) _perfectWords++;
 
+    // Champion quality gate
+    final wordPassedChampion = !_isChampion || _mistakesThisWord <= 1;
+
+    // Champion perfect streak
+    if (_isChampion) {
+      if (_mistakesThisWord == 0) {
+        _perfectStreak++;
+        _streakPopController.forward(from: 0);
+      } else {
+        _perfectStreak = 0;
+      }
+      _championWordFailed = !wordPassedChampion;
+    }
+
     // Save progress BEFORE showing celebration UI to prevent data loss on back-nav
     setState(() => _savingProgress = true);
-    final wasLevelComplete = await widget.progressService.recordWordComplete(
+    final wasTierComplete = await widget.progressService.recordTierWordComplete(
       level: widget.level,
+      tier: widget.tier,
       wordText: _currentWord.text,
       mistakes: _mistakesThisWord,
     );
     if (mounted) setState(() => _savingProgress = false);
 
-    // Play success sound + personalized encouragement
+    // Play success chime
     widget.audioService.playSuccess();
-    Future.delayed(const Duration(milliseconds: 300), () {
-      widget.audioService.playWordComplete(widget.playerName);
-    });
+
+    // Tier-aware confetti
+    if (_isChampion && _mistakesThisWord == 0) {
+      // Extra golden burst for perfect champion words
+      _goldenConfettiController.play();
+    }
     _confettiController.play();
+
     if (Platform.isAndroid || Platform.isIOS) HapticFeedback.lightImpact();
 
     setState(() => _showingCelebration = true);
 
-    // Celebrate briefly, then advance
-    await Future.delayed(const Duration(milliseconds: 1800));
+    // Celebrate — give the child time to enjoy it
+    await Future.delayed(const Duration(milliseconds: 2500));
 
-    if (_isLastWord || wasLevelComplete) {
-      // Level complete!
+    if (_isLastWord || wasTierComplete) {
+      // Level/tier complete!
       _levelConfettiController.play();
       widget.audioService.playLevelCompleteEffect();
       Future.delayed(const Duration(milliseconds: 500), () {
@@ -219,10 +312,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   void dispose() {
     _shakeController.dispose();
+    _nudgeController.dispose();
+    _streakPopController.dispose();
     _confettiController.stop();
     _confettiController.dispose();
     _levelConfettiController.stop();
     _levelConfettiController.dispose();
+    _goldenConfettiController.stop();
+    _goldenConfettiController.dispose();
     _focusNode.dispose();
     super.dispose();
   }
@@ -291,6 +388,20 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         _buildProgressDots(levelColors),
                         const Spacer(flex: 2),
 
+                        // Champion: "Keep practicing!" message for failed words
+                        if (_isChampion && _championWordFailed)
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Text(
+                              'Keep practicing!',
+                              style: GoogleFonts.fredoka(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w500,
+                                color: AppColors.secondaryText,
+                              ),
+                            ),
+                          ),
+
                         // Hear word button
                         _buildHearButton(),
                         const SizedBox(height: 28),
@@ -307,6 +418,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ),
                 ),
 
+                // ── Champion perfect streak badge ─────────
+                if (_isChampion && _perfectStreak > 0 && !_levelComplete)
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 8,
+                    right: 8,
+                    child: _buildStreakBadge(),
+                  ),
+
                 // ── Celebration overlay ───────────────────
                 if (_showingCelebration)
                   CelebrationOverlay(
@@ -314,33 +433,55 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     playerName: widget.playerName,
                   ),
 
-                // ── Confetti ─────────────────────────────
+                // ── Standard confetti ─────────────────────
                 Align(
                   alignment: Alignment.topCenter,
                   child: ConfettiWidget(
                     confettiController: _confettiController,
                     blastDirection: pi / 2,
-                    maxBlastForce: 5,
+                    maxBlastForce: _isAdventurer ? 7 : 5,
                     minBlastForce: 2,
-                    emissionFrequency: 0.3,
-                    numberOfParticles: 8,
+                    emissionFrequency: _isAdventurer ? 0.2 : 0.3,
+                    numberOfParticles: _isChampion ? 15 : (_isAdventurer ? 12 : 8),
                     gravity: 0.3,
                     colors: AppColors.confettiColors,
                   ),
                 ),
+
+                // ── Level complete confetti ───────────────
                 Align(
                   alignment: Alignment.topCenter,
                   child: ConfettiWidget(
                     confettiController: _levelConfettiController,
                     blastDirectionality: BlastDirectionality.explosive,
-                    maxBlastForce: 15,
+                    maxBlastForce: _isChampion ? 20 : 15,
                     minBlastForce: 5,
-                    emissionFrequency: 0.1,
-                    numberOfParticles: 20,
+                    emissionFrequency: _isChampion ? 0.05 : 0.1,
+                    numberOfParticles: _isChampion ? 35 : 20,
                     gravity: 0.2,
                     colors: AppColors.confettiColors,
                   ),
                 ),
+
+                // ── Champion golden confetti (perfect word) ───
+                if (_isChampion)
+                  Align(
+                    alignment: Alignment.topCenter,
+                    child: ConfettiWidget(
+                      confettiController: _goldenConfettiController,
+                      blastDirectionality: BlastDirectionality.explosive,
+                      maxBlastForce: 12,
+                      minBlastForce: 4,
+                      emissionFrequency: 0.15,
+                      numberOfParticles: 12,
+                      gravity: 0.25,
+                      colors: const [
+                        AppColors.starGold,
+                        Color(0xFFFFF176), // light gold
+                        Color(0xFFFFE082), // amber
+                      ],
+                    ),
+                  ),
               ],
             ),
           ),
@@ -352,6 +493,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   // ── Header ──────────────────────────────────────────────────────
 
   Widget _buildHeader(List<Color> levelColors) {
+    final zone = DolchWords.zoneForLevel(widget.level);
+    final tierColor = _wordTier.color;
+
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
       child: Row(
@@ -365,27 +509,44 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   : AppColors.primaryText,
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                'Level ${widget.level}',
-                style: GoogleFonts.fredoka(
-                  fontSize: 20,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryText,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Level name
+                Text(
+                  DolchWords.levelName(widget.level),
+                  style: GoogleFonts.fredoka(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryText,
+                  ),
+                  overflow: TextOverflow.ellipsis,
                 ),
-              ),
-              Text(
-                DolchWords.levelName(widget.level),
-                style: GoogleFonts.nunito(
-                  fontSize: 12,
-                  color: AppColors.secondaryText,
+                // Zone name + tier badge
+                Row(
+                  children: [
+                    Text(
+                      '${zone.icon} ${zone.name}',
+                      style: GoogleFonts.nunito(
+                        fontSize: 11,
+                        color: AppColors.secondaryText,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '${_wordTier.icon} ${_wordTier.displayName}',
+                      style: GoogleFonts.fredoka(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: tierColor,
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
-          const Spacer(),
           // Word counter
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -532,11 +693,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         spacing: 6,
         runSpacing: 6,
         children: List.generate(_targetText.length, (i) {
+          // Tier 2: first letter is pre-revealed with silver tint
+          final isPreRevealed = _isAdventurer && i == 0;
           return LetterTile(
             letter: _targetText[i],
             isRevealed: _revealedLetters[i],
             isActive: i == _currentLetterIndex && !_showingCelebration,
             isError: _shaking && i == _currentLetterIndex,
+            revealedColor: isPreRevealed && !(_currentLetterIndex > i && i > 0)
+                ? AppColors.silver
+                : null,
           );
         }),
       ),
@@ -561,14 +727,21 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: row.map((letter) {
-                final isExpected = !_showingCelebration &&
+                // Tier 1: highlight expected letter
+                final isExpected = _isExplorer &&
+                    !_showingCelebration &&
                     !_levelComplete &&
                     _currentLetterIndex < _targetText.length &&
                     letter == _targetText[_currentLetterIndex];
 
+                // Tier 2: nudge pulse on the correct key after 2 wrong
+                final isNudging = _isAdventurer && _nudgeKey == letter;
+
                 return _KeyboardKey(
                   letter: letter,
                   isExpected: isExpected,
+                  isNudging: isNudging,
+                  nudgeController: _nudgeController,
                   accentColor: levelColors.first,
                   onTap: () => _onKeyPressed(letter),
                 );
@@ -580,29 +753,93 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
   }
 
+  // ── Champion Perfect Streak Badge ──────────────────────────────
+
+  Widget _buildStreakBadge() {
+    final isGold = _perfectStreak >= 5;
+    final flameColor = isGold ? AppColors.starGold : AppColors.error;
+
+    return AnimatedBuilder(
+      animation: _streakPopController,
+      builder: (context, child) {
+        // Scale pop: 1.0 -> 1.3 -> 1.0
+        final t = _streakPopController.value;
+        final scale = 1.0 + 0.3 * sin(t * pi);
+        return Transform.scale(scale: scale, child: child);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: flameColor.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: flameColor.withValues(alpha: 0.3),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: flameColor.withValues(alpha: 0.15),
+              blurRadius: 8,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.local_fire_department_rounded,
+              size: 18,
+              color: flameColor,
+            ),
+            const SizedBox(width: 4),
+            Text(
+              '$_perfectStreak',
+              style: GoogleFonts.fredoka(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: flameColor,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   // ── Level Complete ──────────────────────────────────────────────
 
   Widget _buildLevelComplete() {
+    final tierColor = _wordTier.color;
+    final tierLabel = _isChampion
+        ? 'CHAMPION!'
+        : _isAdventurer
+            ? 'Tier Complete!'
+            : 'Level Complete!';
+    final praiseColor = _isChampion
+        ? AppColors.starGold
+        : _isAdventurer
+            ? AppColors.silver
+            : AppColors.success;
+
     return Center(
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 32),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Star with glow
+            // Star with glow (tier-colored)
             Container(
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
-                    color: AppColors.starGold.withValues(alpha: 0.5),
+                    color: tierColor.withValues(alpha: 0.5),
                     blurRadius: 40,
                     spreadRadius: 8,
                   ),
                 ],
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.star_rounded,
-                color: AppColors.starGold,
+                color: tierColor,
                 size: 80,
               ),
             ).animate().scale(
@@ -614,14 +851,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             const SizedBox(height: 20),
 
             Text(
-              'Level Complete!',
+              tierLabel,
               style: GoogleFonts.fredoka(
                 fontSize: 36,
                 fontWeight: FontWeight.w700,
                 color: AppColors.primaryText,
                 shadows: [
                   Shadow(
-                    color: AppColors.starGold.withValues(alpha: 0.3),
+                    color: tierColor.withValues(alpha: 0.3),
                     blurRadius: 16,
                   ),
                 ],
@@ -638,10 +875,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               style: GoogleFonts.fredoka(
                 fontSize: 22,
                 fontWeight: FontWeight.w500,
-                color: AppColors.success,
+                color: praiseColor,
                 shadows: [
                   Shadow(
-                    color: AppColors.success.withValues(alpha: 0.3),
+                    color: praiseColor.withValues(alpha: 0.3),
                     blurRadius: 8,
                   ),
                 ],
@@ -667,6 +904,17 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   label: 'Perfect',
                   color: AppColors.starGold,
                 ),
+                if (_isChampion && _perfectStreak > 0) ...[
+                  const SizedBox(width: 12),
+                  _StatChip(
+                    icon: Icons.local_fire_department_rounded,
+                    value: '$_perfectStreak',
+                    label: 'Streak',
+                    color: _perfectStreak >= 5
+                        ? AppColors.starGold
+                        : AppColors.error,
+                  ),
+                ],
               ],
             ).animate().fadeIn(delay: 600.ms),
 
@@ -685,6 +933,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       _words.shuffle();
                       _currentWordIndex = 0;
                       _perfectWords = 0;
+                      _perfectStreak = 0;
                       _initRevealedLetters();
                       _levelComplete = false;
                     });
@@ -704,6 +953,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         PageRouteBuilder(
                           pageBuilder: (_, __, ___) => GameScreen(
                             level: widget.level + 1,
+                            tier: widget.tier,
                             progressService: widget.progressService,
                             audioService: widget.audioService,
                             playerName: widget.playerName,
@@ -735,12 +985,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 class _KeyboardKey extends StatefulWidget {
   final String letter;
   final bool isExpected;
+  final bool isNudging;
+  final AnimationController? nudgeController;
   final Color accentColor;
   final VoidCallback onTap;
 
   const _KeyboardKey({
     required this.letter,
     required this.isExpected,
+    this.isNudging = false,
+    this.nudgeController,
     required this.accentColor,
     required this.onTap,
   });
@@ -754,6 +1008,31 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
 
   @override
   Widget build(BuildContext context) {
+    // If this key is being nudged (Tier 2), wrap in animated builder
+    if (widget.isNudging && widget.nudgeController != null) {
+      return AnimatedBuilder(
+        animation: widget.nudgeController!,
+        builder: (context, child) {
+          // Pulse: scale 1.0 -> 1.1 -> 1.0 with blue glow
+          final t = widget.nudgeController!.value;
+          final pulse = 1.0 + 0.1 * sin(t * pi * 2);
+          final glowAlpha = 0.4 * sin(t * pi);
+          return Transform.scale(
+            scale: pulse,
+            child: _buildKey(
+              nudgeGlowAlpha: glowAlpha.clamp(0.0, 1.0),
+            ),
+          );
+        },
+      );
+    }
+    return _buildKey();
+  }
+
+  Widget _buildKey({double nudgeGlowAlpha = 0.0}) {
+    final showHighlight = widget.isExpected;
+    final showNudge = nudgeGlowAlpha > 0;
+
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) {
@@ -767,26 +1046,36 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
         width: 34,
         height: 46,
         transform: Matrix4.identity()
-          ..scale(_pressed ? 0.92 : 1.0, _pressed ? 0.92 : 1.0),
+          ..setEntry(0, 0, _pressed ? 0.92 : 1.0)
+          ..setEntry(1, 1, _pressed ? 0.92 : 1.0),
         transformAlignment: Alignment.center,
         decoration: BoxDecoration(
-          color: widget.isExpected
+          color: showHighlight
               ? AppColors.electricBlue.withValues(alpha: 0.2)
-              : _pressed
-                  ? AppColors.surface.withValues(alpha: 0.5)
-                  : AppColors.surface.withValues(alpha: 0.7),
+              : showNudge
+                  ? AppColors.electricBlue.withValues(alpha: 0.15)
+                  : _pressed
+                      ? AppColors.surface.withValues(alpha: 0.5)
+                      : AppColors.surface.withValues(alpha: 0.7),
           borderRadius: BorderRadius.circular(10),
           border: Border.all(
-            color: widget.isExpected
+            color: showHighlight
                 ? AppColors.electricBlue
-                : AppColors.border.withValues(alpha: 0.5),
-            width: widget.isExpected ? 1.5 : 1,
+                : showNudge
+                    ? AppColors.electricBlue.withValues(alpha: 0.6)
+                    : AppColors.border.withValues(alpha: 0.5),
+            width: showHighlight ? 1.5 : 1,
           ),
           boxShadow: [
-            if (widget.isExpected)
+            if (showHighlight)
               BoxShadow(
                 color: AppColors.electricBlue.withValues(alpha: 0.25),
                 blurRadius: 8,
+              ),
+            if (showNudge)
+              BoxShadow(
+                color: AppColors.electricBlue.withValues(alpha: nudgeGlowAlpha * 0.4),
+                blurRadius: 10,
               ),
           ],
         ),
@@ -796,8 +1085,8 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
             style: GoogleFonts.fredoka(
               fontSize: 18,
               fontWeight:
-                  widget.isExpected ? FontWeight.w600 : FontWeight.w400,
-              color: widget.isExpected
+                  (showHighlight || showNudge) ? FontWeight.w600 : FontWeight.w400,
+              color: (showHighlight || showNudge)
                   ? AppColors.electricBlue
                   : AppColors.primaryText,
             ),

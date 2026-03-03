@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
-import '../data/phrase_templates.dart';
 import '../theme/app_theme.dart';
 
 class CelebrationOverlay extends StatefulWidget {
@@ -41,7 +40,18 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
       duration: const Duration(seconds: 3),
     )..repeat();
 
-    _praise = PhraseTemplates.randomWordComplete(widget.playerName);
+    // Simple generic praise per word — personalized phrases are for level complete
+    const genericPraise = [
+      'Great job!',
+      'Awesome!',
+      'You got it!',
+      'Well done!',
+      'Perfect!',
+      'Nice work!',
+      'Way to go!',
+      'Fantastic!',
+    ];
+    _praise = (List.of(genericPraise)..shuffle()).first;
   }
 
   @override
