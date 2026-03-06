@@ -5,7 +5,7 @@
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License">
 </p>
 
-<h1 align="center">ReadSprout</h1>
+<h1 align="center">ReadingSprout</h1>
 
 <p align="center">
   <em>A beautiful, immersive sight word learning app for early readers.</em>
