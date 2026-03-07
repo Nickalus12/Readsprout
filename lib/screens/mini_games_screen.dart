@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/progress_service.dart';
 import '../services/audio_service.dart';
@@ -19,7 +20,7 @@ import 'mini_games/rhyme_time_game.dart';
 import 'mini_games/star_catcher_game.dart';
 import 'mini_games/paint_splash_game.dart';
 
-class MiniGamesScreen extends StatelessWidget {
+class MiniGamesScreen extends StatefulWidget {
   final ProgressService progressService;
   final AudioService audioService;
   final HighScoreService highScoreService;
@@ -36,6 +37,35 @@ class MiniGamesScreen extends StatelessWidget {
     this.profileService,
     this.statsService,
   });
+
+  @override
+  State<MiniGamesScreen> createState() => _MiniGamesScreenState();
+}
+
+class _MiniGamesScreenState extends State<MiniGamesScreen> {
+  static const _hintsPrefKey = 'mini_game_hints_enabled';
+  bool _hintsEnabled = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadHintsPref();
+  }
+
+  Future<void> _loadHintsPref() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _hintsEnabled = prefs.getBool(_hintsPrefKey) ?? true;
+    });
+  }
+
+  Future<void> _toggleHints() async {
+    final prefs = await SharedPreferences.getInstance();
+    setState(() {
+      _hintsEnabled = !_hintsEnabled;
+    });
+    await prefs.setBool(_hintsPrefKey, _hintsEnabled);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -75,100 +105,110 @@ class MiniGamesScreen extends StatelessWidget {
                           context, 'Unicorn Flight',
                           const _UnicornIconPainter(), AppColors.magenta, 0,
                           UnicornFlightGame(
-                            progressService: progressService,
-                            audioService: audioService,
-                            playerName: playerName,
-                            profileService: profileService,
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            playerName: widget.playerName,
+                            profileService: widget.profileService,
+                            hintsEnabled: _hintsEnabled,
                           ),
                         ),
                         _buildGameBtn(
                           context, 'Lightning Speller',
                           const _StormCloudPainter(), AppColors.electricBlue, 1,
                           LightningSpellerGame(
-                            progressService: progressService,
-                            audioService: audioService,
-                            playerName: playerName,
-                            profileService: profileService,
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            playerName: widget.playerName,
+                            profileService: widget.profileService,
+                            hintsEnabled: _hintsEnabled,
                           ),
                         ),
                         _buildGameBtn(
                           context, 'Word Bubbles',
                           const _BubblesIconPainter(), AppColors.cyan, 2,
                           WordBubblesGame(
-                            progressService: progressService,
-                            audioService: audioService,
-                            playerName: playerName,
-                            profileService: profileService,
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            playerName: widget.playerName,
+                            profileService: widget.profileService,
+                            hintsEnabled: _hintsEnabled,
                           ),
                         ),
                         _buildGameBtn(
                           context, 'Memory Match',
                           const _CardsIconPainter(), AppColors.violet, 3,
                           MemoryMatchGame(
-                            progressService: progressService,
-                            audioService: audioService,
-                            playerName: playerName,
-                            profileService: profileService,
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            playerName: widget.playerName,
+                            profileService: widget.profileService,
+                            hintsEnabled: _hintsEnabled,
                           ),
                         ),
                         _buildGameBtn(
                           context, 'Falling Letters',
                           const _FallingIconPainter(), AppColors.starGold, 4,
                           FallingLettersGame(
-                            progressService: progressService,
-                            audioService: audioService,
-                            playerName: playerName,
-                            profileService: profileService,
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            playerName: widget.playerName,
+                            profileService: widget.profileService,
+                            hintsEnabled: _hintsEnabled,
                           ),
                         ),
                         _buildGameBtn(
                           context, 'Cat Toss',
                           const _CatIconPainter(), AppColors.magenta, 5,
                           CatLetterTossGame(
-                            progressService: progressService,
-                            audioService: audioService,
-                            playerName: playerName,
-                            profileService: profileService,
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            playerName: widget.playerName,
+                            profileService: widget.profileService,
+                            hintsEnabled: _hintsEnabled,
                           ),
                         ),
                         _buildGameBtn(
                           context, 'Letter Drop',
                           const _DropIconPainter(), AppColors.emerald, 6,
                           LetterDropGame(
-                            progressService: progressService,
-                            audioService: audioService,
-                            playerName: playerName,
-                            profileService: profileService,
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            playerName: widget.playerName,
+                            profileService: widget.profileService,
+                            hintsEnabled: _hintsEnabled,
                           ),
                         ),
                         _buildGameBtn(
                           context, 'Rhyme Time',
                           const _RhymeIconPainter(), AppColors.magenta, 7,
                           RhymeTimeGame(
-                            progressService: progressService,
-                            audioService: audioService,
-                            playerName: playerName,
-                            profileService: profileService,
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            playerName: widget.playerName,
+                            profileService: widget.profileService,
+                            hintsEnabled: _hintsEnabled,
                           ),
                         ),
                         _buildGameBtn(
                           context, 'Star Catcher',
                           const _StarCatcherIconPainter(), AppColors.violet, 8,
                           StarCatcherGame(
-                            progressService: progressService,
-                            audioService: audioService,
-                            playerName: playerName,
-                            profileService: profileService,
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            playerName: widget.playerName,
+                            profileService: widget.profileService,
+                            hintsEnabled: _hintsEnabled,
                           ),
                         ),
                         _buildGameBtn(
                           context, 'Paint Splash',
                           const _PaintSplashIconPainter(), AppColors.magenta, 9,
                           PaintSplashGame(
-                            progressService: progressService,
-                            audioService: audioService,
-                            playerName: playerName,
-                            profileService: profileService,
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            playerName: widget.playerName,
+                            profileService: widget.profileService,
+                            hintsEnabled: _hintsEnabled,
                           ),
                         ),
                       ],
@@ -196,11 +236,11 @@ class MiniGamesScreen extends StatelessWidget {
           ),
           Expanded(
             child: GestureDetector(
-              onTap: () => audioService.playWord('mini_games'),
+              onTap: () => widget.audioService.playWord('mini_games'),
               child: Text(
                 'Mini Games',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primaryText,
@@ -208,7 +248,21 @@ class MiniGamesScreen extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 48),
+          Tooltip(
+            message: _hintsEnabled ? 'Hints ON' : 'Hints OFF',
+            child: IconButton(
+              onPressed: _toggleHints,
+              icon: Icon(
+                _hintsEnabled
+                    ? Icons.lightbulb_rounded
+                    : Icons.lightbulb_outline_rounded,
+                color: _hintsEnabled
+                    ? AppColors.starGold
+                    : AppColors.secondaryText,
+              ),
+              iconSize: 28,
+            ),
+          ),
         ],
       ),
     );
@@ -318,7 +372,7 @@ class _GameButtonState extends State<_GameButton> {
               // Label
               Text(
                 widget.label,
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 11,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primaryText.withValues(alpha: 0.9),
@@ -591,7 +645,7 @@ class _BubblesIconPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: 'abc',
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 11,
           fontWeight: FontWeight.w600,
           color: Colors.white.withValues(alpha: 0.8),
@@ -639,7 +693,7 @@ class _CardsIconPainter extends CustomPainter {
     final tp1 = TextPainter(
       text: TextSpan(
         text: '?',
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 16,
           fontWeight: FontWeight.w600,
           color: AppColors.violet.withValues(alpha: 0.3),
@@ -679,7 +733,7 @@ class _CardsIconPainter extends CustomPainter {
     final tp2 = TextPainter(
       text: TextSpan(
         text: 'the',
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 10,
           fontWeight: FontWeight.w700,
           color: const Color(0xFF2A2A4A),
@@ -741,7 +795,7 @@ class _FallingIconPainter extends CustomPainter {
       final tp = TextPainter(
         text: TextSpan(
           text: letters[i],
-          style: GoogleFonts.fredoka(
+          style: AppFonts.fredoka(
             fontSize: 14,
             fontWeight: FontWeight.w600,
             color: AppColors.electricBlue.withValues(alpha: alphas[i]),
@@ -929,7 +983,7 @@ class _DropIconPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: 'A',
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 13,
           fontWeight: FontWeight.w700,
           color: AppColors.emerald,
@@ -967,7 +1021,7 @@ class _DropIconPainter extends CustomPainter {
     final tp2 = TextPainter(
       text: TextSpan(
         text: 'B',
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 8,
           fontWeight: FontWeight.w600,
           color: AppColors.starGold.withValues(alpha: 0.7),
@@ -1049,7 +1103,7 @@ class _RhymeIconPainter extends CustomPainter {
     final tp1 = TextPainter(
       text: TextSpan(
         text: 'cat',
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 10,
           fontWeight: FontWeight.w700,
           color: AppColors.magenta,
@@ -1062,7 +1116,7 @@ class _RhymeIconPainter extends CustomPainter {
     final tp2 = TextPainter(
       text: TextSpan(
         text: 'hat',
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 10,
           fontWeight: FontWeight.w700,
           color: AppColors.violet,
@@ -1134,7 +1188,7 @@ class _StarCatcherIconPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: 'A',
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 7,
           fontWeight: FontWeight.w700,
           color: const Color(0xFF1A0A00),
@@ -1235,7 +1289,7 @@ class _PaintSplashIconPainter extends CustomPainter {
     final tp = TextPainter(
       text: TextSpan(
         text: 'B',
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 8,
           fontWeight: FontWeight.w700,
           color: Colors.white.withValues(alpha: 0.9),

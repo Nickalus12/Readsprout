@@ -101,7 +101,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                       ),
                       Text(
                         'Custom Words',
-                        style: GoogleFonts.fredoka(
+                        style: AppFonts.fredoka(
                           fontSize: 26,
                           fontWeight: FontWeight.w600,
                           color: AppColors.primaryText,
@@ -127,7 +127,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                             textCapitalization: TextCapitalization.none,
                             decoration: InputDecoration(
                               hintText: 'Type a word...',
-                              hintStyle: GoogleFonts.nunito(
+                              hintStyle: AppFonts.nunito(
                                 color: AppColors.secondaryText
                                     .withValues(alpha: 0.5),
                               ),
@@ -137,7 +137,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                                 vertical: 14,
                               ),
                             ),
-                            style: GoogleFonts.fredoka(
+                            style: AppFonts.fredoka(
                               fontSize: 18,
                               color: AppColors.primaryText,
                             ),
@@ -172,7 +172,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Text(
                     'Note: Custom words need audio files generated. See the README for the TTS generation script.',
-                    style: GoogleFonts.nunito(
+                    style: AppFonts.nunito(
                       fontSize: 12,
                       color: AppColors.secondaryText,
                       fontStyle: FontStyle.italic,
@@ -196,14 +196,14 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                                   const SizedBox(height: 12),
                                   Text(
                                     'No custom words yet',
-                                    style: GoogleFonts.fredoka(
+                                    style: AppFonts.fredoka(
                                       fontSize: 18,
                                       color: AppColors.secondaryText,
                                     ),
                                   ),
                                   Text(
                                     'Add words above to practice!',
-                                    style: GoogleFonts.nunito(
+                                    style: AppFonts.nunito(
                                       fontSize: 14,
                                       color: AppColors.secondaryText
                                           .withValues(alpha: 0.7),
@@ -236,7 +236,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
                                       children: [
                                         Text(
                                           word.text,
-                                          style: GoogleFonts.fredoka(
+                                          style: AppFonts.fredoka(
                                             fontSize: 20,
                                             color: AppColors.primaryText,
                                           ),

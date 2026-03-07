@@ -107,6 +107,62 @@ class AppColors {
   ];
 }
 
+/// App-wide font helpers. Use these instead of GoogleFonts directly
+/// so the bundled pubspec fonts serve as automatic fallback when offline.
+class AppFonts {
+  AppFonts._();
+
+  /// Fredoka text style with offline fallback to bundled font.
+  static TextStyle fredoka({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? letterSpacing,
+    double? height,
+    FontStyle? fontStyle,
+    List<Shadow>? shadows,
+    TextDecoration? decoration,
+    Color? decorationColor,
+  }) {
+    return GoogleFonts.fredoka(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: letterSpacing,
+      height: height,
+      fontStyle: fontStyle,
+      shadows: shadows,
+      decoration: decoration,
+      decorationColor: decorationColor,
+    ).copyWith(fontFamilyFallback: const ['Fredoka']);
+  }
+
+  /// Nunito text style with offline fallback to bundled font.
+  static TextStyle nunito({
+    double? fontSize,
+    FontWeight? fontWeight,
+    Color? color,
+    double? letterSpacing,
+    double? height,
+    FontStyle? fontStyle,
+    List<Shadow>? shadows,
+    TextDecoration? decoration,
+    Color? decorationColor,
+  }) {
+    return GoogleFonts.nunito(
+      fontSize: fontSize,
+      fontWeight: fontWeight,
+      color: color,
+      letterSpacing: letterSpacing,
+      height: height,
+      fontStyle: fontStyle,
+      shadows: shadows,
+      decoration: decoration,
+      decorationColor: decorationColor,
+    ).copyWith(fontFamilyFallback: const ['Nunito']);
+  }
+}
+
 class AppTheme {
   AppTheme._();
 
@@ -121,37 +177,37 @@ class AppTheme {
         surface: AppColors.surface,
       ),
       textTheme: GoogleFonts.fredokaTextTheme(ThemeData.dark().textTheme).copyWith(
-        displayLarge: GoogleFonts.fredoka(
+        displayLarge: AppFonts.fredoka(
           fontSize: 48,
           fontWeight: FontWeight.w600,
           color: AppColors.primaryText,
         ),
-        displayMedium: GoogleFonts.fredoka(
+        displayMedium: AppFonts.fredoka(
           fontSize: 36,
           fontWeight: FontWeight.w600,
           color: AppColors.primaryText,
         ),
-        headlineLarge: GoogleFonts.fredoka(
+        headlineLarge: AppFonts.fredoka(
           fontSize: 28,
           fontWeight: FontWeight.w500,
           color: AppColors.primaryText,
         ),
-        headlineMedium: GoogleFonts.fredoka(
+        headlineMedium: AppFonts.fredoka(
           fontSize: 22,
           fontWeight: FontWeight.w500,
           color: AppColors.primaryText,
         ),
-        bodyLarge: GoogleFonts.nunito(
+        bodyLarge: AppFonts.nunito(
           fontSize: 18,
           fontWeight: FontWeight.w400,
           color: AppColors.secondaryText,
         ),
-        bodyMedium: GoogleFonts.nunito(
+        bodyMedium: AppFonts.nunito(
           fontSize: 16,
           fontWeight: FontWeight.w400,
           color: AppColors.secondaryText,
         ),
-        labelLarge: GoogleFonts.fredoka(
+        labelLarge: AppFonts.fredoka(
           fontSize: 18,
           fontWeight: FontWeight.w500,
           color: Colors.white,

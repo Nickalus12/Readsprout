@@ -20,6 +20,7 @@ class MemoryMatchGame extends StatefulWidget {
   final AudioService audioService;
   final String playerName;
   final ProfileService? profileService;
+  final bool hintsEnabled;
 
   const MemoryMatchGame({
     super.key,
@@ -27,6 +28,7 @@ class MemoryMatchGame extends StatefulWidget {
     required this.audioService,
     required this.playerName,
     this.profileService,
+    this.hintsEnabled = true,
   });
 
   @override
@@ -420,7 +422,7 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
               Expanded(
                 child: Text(
                   'Memory Match',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 22,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryText,
@@ -592,7 +594,7 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
           Center(
             child: Text(
               '?',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: size * 0.35,
                 fontWeight: FontWeight.w600,
                 color: AppColors.violet.withValues(alpha: 0.3),
@@ -607,15 +609,19 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
   Widget _buildCardFront(_CardData card, double size) {
     final gradient = AppColors.levelGradients[card.gradientIndex];
     final isMatched = card.matched;
+    final useGradientColor = widget.hintsEnabled && !isMatched;
+    final borderColor = isMatched
+        ? AppColors.starGold.withValues(alpha: 0.8)
+        : useGradientColor
+            ? gradient[0].withValues(alpha: 0.7)
+            : AppColors.violet.withValues(alpha: 0.4);
 
     return Container(
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(16),
         color: const Color(0xFFF8F8FF),
         border: Border.all(
-          color: isMatched
-              ? AppColors.starGold.withValues(alpha: 0.8)
-              : gradient[0].withValues(alpha: 0.7),
+          color: borderColor,
           width: isMatched ? 3 : 2,
         ),
         boxShadow: [
@@ -628,7 +634,9 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
             )
           else
             BoxShadow(
-              color: gradient[0].withValues(alpha: 0.2),
+              color: useGradientColor
+                  ? gradient[0].withValues(alpha: 0.2)
+                  : AppColors.violet.withValues(alpha: 0.1),
               blurRadius: 8,
               spreadRadius: 1,
             ),
@@ -639,7 +647,7 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
         child: Center(
           child: Text(
             card.word,
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: size * 0.22,
               fontWeight: FontWeight.w700,
               color: const Color(0xFF2A2A4A),
@@ -687,7 +695,7 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
                   children: [
                     Text(
                       'You found all the words!',
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 26,
                         fontWeight: FontWeight.w600,
                         color: AppColors.primaryText,
@@ -752,7 +760,7 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
                       icon: const Icon(Icons.replay_rounded, size: 22),
                       label: Text(
                         'Play Again',
-                        style: GoogleFonts.fredoka(
+                        style: AppFonts.fredoka(
                           fontSize: 18,
                           fontWeight: FontWeight.w500,
                         ),
@@ -807,7 +815,7 @@ class _StatChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 14,
               fontWeight: FontWeight.w500,
               color: color,
@@ -839,7 +847,7 @@ class _CompleteStat extends StatelessWidget {
         const SizedBox(height: 4),
         Text(
           label,
-          style: GoogleFonts.fredoka(
+          style: AppFonts.fredoka(
             fontSize: 16,
             fontWeight: FontWeight.w500,
             color: AppColors.primaryText,

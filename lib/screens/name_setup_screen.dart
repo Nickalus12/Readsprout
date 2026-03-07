@@ -76,6 +76,9 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
+
     return Focus(
       onKeyEvent: _onKey,
       child: Scaffold(
@@ -104,7 +107,7 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
             child: Center(
               child: SingleChildScrollView(
                 physics: const BouncingScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 40),
+                padding: EdgeInsets.symmetric(horizontal: 40 * sf),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -115,8 +118,8 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                       onTap: () => _playAppName(),
                       child: Image.asset(
                         'assets/images/logo.png',
-                        width: 120,
-                        height: 120,
+                        width: 120 * sf,
+                        height: 120 * sf,
                       ),
                     ).animate().scale(
                           begin: const Offset(0.5, 0.5),
@@ -125,55 +128,55 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                           duration: 800.ms,
                         ),
 
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24 * sf),
 
                     // Title
                     Text(
                       'Reading Sprout',
-                      style: GoogleFonts.fredoka(
-                        fontSize: 40,
+                      style: AppFonts.fredoka(
+                        fontSize: 40 * sf,
                         fontWeight: FontWeight.w600,
                         color: AppColors.primaryText,
                         shadows: [
                           Shadow(
                             color:
                                 AppColors.electricBlue.withValues(alpha: 0.5),
-                            blurRadius: 20,
+                            blurRadius: 20 * sf,
                           ),
                         ],
                       ),
                     ).animate().fadeIn(delay: 200.ms, duration: 600.ms),
 
-                    const SizedBox(height: 32),
+                    SizedBox(height: 32 * sf),
 
                     // Prompt
                     Text(
                       "What's your name?",
-                      style: GoogleFonts.nunito(
-                        fontSize: 22,
+                      style: AppFonts.nunito(
+                        fontSize: 22 * sf,
                         fontWeight: FontWeight.w600,
                         color: AppColors.secondaryText,
                       ),
                     ).animate().fadeIn(delay: 400.ms, duration: 500.ms),
 
-                    const SizedBox(height: 8),
+                    SizedBox(height: 8 * sf),
 
                     Text(
                       "We'll cheer you on by name!",
-                      style: GoogleFonts.nunito(
-                        fontSize: 16,
+                      style: AppFonts.nunito(
+                        fontSize: 16 * sf,
                         color:
                             AppColors.secondaryText.withValues(alpha: 0.7),
                       ),
                     ).animate().fadeIn(delay: 500.ms, duration: 500.ms),
 
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24 * sf),
 
                     // Name input field
                     Container(
                       decoration: BoxDecoration(
                         color: AppColors.surface.withValues(alpha: 0.85),
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(16 * sf),
                         border: Border.all(
                           color: _hasText
                               ? AppColors.electricBlue
@@ -186,7 +189,7 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                             BoxShadow(
                               color: AppColors.electricBlue
                                   .withValues(alpha: 0.15),
-                              blurRadius: 12,
+                              blurRadius: 12 * sf,
                             ),
                         ],
                       ),
@@ -195,30 +198,30 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                         focusNode: _focusNode,
                         textCapitalization: TextCapitalization.words,
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.fredoka(
-                          fontSize: 28,
+                        style: AppFonts.fredoka(
+                          fontSize: 28 * sf,
                           fontWeight: FontWeight.w500,
                           color: AppColors.primaryText,
                         ),
                         decoration: InputDecoration(
                           hintText: 'Enter name',
-                          hintStyle: GoogleFonts.fredoka(
-                            fontSize: 28,
+                          hintStyle: AppFonts.fredoka(
+                            fontSize: 28 * sf,
                             fontWeight: FontWeight.w400,
                             color: AppColors.secondaryText
                                 .withValues(alpha: 0.4),
                           ),
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 24,
-                            vertical: 16,
+                          contentPadding: EdgeInsets.symmetric(
+                            horizontal: 24 * sf,
+                            vertical: 16 * sf,
                           ),
                         ),
                         onSubmitted: (_) => _submit(),
                       ),
                     ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
 
-                    const SizedBox(height: 24),
+                    SizedBox(height: 24 * sf),
 
                     // Let's Go button
                     AnimatedOpacity(
@@ -227,8 +230,8 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                       child: GestureDetector(
                         onTap: _hasText ? _submit : null,
                         child: Container(
-                          width: 200,
-                          height: 56,
+                          width: 200 * sf,
+                          height: 56 * sf,
                           decoration: BoxDecoration(
                             gradient: const LinearGradient(
                               colors: [
@@ -236,22 +239,22 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                                 AppColors.violet,
                               ],
                             ),
-                            borderRadius: BorderRadius.circular(28),
+                            borderRadius: BorderRadius.circular(28 * sf),
                             boxShadow: [
                               if (_hasText)
                                 BoxShadow(
                                   color: AppColors.electricBlue
                                       .withValues(alpha: 0.4),
-                                  blurRadius: 16,
-                                  offset: const Offset(0, 4),
+                                  blurRadius: 16 * sf,
+                                  offset: Offset(0, 4 * sf),
                                 ),
                             ],
                           ),
                           child: Center(
                             child: Text(
                               "Let's Go!",
-                              style: GoogleFonts.fredoka(
-                                fontSize: 24,
+                              style: AppFonts.fredoka(
+                                fontSize: 24 * sf,
                                 fontWeight: FontWeight.w600,
                                 color: Colors.white,
                               ),
@@ -263,13 +266,13 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
 
                     // Back button (only when changing name, not first launch)
                     if (widget.onBack != null) ...[
-                      const SizedBox(height: 12),
+                      SizedBox(height: 12 * sf),
                       GestureDetector(
                         onTap: widget.onBack,
                         child: Text(
                           'Back',
-                          style: GoogleFonts.nunito(
-                            fontSize: 14,
+                          style: AppFonts.nunito(
+                            fontSize: 14 * sf,
                             color: AppColors.secondaryText
                                 .withValues(alpha: 0.5),
                           ),

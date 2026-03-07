@@ -60,7 +60,7 @@ class HighScoreDisplay extends StatelessWidget {
               const SizedBox(width: 6),
               Text(
                 'High Scores',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primaryText,
@@ -80,7 +80,7 @@ class HighScoreDisplay extends StatelessWidget {
                   ),
                   child: Text(
                     'NEW BEST!',
-                    style: GoogleFonts.fredoka(
+                    style: AppFonts.fredoka(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,
                       color: AppColors.starGold,
@@ -124,7 +124,7 @@ class HighScoreDisplay extends StatelessWidget {
                         width: 22,
                         child: Text(
                           '${index + 1}.',
-                          style: GoogleFonts.fredoka(
+                          style: AppFonts.fredoka(
                             fontSize: 13,
                             fontWeight: FontWeight.w500,
                             color: index == 0
@@ -138,7 +138,7 @@ class HighScoreDisplay extends StatelessWidget {
                         child: Text(
                           entry.playerName,
                           overflow: TextOverflow.ellipsis,
-                          style: GoogleFonts.nunito(
+                          style: AppFonts.nunito(
                             fontSize: 13,
                             fontWeight: isCurrentScore
                                 ? FontWeight.w700
@@ -152,7 +152,7 @@ class HighScoreDisplay extends StatelessWidget {
                       // Score
                       Text(
                         '${entry.score}',
-                        style: GoogleFonts.fredoka(
+                        style: AppFonts.fredoka(
                           fontSize: 14,
                           fontWeight: FontWeight.w600,
                           color: isCurrentScore
@@ -164,7 +164,7 @@ class HighScoreDisplay extends StatelessWidget {
                       // Date
                       Text(
                         _formatDate(entry.date),
-                        style: GoogleFonts.nunito(
+                        style: AppFonts.nunito(
                           fontSize: 10,
                           color: AppColors.secondaryText.withValues(alpha: 0.6),
                         ),

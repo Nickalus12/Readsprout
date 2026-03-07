@@ -177,8 +177,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _championWordFailed = false;
     _mistakesThisWord = 0;
 
-    if (_isAdventurer && _targetText.isNotEmpty) {
-      // Tier 2: pre-reveal first letter, start typing at index 1
+    if ((_isExplorer || _isAdventurer) && _targetText.isNotEmpty) {
+      // Explorer & Adventurer: pre-reveal first letter, start typing at index 1
       _revealedLetters[0] = true;
       _currentLetterIndex = 1;
 
@@ -490,7 +490,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                   padding: const EdgeInsets.only(bottom: 8),
                                   child: Text(
                                     'Keep practicing!',
-                                    style: GoogleFonts.fredoka(
+                                    style: AppFonts.fredoka(
                                       fontSize: 16,
                                       fontWeight: FontWeight.w500,
                                       color: AppColors.secondaryText,
@@ -614,7 +614,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 // Level name
                 Text(
                   DolchWords.levelName(widget.level),
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryText,
@@ -626,7 +626,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   children: [
                     Text(
                       '${zone.icon} ${zone.name}',
-                      style: GoogleFonts.nunito(
+                      style: AppFonts.nunito(
                         fontSize: 11,
                         color: AppColors.secondaryText,
                       ),
@@ -634,7 +634,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     const SizedBox(width: 8),
                     Text(
                       '${_wordTier.icon} ${_wordTier.displayName}',
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 11,
                         fontWeight: FontWeight.w500,
                         color: tierColor,
@@ -657,7 +657,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             ),
             child: Text(
               '${_currentWordIndex + 1}/${_words.length}',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 15,
                 fontWeight: FontWeight.w600,
                 color: AppColors.primaryText,
@@ -773,7 +773,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             const SizedBox(width: 10),
             Text(
               _isPlayingAudio ? 'Listen...' : 'Hear Word',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
                 color: AppColors.electricBlue,
@@ -813,8 +813,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         spacing: 6,
         runSpacing: 6,
         children: List.generate(_targetText.length, (i) {
-          // Tier 2: first letter is pre-revealed with silver tint
-          final isPreRevealed = _isAdventurer && i == 0;
+          // Explorer/Adventurer: first letter is pre-revealed
+          final isPreRevealed = (_isExplorer || _isAdventurer) && i == 0;
           return LetterTile(
             letter: _targetText[i],
             isRevealed: _revealedLetters[i],
@@ -913,7 +913,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             const SizedBox(width: 4),
             Text(
               '$_perfectStreak',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: flameColor,
@@ -1019,7 +1019,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
             Text(
               tierLabel,
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 38,
                 fontWeight: FontWeight.w700,
                 color: AppColors.primaryText,
@@ -1048,7 +1048,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   : _levelCompletePhrase.isNotEmpty
                       ? _levelCompletePhrase
                       : 'Amazing job!',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 22,
                 fontWeight: FontWeight.w500,
                 color: championNotDone ? AppColors.electricBlue : praiseColor,
@@ -1085,7 +1085,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     ),
                     child: Text(
                       word,
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 16,
                         fontWeight: FontWeight.w600,
                         color: AppColors.error.withValues(alpha: 0.9),
@@ -1098,7 +1098,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               const SizedBox(height: 8),
               Text(
                 'Spell with 1 mistake or less!',
-                style: GoogleFonts.nunito(
+                style: AppFonts.nunito(
                   fontSize: 13,
                   color: AppColors.secondaryText.withValues(alpha: 0.7),
                 ),
@@ -1301,6 +1301,14 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
     final showHighlight = widget.isExpected;
     final showNudge = nudgeGlowAlpha > 0;
 
+    // Dynamic key sizing based on screen width
+    // 10 keys per row + margins = need to fit within screen width - padding
+    final screenW = MediaQuery.of(context).size.width;
+    final keyMargin = (screenW / 200).clamp(1.5, 3.0);
+    final keyWidth = ((screenW - 16) / 10 - keyMargin * 2).clamp(24.0, 38.0);
+    final keyHeight = (keyWidth * 1.3).clamp(32.0, 50.0);
+    final fontSize = (keyWidth * 0.5).clamp(13.0, 20.0);
+
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
       onTapUp: (_) {
@@ -1314,9 +1322,9 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
         curve: Curves.easeOut,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 120),
-          margin: const EdgeInsets.symmetric(horizontal: 2.5),
-          width: 34,
-          height: 46,
+          margin: EdgeInsets.symmetric(horizontal: keyMargin),
+          width: keyWidth,
+          height: keyHeight,
           decoration: BoxDecoration(
             color: showHighlight
                 ? AppColors.electricBlue.withValues(alpha: 0.2)
@@ -1358,8 +1366,8 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
           child: Center(
             child: Text(
               widget.letter,
-              style: GoogleFonts.fredoka(
-                fontSize: 18,
+              style: AppFonts.fredoka(
+                fontSize: fontSize,
                 fontWeight:
                     (showHighlight || showNudge) ? FontWeight.w600 : FontWeight.w400,
                 color: (showHighlight || showNudge || _pressed)
@@ -1433,7 +1441,7 @@ class _RoundButtonState extends State<_RoundButton> {
             const SizedBox(height: 8),
             Text(
               widget.label,
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
                 color: widget.color,
@@ -1477,7 +1485,7 @@ class _StatChip extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             value,
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: color,
@@ -1486,7 +1494,7 @@ class _StatChip extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             label,
-            style: GoogleFonts.nunito(
+            style: AppFonts.nunito(
               fontSize: 12,
               color: color.withValues(alpha: 0.7),
             ),

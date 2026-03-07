@@ -20,6 +20,7 @@ class WordBubblesGame extends StatefulWidget {
   final AudioService audioService;
   final String playerName;
   final ProfileService? profileService;
+  final bool hintsEnabled;
 
   const WordBubblesGame({
     super.key,
@@ -27,6 +28,7 @@ class WordBubblesGame extends StatefulWidget {
     required this.audioService,
     required this.playerName,
     this.profileService,
+    this.hintsEnabled = true,
   });
 
   @override
@@ -619,7 +621,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
 
   void _spawnPopEffect(_Bubble bubble, bool isCorrect) {
     final droplets = <_Droplet>[];
-    final count = isCorrect ? 16 : 10;
+    final count = (isCorrect && widget.hintsEnabled) ? 16 : 10;
     for (int i = 0; i < count; i++) {
       final angle = (i / count) * pi * 2 + _rng.nextDouble() * 0.3;
       final speed = 80 + _rng.nextDouble() * 150;
@@ -649,7 +651,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
       isCorrect: isCorrect,
       droplets: droplets,
       age: 0,
-      rippleCount: isCorrect ? 3 : 2,
+      rippleCount: (isCorrect && widget.hintsEnabled) ? 3 : 2,
     ));
   }
 
@@ -824,7 +826,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
                 child: Text(
                   bubble.word,
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: (r * 0.42).clamp(12.0, 22.0),
                     fontWeight: FontWeight.w600,
                     color: Colors.white.withValues(alpha: 0.95),
@@ -850,7 +852,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
     final size = MediaQuery.of(context).size;
     return CustomPaint(
       size: size,
-      painter: _PopEffectPainter(effects: _popEffects, screenSize: size),
+      painter: _PopEffectPainter(effects: _popEffects, screenSize: size, hintsEnabled: widget.hintsEnabled),
     );
   }
 
@@ -958,7 +960,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
           const SizedBox(width: 4),
           Text(
             '$_score',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: AppColors.primaryText,
@@ -1016,7 +1018,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
           const SizedBox(width: 3),
           Text(
             '${_comboMultiplier}x',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 14,
               fontWeight: FontWeight.w600,
               color: glowColor,
@@ -1056,7 +1058,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
       ),
       child: Text(
         _targetWord,
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 26,
           fontWeight: FontWeight.w600,
           color: Colors.white,
@@ -1080,7 +1082,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
       child: Center(
         child: Text(
           'Get Ready!',
-          style: GoogleFonts.fredoka(
+          style: AppFonts.fredoka(
             fontSize: 40,
             fontWeight: FontWeight.w600,
             color: const Color(0xFF60C0FF),
@@ -1123,7 +1125,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
             children: [
               Text(
                 _lives <= 0 ? 'Out of Lives!' : "Time's Up!",
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 30,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primaryText,
@@ -1139,7 +1141,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
                   const SizedBox(width: 8),
                   Text(
                     '$_score',
-                    style: GoogleFonts.fredoka(
+                    style: AppFonts.fredoka(
                       fontSize: 48,
                       fontWeight: FontWeight.w700,
                       color: AppColors.starGold,
@@ -1150,7 +1152,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
               const SizedBox(height: 8),
               Text(
                 'Great job, ${widget.playerName}!',
-                style: GoogleFonts.nunito(
+                style: AppFonts.nunito(
                   fontSize: 16,
                   color: AppColors.secondaryText,
                 ),
@@ -1159,7 +1161,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
                 const SizedBox(height: 6),
                 Text(
                   'Best Combo: ${_bestCombo}x',
-                  style: GoogleFonts.nunito(
+                  style: AppFonts.nunito(
                     fontSize: 14,
                     color: AppColors.secondaryText,
                   ),
@@ -1183,7 +1185,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
                     ),
                     child: Text(
                       'Play Again',
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                           fontSize: 18, fontWeight: FontWeight.w500),
                     ),
                   ),
@@ -1204,7 +1206,7 @@ class _WordBubblesGameState extends State<WordBubblesGame>
                     ),
                     child: Text(
                       'Back',
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                           fontSize: 18, fontWeight: FontWeight.w500),
                     ),
                   ),
@@ -1502,8 +1504,9 @@ class _BubblePainter extends CustomPainter {
 class _PopEffectPainter extends CustomPainter {
   final List<_PopEffect> effects;
   final Size screenSize;
+  final bool hintsEnabled;
 
-  _PopEffectPainter({required this.effects, required this.screenSize});
+  _PopEffectPainter({required this.effects, required this.screenSize, this.hintsEnabled = true});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1517,7 +1520,7 @@ class _PopEffectPainter extends CustomPainter {
       if (progress < 0.3) {
         final flashAlpha = (1.0 - progress / 0.3) * 0.7;
         final flashRadius = 20 + progress * 60;
-        final flashColor = effect.isCorrect
+        final flashColor = (!hintsEnabled || effect.isCorrect)
             ? const Color(0xFF80E0FF)
             : const Color(0xFFFF6060);
         final flashPaint = Paint()
@@ -1527,7 +1530,7 @@ class _PopEffectPainter extends CustomPainter {
       }
 
       // Expanding ripple rings (multiple)
-      final ringColor = effect.isCorrect
+      final ringColor = (!hintsEnabled || effect.isCorrect)
           ? const Color(0xFF60C0FF)
           : const Color(0xFFFF4040);
       for (int r = 0; r < effect.rippleCount; r++) {
@@ -1546,7 +1549,7 @@ class _PopEffectPainter extends CustomPainter {
       }
 
       // Droplets
-      final dropletColor = effect.isCorrect
+      final dropletColor = (!hintsEnabled || effect.isCorrect)
           ? const Color(0xFF80D0FF)
           : const Color(0xFFFF5050);
       for (final d in effect.droplets) {
@@ -1557,8 +1560,8 @@ class _PopEffectPainter extends CustomPainter {
         canvas.drawCircle(Offset(dx, dy), d.size * fadeOut, dPaint);
       }
 
-      // Sparkles for correct pops
-      if (effect.isCorrect && progress < 0.5) {
+      // Sparkles for correct pops (hidden when hints disabled to avoid giving away answer)
+      if (effect.isCorrect && progress < 0.5 && hintsEnabled) {
         final sparkleAlpha = (1.0 - progress / 0.5) * 0.9;
         final sparklePaint = Paint()
           ..color = Colors.white.withValues(alpha: sparkleAlpha);

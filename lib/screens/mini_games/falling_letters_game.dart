@@ -21,6 +21,7 @@ class FallingLettersGame extends StatefulWidget {
   final AudioService audioService;
   final String playerName;
   final ProfileService? profileService;
+  final bool hintsEnabled;
 
   const FallingLettersGame({
     super.key,
@@ -28,6 +29,7 @@ class FallingLettersGame extends StatefulWidget {
     required this.audioService,
     required this.playerName,
     this.profileService,
+    this.hintsEnabled = true,
   });
 
   @override
@@ -1176,7 +1178,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
         angle: item.rotation,
         child: item.powerUp != null
             ? _powerUpTile(item)
-            : _letterTile(item, highlight: item.isNeeded),
+            : _letterTile(item, highlight: widget.hintsEnabled && item.isNeeded),
       ),
     );
   }
@@ -1221,7 +1223,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
       alignment: Alignment.center,
       child: Text(
         item.letter.toUpperCase(),
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 22,
           fontWeight: FontWeight.w600,
           color: shouldGlow ? AppColors.electricBlue : AppColors.primaryText,
@@ -1328,7 +1330,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
                     const SizedBox(width: 4),
                     Text(
                       '$_score',
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: AppColors.starGold,
@@ -1353,7 +1355,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
                 ),
                 child: Text(
                   'Words: $_wordsCompleted',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: AppColors.electricBlue,
@@ -1426,7 +1428,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
           const SizedBox(width: 4),
           Text(
             '${timer.ceil()}s',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 13,
               color: color,
               fontWeight: FontWeight.w500,
@@ -1509,7 +1511,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
               child: filled
                   ? Text(
                       _currentWord[i].toUpperCase(),
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                         color: textColor,
@@ -1565,7 +1567,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
           // Game over title
           Text(
             'GAME OVER',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 42,
               fontWeight: FontWeight.w700,
               color: AppColors.electricBlue,
@@ -1605,7 +1607,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
                     const SizedBox(width: 8),
                     Text(
                       '$_score',
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 36,
                         fontWeight: FontWeight.w700,
                         color: AppColors.starGold,
@@ -1616,7 +1618,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
                 const SizedBox(height: 8),
                 Text(
                   '$_wordsCompleted words completed',
-                  style: GoogleFonts.nunito(
+                  style: AppFonts.nunito(
                     fontSize: 16,
                     color: AppColors.secondaryText,
                   ),
@@ -1651,7 +1653,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
               ),
               child: Text(
                 'Play Again',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -1667,7 +1669,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
             onTap: () => Navigator.of(context).pop(),
             child: Text(
               'Back to Menu',
-              style: GoogleFonts.nunito(
+              style: AppFonts.nunito(
                 fontSize: 16,
                 color: AppColors.secondaryText,
                 decoration: TextDecoration.underline,

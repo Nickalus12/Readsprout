@@ -131,7 +131,7 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
             child: Text(
               'Create Your Look',
               textAlign: TextAlign.center,
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 22,
                 fontWeight: FontWeight.w600,
                 color: AppColors.primaryText,
@@ -245,7 +245,7 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                   const SizedBox(height: 2),
                   Text(
                     cat.label,
-                    style: GoogleFonts.fredoka(
+                    style: AppFonts.fredoka(
                       fontSize: 10,
                       fontWeight:
                           selected ? FontWeight.w600 : FontWeight.w400,
@@ -1011,7 +1011,7 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
           ),
           child: Text(
             'Done',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 20,
               fontWeight: FontWeight.w600,
             ),
@@ -1024,7 +1024,7 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
         .slideY(begin: 0.2, end: 0, duration: 300.ms);
   }
 
-  TextStyle get _optLabelStyle => GoogleFonts.fredoka(
+  TextStyle get _optLabelStyle => AppFonts.fredoka(
         fontSize: 10,
         fontWeight: FontWeight.w400,
         color: AppColors.secondaryText,
@@ -1073,7 +1073,7 @@ class _OptionTileContent extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   hint!,
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 9,
                     color: AppColors.starGold.withValues(alpha: 0.8),
                     fontWeight: FontWeight.w500,

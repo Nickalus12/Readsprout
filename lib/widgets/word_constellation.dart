@@ -42,7 +42,7 @@ class WordConstellation extends StatelessWidget {
                 onTap: () => audioService.playWord('words_mastered'),
                 child: Text(
                   'Words Mastered',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: AppColors.electricBlue,
@@ -52,7 +52,7 @@ class WordConstellation extends StatelessWidget {
               const SizedBox(width: 8),
               Text(
                 '$masteredCount / 220',
-                style: GoogleFonts.nunito(
+                style: AppFonts.nunito(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: AppColors.electricBlue.withValues(alpha: 0.4),
@@ -266,7 +266,7 @@ class _ConstellationMapState extends State<_ConstellationMap>
                 ),
                 child: Text(
                   word.text,
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 10,
                     fontWeight: FontWeight.w600,
                     color: isMastered
@@ -360,7 +360,7 @@ class _ConstellationMapState extends State<_ConstellationMap>
             child: Text(
               '${zone.icon} ${zone.name}',
               textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(
+              style: AppFonts.nunito(
                 fontSize: 9,
                 fontWeight: FontWeight.w700,
                 color: Colors.white.withValues(alpha: 0.18),
@@ -458,7 +458,7 @@ class _ConstellationNode extends StatelessWidget {
           children: [
             Text(
               '$level',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: isMastered ? 14 : (isUnlocked ? 11 : 9),
                 fontWeight: FontWeight.w600,
                 color: isMastered

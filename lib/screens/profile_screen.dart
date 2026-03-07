@@ -151,15 +151,18 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ── Header ─────────────────────────────────────────────────────────
 
   Widget _buildHeader() {
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
+
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: 8 * sf, vertical: 4 * sf),
       child: Row(
         children: [
           IconButton(
             onPressed: () => Navigator.of(context).pop(),
             icon: const Icon(Icons.arrow_back_rounded),
             color: AppColors.primaryText,
-            iconSize: 28,
+            iconSize: 28 * sf,
           ),
           Expanded(
             child: GestureDetector(
@@ -170,15 +173,15 @@ class _ProfileScreenState extends State<ProfileScreen>
                 children: [
                   Icon(
                     Icons.local_florist_rounded,
-                    size: 20,
+                    size: 20 * sf,
                     color: AppColors.emerald.withValues(alpha: 0.7),
                   ),
-                  const SizedBox(width: 6),
+                  SizedBox(width: 6 * sf),
                   Text(
                     'My Garden',
                     textAlign: TextAlign.center,
-                    style: GoogleFonts.fredoka(
-                      fontSize: 22,
+                    style: AppFonts.fredoka(
+                      fontSize: 22 * sf,
                       fontWeight: FontWeight.w600,
                       color: AppColors.primaryText,
                     ),
@@ -195,10 +198,10 @@ class _ProfileScreenState extends State<ProfileScreen>
                 widget.onSignOut!();
               },
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                padding: EdgeInsets.symmetric(horizontal: 10 * sf, vertical: 6 * sf),
                 decoration: BoxDecoration(
                   color: AppColors.violet.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(14 * sf),
                   border: Border.all(
                     color: AppColors.violet.withValues(alpha: 0.3),
                   ),
@@ -208,14 +211,14 @@ class _ProfileScreenState extends State<ProfileScreen>
                   children: [
                     Icon(
                       Icons.swap_horiz_rounded,
-                      size: 18,
+                      size: 18 * sf,
                       color: AppColors.violet.withValues(alpha: 0.8),
                     ),
-                    const SizedBox(width: 4),
+                    SizedBox(width: 4 * sf),
                     Text(
                       'Switch',
-                      style: GoogleFonts.fredoka(
-                        fontSize: 13,
+                      style: AppFonts.fredoka(
+                        fontSize: 13 * sf,
                         fontWeight: FontWeight.w500,
                         color: AppColors.violet.withValues(alpha: 0.8),
                       ),
@@ -225,7 +228,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             )
           else
-            const SizedBox(width: 48),
+            SizedBox(width: 48 * sf),
         ],
       ),
     );
@@ -234,6 +237,9 @@ class _ProfileScreenState extends State<ProfileScreen>
   // ── Hero Section ───────────────────────────────────────────────────
 
   Widget _buildHeroSection() {
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
+
     return Column(
       children: [
         // Avatar + name row — compact side-by-side layout
@@ -252,49 +258,49 @@ class _ProfileScreenState extends State<ProfileScreen>
                     clipBehavior: Clip.none,
                     children: [
                       Container(
-                        width: 100,
-                        height: 100,
+                        width: 100 * sf,
+                        height: 100 * sf,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(
                             color: AppColors.violet.withValues(alpha: 0.4 + _avatarGlowController.value * 0.2),
-                            width: 2.5,
+                            width: 2.5 * sf,
                           ),
                           boxShadow: [
                             BoxShadow(
                               color: AppColors.violet.withValues(alpha: glowAlpha),
                               blurRadius: blurRadius,
-                              spreadRadius: 3,
+                              spreadRadius: 3 * sf,
                             ),
                           ],
                         ),
-                        padding: const EdgeInsets.all(2),
-                        child: AvatarWidget(config: _avatar, size: 90),
+                        padding: EdgeInsets.all(2 * sf),
+                        child: AvatarWidget(config: _avatar, size: 90 * sf),
                       ),
                       // Edit badge — small pencil icon
                       Positioned(
                         right: -2,
                         bottom: -2,
                         child: Container(
-                          width: 28,
-                          height: 28,
+                          width: 28 * sf,
+                          height: 28 * sf,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             color: AppColors.violet,
                             border: Border.all(
                               color: AppColors.background,
-                              width: 2,
+                              width: 2 * sf,
                             ),
                             boxShadow: [
                               BoxShadow(
                                 color: AppColors.violet.withValues(alpha: 0.4),
-                                blurRadius: 8,
+                                blurRadius: 8 * sf,
                               ),
                             ],
                           ),
-                          child: const Icon(
+                          child: Icon(
                             Icons.edit_rounded,
-                            size: 14,
+                            size: 14 * sf,
                             color: Colors.white,
                           ),
                         ),
@@ -305,7 +311,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ),
 
-            const SizedBox(width: 16),
+            SizedBox(width: 16 * sf),
 
             // Name + stats stacked
             Column(
@@ -319,46 +325,46 @@ class _ProfileScreenState extends State<ProfileScreen>
                       children: [
                         Text(
                           widget.playerName,
-                          style: GoogleFonts.fredoka(
-                            fontSize: 28,
+                          style: AppFonts.fredoka(
+                            fontSize: 28 * sf,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
                             shadows: [
                               Shadow(
                                 color: AppColors.magenta.withValues(alpha: 0.5),
-                                blurRadius: 16,
+                                blurRadius: 16 * sf,
                               ),
                             ],
                           ),
                         ),
-                        const SizedBox(width: 6),
+                        SizedBox(width: 6 * sf),
                         Icon(
                           Icons.volume_up_rounded,
                           color: AppColors.secondaryText.withValues(alpha: 0.4),
-                          size: 16,
+                          size: 16 * sf,
                         ),
                       ],
                     ),
                   ),
 
-                const SizedBox(height: 10),
+                SizedBox(height: 10 * sf),
 
                 // Inline stats chips with labels
                 Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     _StatChip(Icons.local_florist_rounded, AppColors.emerald, '$_wordCount',
-                      label: 'Words',
+                      label: 'Words', sf: sf,
                       onTap: () => widget.audioService.playWord('words'),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8 * sf),
                     _StatChip(Icons.star_rounded, AppColors.starGold, '$_masteredCount',
-                      label: 'Stars',
+                      label: 'Stars', sf: sf,
                       onTap: () => widget.audioService.playWord('stars'),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8 * sf),
                     _StatChip(Icons.local_fire_department_rounded, AppColors.flameOrange, '$_streak',
-                      label: 'Streak',
+                      label: 'Streak', sf: sf,
                       animate: _streak > 0,
                       onTap: () => widget.audioService.playWord('streak'),
                     ),
@@ -382,26 +388,27 @@ class _StatChip extends StatelessWidget {
   final String value;
   final String? label;
   final bool animate;
+  final double sf;
   final VoidCallback? onTap;
 
-  const _StatChip(this.icon, this.color, this.value, {this.label, this.animate = false, this.onTap});
+  const _StatChip(this.icon, this.color, this.value, {this.label, this.animate = false, this.sf = 1.0, this.onTap});
 
   @override
   Widget build(BuildContext context) {
     Widget chip = GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        padding: EdgeInsets.symmetric(horizontal: 10 * sf, vertical: 6 * sf),
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.1),
-          borderRadius: BorderRadius.circular(14),
+          borderRadius: BorderRadius.circular(14 * sf),
           border: Border.all(
             color: color.withValues(alpha: 0.25),
           ),
           boxShadow: [
             BoxShadow(
               color: color.withValues(alpha: 0.1),
-              blurRadius: 8,
+              blurRadius: 8 * sf,
               spreadRadius: 0,
             ),
           ],
@@ -412,12 +419,12 @@ class _StatChip extends StatelessWidget {
             Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(icon, size: 16, color: color),
-                const SizedBox(width: 4),
+                Icon(icon, size: 16 * sf, color: color),
+                SizedBox(width: 4 * sf),
                 Text(
                   value,
-                  style: GoogleFonts.fredoka(
-                    fontSize: 15,
+                  style: AppFonts.fredoka(
+                    fontSize: 15 * sf,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryText,
                   ),
@@ -425,11 +432,11 @@ class _StatChip extends StatelessWidget {
               ],
             ),
             if (label != null) ...[
-              const SizedBox(height: 1),
+              SizedBox(height: 1 * sf),
               Text(
                 label!,
-                style: GoogleFonts.nunito(
-                  fontSize: 9,
+                style: AppFonts.nunito(
+                  fontSize: 9 * sf,
                   fontWeight: FontWeight.w600,
                   color: color.withValues(alpha: 0.7),
                 ),

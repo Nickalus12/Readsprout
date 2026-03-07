@@ -122,7 +122,7 @@ class _WordGardenState extends State<WordGarden>
             onTap: () => widget.audioService.playWord('garden'),
             child: Text(
               'Garden',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.gardenStem,
@@ -1503,7 +1503,7 @@ class _WordBubble extends StatelessWidget {
       ),
       child: Text(
         word,
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 12,
           color: AppColors.primaryText,
           fontWeight: FontWeight.w600,

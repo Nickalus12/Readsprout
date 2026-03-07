@@ -55,7 +55,7 @@ class EvolutionPath extends StatelessWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                   child: Text(
                     'Evolution Path',
-                    style: GoogleFonts.fredoka(
+                    style: AppFonts.fredoka(
                       fontSize: 24,
                       fontWeight: FontWeight.w600,
                       color: AppColors.primaryText,
@@ -177,7 +177,7 @@ class _StageCard extends StatelessWidget {
               children: [
                 Text(
                   stage.title,
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: isLocked
@@ -188,7 +188,7 @@ class _StageCard extends StatelessWidget {
                 const SizedBox(height: 2),
                 Text(
                   '${stage.minWords}-${stage.maxWords} words',
-                  style: GoogleFonts.nunito(
+                  style: AppFonts.nunito(
                     fontSize: 13,
                     color: AppColors.secondaryText.withValues(
                       alpha: isLocked ? 0.4 : 0.8,
@@ -350,7 +350,7 @@ class _StageCard extends StatelessWidget {
         // Progress text
         Text(
           '$wordsInRange / $totalRange words to next!',
-          style: GoogleFonts.nunito(
+          style: AppFonts.nunito(
             fontSize: 12,
             fontWeight: FontWeight.w600,
             color: stage.primaryColor,

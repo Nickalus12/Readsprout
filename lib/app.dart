@@ -240,7 +240,7 @@ class _SplashScreen extends StatelessWidget {
                 const SizedBox(height: 24),
                 Text(
                   'Reading Sprout',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 32,
                     color: AppColors.primaryText,
                     fontWeight: FontWeight.w600,

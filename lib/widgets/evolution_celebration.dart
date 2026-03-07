@@ -265,7 +265,7 @@ class _EvolutionCelebrationState extends State<EvolutionCelebration>
                         ),
                         child: Text(
                           "You're now a ${_newStage.title}!",
-                          style: GoogleFonts.fredoka(
+                          style: AppFonts.fredoka(
                             fontSize: 26,
                             fontWeight: FontWeight.w600,
                             color: _newStage.primaryColor,
@@ -287,7 +287,7 @@ class _EvolutionCelebrationState extends State<EvolutionCelebration>
                     if (_showTitle)
                       Text(
                         'Tap to continue',
-                        style: GoogleFonts.nunito(
+                        style: AppFonts.nunito(
                           fontSize: 14,
                           color: AppColors.secondaryText.withValues(alpha: 0.6),
                         ),

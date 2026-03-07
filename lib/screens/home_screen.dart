@@ -102,7 +102,7 @@ class _HomeScreenState extends State<HomeScreen>
             const SizedBox(width: 8),
             Text(
               message,
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -399,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen>
                               children: [
                                 Text(
                                   'Adventure Mode',
-                                  style: GoogleFonts.fredoka(
+                                  style: AppFonts.fredoka(
                                     fontSize: 18 * sf,
                                     fontWeight: FontWeight.w600,
                                     color: Colors.white,
@@ -407,7 +407,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 ),
                                 Text(
                                   'Begin your word journey',
-                                  style: GoogleFonts.nunito(
+                                  style: AppFonts.nunito(
                                     fontSize: 10 * sf,
                                     color: AppColors.emerald
                                         .withValues(alpha: 0.8),
@@ -604,7 +604,7 @@ class _StatBadgeState extends State<_StatBadge>
               const SizedBox(width: 6),
               Text(
                 widget.value,
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 18,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primaryText,
@@ -613,7 +613,7 @@ class _StatBadgeState extends State<_StatBadge>
               const SizedBox(width: 4),
               Text(
                 widget.label,
-                style: GoogleFonts.nunito(
+                style: AppFonts.nunito(
                   fontSize: 13,
                   color: AppColors.secondaryText,
                 ),
@@ -691,7 +691,7 @@ class _TappableNameLetterState extends State<_TappableNameLetter>
             scale: bounce,
             child: Text(
               widget.letter.toUpperCase(),
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 36 * nameSf,
                 fontWeight: FontWeight.w700,
                 color: glow > 0.01 ? coreColor : Colors.white,
@@ -789,7 +789,7 @@ class _TappableTagWordState extends State<_TappableTagWord>
             scale: scale,
             child: Text(
               widget.text,
-              style: GoogleFonts.nunito(
+              style: AppFonts.nunito(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: color,

@@ -24,6 +24,7 @@ class RhymeTimeGame extends StatefulWidget {
   final AudioService audioService;
   final String playerName;
   final ProfileService? profileService;
+  final bool hintsEnabled;
 
   const RhymeTimeGame({
     super.key,
@@ -31,6 +32,7 @@ class RhymeTimeGame extends StatefulWidget {
     required this.audioService,
     required this.playerName,
     this.profileService,
+    this.hintsEnabled = true,
   });
 
   @override
@@ -300,7 +302,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
       vy: (_rng.nextDouble() - 0.5) * 0.14,
       radius: 42,
       wobblePhase: _rng.nextDouble() * pi * 2,
-      color: correct
+      color: (correct && widget.hintsEnabled)
           ? roundColor
           : [
               const Color(0xFF4B5563),
@@ -616,7 +618,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
               // Title
               Text(
                 'Rhyme Time',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 44,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
@@ -707,7 +709,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
                           const SizedBox(height: 2),
                           Text(
                             'cat',
-                            style: GoogleFonts.fredoka(
+                            style: AppFonts.fredoka(
                               fontSize: 22,
                               fontWeight: FontWeight.w700,
                               color: AppColors.electricBlue,
@@ -758,7 +760,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
                           const SizedBox(height: 2),
                           Text(
                             'hat',
-                            style: GoogleFonts.fredoka(
+                            style: AppFonts.fredoka(
                               fontSize: 22,
                               fontWeight: FontWeight.w700,
                               color: AppColors.magenta,
@@ -807,7 +809,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
                       const SizedBox(width: 8),
                       Text(
                         'Play!',
-                        style: GoogleFonts.fredoka(
+                        style: AppFonts.fredoka(
                           fontSize: 28,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -913,7 +915,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
             ),
             child: Text(
               '$_score',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: AppColors.starGold,
@@ -941,7 +943,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
               ),
               child: Text(
                 '${_combo}x',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: AppColors.magenta,
@@ -987,7 +989,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
             ),
             child: Text(
               '${_timeRemaining}s',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: _timeRemaining <= 10
@@ -1038,7 +1040,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
             const SizedBox(width: 12),
             Text(
               'What rhymes with ',
-              style: GoogleFonts.nunito(
+              style: AppFonts.nunito(
                 fontSize: 16,
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w500,
@@ -1046,7 +1048,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
             ),
             Text(
               '"$_targetWord"',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 24,
                 fontWeight: FontWeight.w700,
                 color: AppColors.electricBlue,
@@ -1054,7 +1056,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
             ),
             Text(
               ' ?',
-              style: GoogleFonts.nunito(
+              style: AppFonts.nunito(
                 fontSize: 16,
                 color: AppColors.secondaryText,
                 fontWeight: FontWeight.w500,
@@ -1113,7 +1115,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
               child: Center(
                 child: Text(
                   bubble.word,
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 18,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -1186,7 +1188,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
 
                 Text(
                   title,
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 38,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -1203,7 +1205,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
 
                 Text(
                   subtitle,
-                  style: GoogleFonts.nunito(
+                  style: AppFonts.nunito(
                     fontSize: 16,
                     color: AppColors.secondaryText,
                     fontWeight: FontWeight.w500,
@@ -1278,7 +1280,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
             const SizedBox(width: 10),
             Text(
               label,
-              style: GoogleFonts.nunito(
+              style: AppFonts.nunito(
                 fontSize: 14,
                 color: AppColors.secondaryText,
               ),
@@ -1286,7 +1288,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
             const SizedBox(width: 12),
             Text(
               value,
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 20,
                 fontWeight: FontWeight.w700,
                 color: AppColors.primaryText,
@@ -1327,7 +1329,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
             const SizedBox(width: 8),
             Text(
               label,
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.primaryText,

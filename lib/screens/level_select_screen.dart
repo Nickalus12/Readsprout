@@ -65,6 +65,9 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+
     return Scaffold(
       body: Stack(
         children: [
@@ -79,30 +82,31 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
               children: [
                 // Header
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+                  padding: EdgeInsets.fromLTRB(8 * sf, 8 * sf, 16 * sf, 0),
                   child: Row(
                     children: [
                       IconButton(
                         onPressed: () => Navigator.pop(context),
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.arrow_back_rounded,
                           color: AppColors.primaryText,
+                          size: 24 * sf,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: 4 * sf),
                       GestureDetector(
                         onTap: () => widget.audioService.playWord('adventure_path'),
                         child: Text(
                           'Adventure Path',
-                          style: GoogleFonts.fredoka(
-                            fontSize: 22,
+                          style: AppFonts.fredoka(
+                            fontSize: 22 * sf,
                             fontWeight: FontWeight.w600,
                             color: AppColors.primaryText,
                             shadows: [
                               Shadow(
                                 color: AppColors.electricBlue
                                     .withValues(alpha: 0.3),
-                                blurRadius: 12,
+                                blurRadius: 12 * sf,
                               ),
                             ],
                           ),
@@ -116,13 +120,13 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                     ],
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: 8 * sf),
 
                 // Scrollable zone list
                 Expanded(
                   child: ListView.builder(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 4, 16, 24),
+                    padding: EdgeInsets.fromLTRB(16 * sf, 4 * sf, 16 * sf, 24 * sf),
                     itemCount: DolchWords.zones.length,
                     itemBuilder: (context, zoneIndex) {
                       return _buildZoneSection(context, zoneIndex);
@@ -140,6 +144,9 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
   // ── Zone section (header + collapsible level list) ───────────────────
 
   Widget _buildZoneSection(BuildContext context, int zoneIndex) {
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+
     final zone = DolchWords.zones[zoneIndex];
     final isExpanded = _expanded[zoneIndex] ?? false;
 
@@ -166,7 +173,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     }
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
+      padding: EdgeInsets.only(bottom: 6 * sf),
       child: Column(
         children: [
           // Zone header (tappable to expand/collapse)
@@ -180,14 +187,14 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
               opacity: zoneUnlocked ? 1.0 : 0.55,
               duration: const Duration(milliseconds: 250),
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                padding: EdgeInsets.symmetric(horizontal: 14 * sf, vertical: 12 * sf),
                 decoration: BoxDecoration(
                   color: zoneComplete
                       ? AppColors.starGold.withValues(alpha: 0.06)
                       : zoneUnlocked
                           ? AppColors.surface.withValues(alpha: 0.8)
                           : AppColors.surface.withValues(alpha: 0.4),
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(14 * sf),
                   border: Border.all(
                     color: zoneComplete
                         ? AppColors.starGold.withValues(alpha: 0.25)
@@ -200,30 +207,30 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                   children: [
                     // Zone icon
                     Container(
-                      width: 38,
-                      height: 38,
+                      width: 38 * sf,
+                      height: 38 * sf,
                       decoration: BoxDecoration(
                         color: zoneComplete
                             ? AppColors.starGold.withValues(alpha: 0.15)
                             : zoneUnlocked
                                 ? AppColors.electricBlue.withValues(alpha: 0.1)
                                 : AppColors.surface.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(10 * sf),
                       ),
                       alignment: Alignment.center,
                       child: zoneUnlocked
                           ? Text(
                               zone.icon,
-                              style: const TextStyle(fontSize: 20),
+                              style: TextStyle(fontSize: 20 * sf),
                             )
                           : Icon(
                               Icons.lock_rounded,
                               color:
                                   AppColors.secondaryText.withValues(alpha: 0.4),
-                              size: 18,
+                              size: 18 * sf,
                             ),
                     ),
-                    const SizedBox(width: 12),
+                    SizedBox(width: 12 * sf),
 
                     // Zone name + star count / locked message
                     Expanded(
@@ -236,8 +243,8 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                             ),
                             child: Text(
                               zone.name,
-                              style: GoogleFonts.fredoka(
-                                fontSize: 17,
+                              style: AppFonts.fredoka(
+                                fontSize: 17 * sf,
                                 fontWeight: FontWeight.w600,
                                 color: zoneUnlocked
                                     ? AppColors.primaryText
@@ -246,28 +253,28 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                               ),
                             ),
                           ),
-                          const SizedBox(height: 4),
+                          SizedBox(height: 4 * sf),
                           if (zoneUnlocked)
                             Row(
                               children: [
-                                const Icon(Icons.star_rounded,
-                                    size: 13, color: AppColors.starGold),
-                                const SizedBox(width: 3),
+                                Icon(Icons.star_rounded,
+                                    size: 13 * sf, color: AppColors.starGold),
+                                SizedBox(width: 3 * sf),
                                 Text(
                                   '$zoneStars / $zonePossibleStars',
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 12,
+                                  style: AppFonts.nunito(
+                                    fontSize: 12 * sf,
                                     fontWeight: FontWeight.w600,
                                     color: AppColors.secondaryText,
                                   ),
                                 ),
-                                const SizedBox(width: 12),
+                                SizedBox(width: 12 * sf),
                                 // Progress bar
                                 Expanded(
                                   child: ClipRRect(
-                                    borderRadius: BorderRadius.circular(2),
+                                    borderRadius: BorderRadius.circular(2 * sf),
                                     child: SizedBox(
-                                      height: 4,
+                                      height: 4 * sf,
                                       child: LinearProgressIndicator(
                                         value: zoneProgress,
                                         backgroundColor: AppColors.background,
@@ -288,8 +295,8 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                               previousZoneName != null
                                   ? 'Master all tiers in $previousZoneName to unlock'
                                   : 'Locked',
-                              style: GoogleFonts.nunito(
-                                fontSize: 12,
+                              style: AppFonts.nunito(
+                                fontSize: 12 * sf,
                                 fontWeight: FontWeight.w500,
                                 color: AppColors.secondaryText
                                     .withValues(alpha: 0.5),
@@ -299,7 +306,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
+                    SizedBox(width: 8 * sf),
 
                     // Expand/collapse chevron
                     AnimatedRotation(
@@ -309,7 +316,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                       child: Icon(
                         Icons.keyboard_arrow_down_rounded,
                         color: AppColors.secondaryText.withValues(alpha: 0.6),
-                        size: 24,
+                        size: 24 * sf,
                       ),
                     ),
                   ],
@@ -340,8 +347,11 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
   }
 
   Widget _buildLevelCards(Zone zone, int zoneIndex) {
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+
     return Padding(
-      padding: const EdgeInsets.only(top: 6),
+      padding: EdgeInsets.only(top: 6 * sf),
       child: Column(
         children: List.generate(zone.levelCount, (i) {
           final level = zone.startLevel + i;
@@ -480,6 +490,9 @@ class _LevelCardState extends State<_LevelCard> {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+
     final isComplete = widget.levelProgress.isComplete;
     final starsEarned = widget.levelProgress.starsEarned;
     final hasAnyStars = starsEarned > 0;
@@ -487,7 +500,7 @@ class _LevelCardState extends State<_LevelCard> {
     final isNextToPlay = widget.unlocked && !hasAnyStars && !isComplete;
 
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: EdgeInsets.only(bottom: 8 * sf),
       child: GestureDetector(
         onTap: widget.onTap,
         onTapDown: _onTapDown,
@@ -501,14 +514,14 @@ class _LevelCardState extends State<_LevelCard> {
             opacity: widget.unlocked ? 1.0 : 0.45,
             duration: const Duration(milliseconds: 200),
             child: Container(
-              padding: const EdgeInsets.all(14),
+              padding: EdgeInsets.all(14 * sf),
               decoration: BoxDecoration(
                 color: hasAnyStars
                     ? widget.accentColor.withValues(alpha: 0.06)
                     : isNextToPlay
                         ? widget.accentColor.withValues(alpha: 0.04)
                         : AppColors.surface.withValues(alpha: 0.75),
-                borderRadius: BorderRadius.circular(16),
+                borderRadius: BorderRadius.circular(16 * sf),
                 border: Border.all(
                   color: hasAnyStars
                       ? widget.accentColor.withValues(alpha: 0.25)
@@ -543,7 +556,7 @@ class _LevelCardState extends State<_LevelCard> {
                     overallProgress: widget.levelProgress.overallProgress,
                     starsEarned: starsEarned,
                   ),
-                  const SizedBox(width: 14),
+                  SizedBox(width: 14 * sf),
 
                   // Center: Level name + word preview
                   Expanded(
@@ -552,19 +565,19 @@ class _LevelCardState extends State<_LevelCard> {
                       children: [
                         Text(
                           widget.name,
-                          style: GoogleFonts.fredoka(
-                            fontSize: 15,
+                          style: AppFonts.fredoka(
+                            fontSize: 15 * sf,
                             fontWeight: FontWeight.w600,
                             color: widget.unlocked
                                 ? AppColors.primaryText
                                 : AppColors.secondaryText,
                           ),
                         ),
-                        const SizedBox(height: 4),
+                        SizedBox(height: 4 * sf),
                         Text(
                           widget.wordPreview,
-                          style: GoogleFonts.nunito(
-                            fontSize: 12,
+                          style: AppFonts.nunito(
+                            fontSize: 12 * sf,
                             color: AppColors.secondaryText
                                 .withValues(alpha: 0.7),
                             fontStyle: FontStyle.italic,
@@ -575,7 +588,7 @@ class _LevelCardState extends State<_LevelCard> {
                       ],
                     ),
                   ),
-                  const SizedBox(width: 10),
+                  SizedBox(width: 10 * sf),
 
                   // Right: 3-star tier display or lock icon
                   if (widget.unlocked)
@@ -583,13 +596,13 @@ class _LevelCardState extends State<_LevelCard> {
                       levelProgress: widget.levelProgress,
                       isTier2Unlocked: widget.isTier2Unlocked,
                       isTier3Unlocked: widget.isTier3Unlocked,
-                      starSize: 18,
+                      starSize: 18 * sf,
                     )
                   else
                     Icon(
                       Icons.lock_rounded,
                       color: AppColors.secondaryText.withValues(alpha: 0.4),
-                      size: 18,
+                      size: 18 * sf,
                     ),
                 ],
               ),
@@ -620,6 +633,9 @@ class _LevelBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+
     // Ring color reflects highest tier completed
     final Color ringColor;
     if (starsEarned >= 3) {
@@ -633,16 +649,16 @@ class _LevelBadge extends StatelessWidget {
     }
 
     return SizedBox(
-      width: 44,
-      height: 44,
+      width: 44 * sf,
+      height: 44 * sf,
       child: Stack(
         alignment: Alignment.center,
         children: [
           SizedBox(
-            width: 44,
-            height: 44,
+            width: 44 * sf,
+            height: 44 * sf,
             child: CircularProgressIndicator(
-              strokeWidth: 3,
+              strokeWidth: 3 * sf,
               value: unlocked ? overallProgress : 0.0,
               backgroundColor: unlocked
                   ? ringColor.withValues(alpha: 0.12)
@@ -652,8 +668,8 @@ class _LevelBadge extends StatelessWidget {
           ),
           Text(
             '$level',
-            style: GoogleFonts.fredoka(
-              fontSize: 17,
+            style: AppFonts.fredoka(
+              fontSize: 17 * sf,
               fontWeight: FontWeight.w700,
               color: unlocked
                   ? AppColors.primaryText
@@ -675,11 +691,14 @@ class _TotalStarsBadge extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      padding: EdgeInsets.symmetric(horizontal: 10 * sf, vertical: 5 * sf),
       decoration: BoxDecoration(
         color: AppColors.starGold.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(12 * sf),
         border: Border.all(
           color: AppColors.starGold.withValues(alpha: 0.25),
         ),
@@ -687,13 +706,13 @@ class _TotalStarsBadge extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Icon(Icons.star_rounded,
-              color: AppColors.starGold, size: 16),
-          const SizedBox(width: 4),
+          Icon(Icons.star_rounded,
+              color: AppColors.starGold, size: 16 * sf),
+          SizedBox(width: 4 * sf),
           Text(
             '$stars/$maxStars',
-            style: GoogleFonts.fredoka(
-              fontSize: 14,
+            style: AppFonts.fredoka(
+              fontSize: 14 * sf,
               fontWeight: FontWeight.w600,
               color: AppColors.starGold,
             ),

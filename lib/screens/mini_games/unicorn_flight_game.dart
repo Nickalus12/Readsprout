@@ -96,6 +96,7 @@ class UnicornFlightGame extends StatefulWidget {
   final AudioService audioService;
   final String playerName;
   final ProfileService? profileService;
+  final bool hintsEnabled;
 
   const UnicornFlightGame({
     super.key,
@@ -103,6 +104,7 @@ class UnicornFlightGame extends StatefulWidget {
     required this.audioService,
     required this.playerName,
     this.profileService,
+    this.hintsEnabled = true,
   });
 
   @override
@@ -648,7 +650,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
               const SizedBox(height: 24),
               Text(
                 'Unicorn Flight',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 42,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primaryText,
@@ -660,7 +662,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
                 child: Text(
                   'Fly your unicorn into the correct sight words!\nAvoid misspelled words and wrong answers.',
                   textAlign: TextAlign.center,
-                  style: GoogleFonts.nunito(
+                  style: AppFonts.nunito(
                     fontSize: 16,
                     color: AppColors.secondaryText,
                     height: 1.5,
@@ -681,7 +683,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
                 ),
                 child: Text(
                   'Take Flight!',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 22,
                     fontWeight: FontWeight.w500,
                   ),
@@ -692,7 +694,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(
                   'Back',
-                  style: GoogleFonts.nunito(
+                  style: AppFonts.nunito(
                     fontSize: 16,
                     color: AppColors.secondaryText,
                   ),
@@ -740,6 +742,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
                   stumble: _stumbleTimer > 0,
                   flashTimer: _flashTimer,
                   totalTime: _totalTime,
+                  hintsEnabled: widget.hintsEnabled,
                 ),
               ),
               // HUD
@@ -810,7 +813,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
                     const SizedBox(width: 6),
                     Text(
                       '$_score',
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 20,
                         fontWeight: FontWeight.w600,
                         color: AppColors.starGold,
@@ -863,14 +866,14 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
                 children: [
                   Text(
                     'Find: ',
-                    style: GoogleFonts.nunito(
+                    style: AppFonts.nunito(
                       fontSize: 18,
                       color: AppColors.secondaryText,
                     ),
                   ),
                   Text(
                     _targetWord,
-                    style: GoogleFonts.fredoka(
+                    style: AppFonts.fredoka(
                       fontSize: 28,
                       fontWeight: FontWeight.w600,
                       color: Colors.white,
@@ -898,7 +901,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
             offset: Offset(0, -20 * (1.0 - opacity)),
             child: Text(
               _feedbackText,
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 32,
                 fontWeight: FontWeight.w600,
                 color: _feedbackColor,
@@ -943,7 +946,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
             children: [
               Text(
                 'Flight Complete!',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 32,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primaryText,
@@ -958,7 +961,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
                   const SizedBox(width: 8),
                   Text(
                     '$_score',
-                    style: GoogleFonts.fredoka(
+                    style: AppFonts.fredoka(
                       fontSize: 48,
                       fontWeight: FontWeight.w700,
                       color: AppColors.starGold,
@@ -976,7 +979,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
                             ? 'Amazing flying, ${widget.playerName}!'
                             : 'You are a superstar, ${widget.playerName}!',
                 textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(
+                style: AppFonts.nunito(
                   fontSize: 18,
                   color: AppColors.secondaryText,
                 ),
@@ -998,7 +1001,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
                     ),
                     child: Text(
                       'Fly Again',
-                      style: GoogleFonts.fredoka(fontSize: 18),
+                      style: AppFonts.fredoka(fontSize: 18),
                     ),
                   ),
                   const SizedBox(width: 16),
@@ -1017,7 +1020,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
                     ),
                     child: Text(
                       'Back',
-                      style: GoogleFonts.fredoka(fontSize: 18),
+                      style: AppFonts.fredoka(fontSize: 18),
                     ),
                   ),
                 ],
@@ -1045,6 +1048,7 @@ class _GamePainter extends CustomPainter {
   final bool stumble;
   final double flashTimer;
   final double totalTime;
+  final bool hintsEnabled;
 
   _GamePainter({
     required this.stars,
@@ -1059,6 +1063,7 @@ class _GamePainter extends CustomPainter {
     required this.stumble,
     required this.flashTimer,
     required this.totalTime,
+    required this.hintsEnabled,
   });
 
   @override
@@ -1249,7 +1254,7 @@ class _GamePainter extends CustomPainter {
       // Bubble background
       final bubbleRadius = 40.0 + bubble.text.length * 4;
 
-      if (bubble.isCorrect) {
+      if (hintsEnabled && bubble.isCorrect) {
         // Correct: soft violet glow border
         final glowPaint = Paint()
           ..color = AppColors.violet.withValues(alpha: 0.2 * bubble.opacity)
@@ -1267,10 +1272,10 @@ class _GamePainter extends CustomPainter {
       }
 
       // Background pill
-      final bgColor = bubble.isCorrect
+      final bgColor = (hintsEnabled && bubble.isCorrect)
           ? AppColors.surface.withValues(alpha: 0.9 * bubble.opacity)
           : AppColors.surfaceVariant.withValues(alpha: 0.85 * bubble.opacity);
-      final borderColor = bubble.isCorrect
+      final borderColor = (hintsEnabled && bubble.isCorrect)
           ? AppColors.violet.withValues(alpha: 0.5 * bubble.opacity)
           : AppColors.border.withValues(alpha: 0.4 * bubble.opacity);
 

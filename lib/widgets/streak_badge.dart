@@ -38,7 +38,7 @@ class StreakBadge extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             '$currentStreak',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 18,
               fontWeight: FontWeight.w600,
               color: AppColors.primaryText,
@@ -47,7 +47,7 @@ class StreakBadge extends StatelessWidget {
           const SizedBox(width: 4),
           Text(
             currentStreak == 1 ? 'Day' : 'Days',
-            style: GoogleFonts.nunito(
+            style: AppFonts.nunito(
               fontSize: 13,
               color: AppColors.secondaryText,
             ),

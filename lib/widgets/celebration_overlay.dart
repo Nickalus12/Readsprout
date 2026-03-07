@@ -87,7 +87,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                 );
                 return Text(
                   widget.word.toUpperCase(),
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 56,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -144,7 +144,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
               ),
               child: Text(
                 _praise,
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 28,
                   fontWeight: FontWeight.w500,
                   color: AppColors.success,

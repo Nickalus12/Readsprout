@@ -87,7 +87,7 @@ class TierSelectionSheet extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(24, 8, 24, 4),
             child: Text(
               levelName,
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 22,
                 fontWeight: FontWeight.w600,
                 color: AppColors.primaryText,
@@ -96,7 +96,7 @@ class TierSelectionSheet extends StatelessWidget {
           ),
           Text(
             zoneName,
-            style: GoogleFonts.nunito(
+            style: AppFonts.nunito(
               fontSize: 13,
               color: AppColors.secondaryText,
             ),
@@ -250,7 +250,7 @@ class _TierOptionCard extends StatelessWidget {
                         children: [
                           Text(
                             tier.displayName,
-                            style: GoogleFonts.fredoka(
+                            style: AppFonts.fredoka(
                               fontSize: 16,
                               fontWeight: FontWeight.w600,
                               color: unlocked
@@ -284,7 +284,7 @@ class _TierOptionCard extends StatelessWidget {
                               ),
                               child: Text(
                                 'Recommended',
-                                style: GoogleFonts.nunito(
+                                style: AppFonts.nunito(
                                   fontSize: 10,
                                   fontWeight: FontWeight.w700,
                                   color: AppColors.electricBlue,
@@ -299,7 +299,7 @@ class _TierOptionCard extends StatelessWidget {
                         unlocked
                             ? _tierDescription
                             : _lockReason ?? _tierDescription,
-                        style: GoogleFonts.nunito(
+                        style: AppFonts.nunito(
                           fontSize: 12,
                           color: AppColors.secondaryText.withValues(alpha: 0.7),
                         ),
@@ -309,7 +309,7 @@ class _TierOptionCard extends StatelessWidget {
                           padding: const EdgeInsets.only(top: 4),
                           child: Text(
                             '$wordsCompleted/10 words',
-                            style: GoogleFonts.nunito(
+                            style: AppFonts.nunito(
                               fontSize: 11,
                               fontWeight: FontWeight.w600,
                               color: accentColor.withValues(alpha: 0.8),
@@ -354,7 +354,7 @@ class _TierOptionCard extends StatelessWidget {
                         const SizedBox(width: 4),
                         Text(
                           isComplete ? 'REPLAY' : 'PLAY',
-                          style: GoogleFonts.fredoka(
+                          style: AppFonts.fredoka(
                             fontSize: 13,
                             fontWeight: FontWeight.w600,
                             color: accentColor,

@@ -85,6 +85,9 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
   @override
   Widget build(BuildContext context) {
     final profiles = widget.settingsService.profiles;
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
+    final cardSize = (140 * sf).roundToDouble();
 
     return Scaffold(
       body: Stack(
@@ -109,7 +112,7 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
           SafeArea(
             child: Center(
               child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
+                padding: EdgeInsets.symmetric(horizontal: 24 * sf),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
@@ -121,7 +124,7 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                       onTap: () =>
                           widget.audioService.playWord('reading_sprout'),
                       child: Builder(builder: (context) {
-                        final logoSize = (MediaQuery.of(context).size.width / 400 * 80).clamp(60.0, 100.0);
+                        final logoSize = (screenW / 400 * 80).clamp(60.0, 100.0);
                         return Image.asset(
                           'assets/images/logo.png',
                           width: logoSize,
@@ -134,7 +137,7 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                           duration: 800.ms,
                         ),
 
-                    const SizedBox(height: 16),
+                    SizedBox(height: 16 * sf),
 
                     // "Who's Playing?" — tappable to replay voice
                     GestureDetector(
@@ -144,13 +147,13 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                         mainAxisAlignment: MainAxisAlignment.center,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(Icons.volume_up_rounded,
-                              color: AppColors.electricBlue, size: 28),
-                          const SizedBox(width: 10),
+                          Icon(Icons.volume_up_rounded,
+                              color: AppColors.electricBlue, size: 28 * sf),
+                          SizedBox(width: 10 * sf),
                           Text(
                             "Who's Playing?",
-                            style: GoogleFonts.fredoka(
-                              fontSize: 26,
+                            style: AppFonts.fredoka(
+                              fontSize: 26 * sf,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
                               shadows: [
@@ -166,13 +169,13 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                       ),
                     ).animate().fadeIn(duration: 600.ms),
 
-                    const SizedBox(height: 28),
+                    SizedBox(height: 28 * sf),
 
                     // Profile cards
                     if (!_showingNameInput) ...[
                       Wrap(
-                        spacing: 16,
-                        runSpacing: 16,
+                        spacing: 16 * sf,
+                        runSpacing: 16 * sf,
                         alignment: WrapAlignment.center,
                         children: [
                           for (int i = 0; i < profiles.length; i++)
@@ -181,23 +184,24 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                               audioService: widget.audioService,
                               onTap: () => _onProfileTap(profiles[i]),
                               index: i,
+                              sf: sf,
                             ),
                         ],
                       )
                           .animate()
                           .fadeIn(delay: 200.ms, duration: 500.ms),
 
-                      const SizedBox(height: 24),
+                      SizedBox(height: 24 * sf),
 
                       // Add player button
                       GestureDetector(
                         onTap: _showAddPlayer,
                         child: Container(
-                          width: 140,
-                          height: 140,
+                          width: cardSize,
+                          height: cardSize,
                           decoration: BoxDecoration(
                             color: AppColors.surface.withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(24),
+                            borderRadius: BorderRadius.circular(24 * sf),
                             border: Border.all(
                               color: AppColors.border.withValues(alpha: 0.4),
                               width: 2,
@@ -208,8 +212,8 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               Container(
-                                width: 52,
-                                height: 52,
+                                width: 52 * sf,
+                                height: 52 * sf,
                                 decoration: BoxDecoration(
                                   shape: BoxShape.circle,
                                   color: AppColors.electricBlue
@@ -220,14 +224,14 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
                                     width: 2,
                                   ),
                                 ),
-                                child: const Icon(Icons.add_rounded,
-                                    color: AppColors.electricBlue, size: 32),
+                                child: Icon(Icons.add_rounded,
+                                    color: AppColors.electricBlue, size: 32 * sf),
                               ),
-                              const SizedBox(height: 8),
+                              SizedBox(height: 8 * sf),
                               Text(
                                 'Add Player',
-                                style: GoogleFonts.fredoka(
-                                  fontSize: 14,
+                                style: AppFonts.fredoka(
+                                  fontSize: 14 * sf,
                                   fontWeight: FontWeight.w500,
                                   color: AppColors.secondaryText,
                                 ),
@@ -242,7 +246,7 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
 
                     // Name input (when adding new player)
                     if (_showingNameInput) ...[
-                      _buildNameInput(),
+                      _buildNameInput(sf),
                     ],
 
                     SizedBox(
@@ -257,7 +261,7 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
     );
   }
 
-  Widget _buildNameInput() {
+  Widget _buildNameInput(double sf) {
     return Column(
       children: [
         // Back arrow
@@ -265,29 +269,29 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
           alignment: Alignment.centerLeft,
           child: IconButton(
             onPressed: () => setState(() => _showingNameInput = false),
-            icon: const Icon(Icons.arrow_back_rounded,
-                color: AppColors.primaryText),
+            icon: Icon(Icons.arrow_back_rounded,
+                color: AppColors.primaryText, size: 24 * sf),
           ),
         ),
 
-        const SizedBox(height: 8),
+        SizedBox(height: 8 * sf),
 
         Text(
           "What's your name?",
-          style: GoogleFonts.fredoka(
-            fontSize: 24,
+          style: AppFonts.fredoka(
+            fontSize: 24 * sf,
             fontWeight: FontWeight.w600,
             color: AppColors.primaryText,
           ),
         ),
 
-        const SizedBox(height: 16),
+        SizedBox(height: 16 * sf),
 
         // Name field
         Container(
           decoration: BoxDecoration(
             color: AppColors.surface.withValues(alpha: 0.85),
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(16 * sf),
             border: Border.all(
               color: _hasText
                   ? AppColors.electricBlue.withValues(alpha: 0.5)
@@ -307,29 +311,29 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
             focusNode: _nameFocus,
             textCapitalization: TextCapitalization.words,
             textAlign: TextAlign.center,
-            style: GoogleFonts.fredoka(
-              fontSize: 28,
+            style: AppFonts.fredoka(
+              fontSize: 28 * sf,
               fontWeight: FontWeight.w500,
               color: AppColors.primaryText,
             ),
             decoration: InputDecoration(
               hintText: 'Enter name',
-              hintStyle: GoogleFonts.fredoka(
-                fontSize: 28,
+              hintStyle: AppFonts.fredoka(
+                fontSize: 28 * sf,
                 fontWeight: FontWeight.w400,
                 color: AppColors.secondaryText.withValues(alpha: 0.4),
               ),
               border: InputBorder.none,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 24,
-                vertical: 16,
+              contentPadding: EdgeInsets.symmetric(
+                horizontal: 24 * sf,
+                vertical: 16 * sf,
               ),
             ),
             onSubmitted: (_) => _submitNewName(),
           ),
         ),
 
-        const SizedBox(height: 20),
+        SizedBox(height: 20 * sf),
 
         // Let's Go button
         AnimatedOpacity(
@@ -338,13 +342,13 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
           child: GestureDetector(
             onTap: _hasText ? _submitNewName : null,
             child: Container(
-              width: 200,
-              height: 56,
+              width: 200 * sf,
+              height: 56 * sf,
               decoration: BoxDecoration(
                 gradient: const LinearGradient(
                   colors: [AppColors.electricBlue, AppColors.violet],
                 ),
-                borderRadius: BorderRadius.circular(28),
+                borderRadius: BorderRadius.circular(28 * sf),
                 boxShadow: [
                   if (_hasText)
                     BoxShadow(
@@ -357,8 +361,8 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
               child: Center(
                 child: Text(
                   "Let's Go!",
-                  style: GoogleFonts.fredoka(
-                    fontSize: 24,
+                  style: AppFonts.fredoka(
+                    fontSize: 24 * sf,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
@@ -379,12 +383,14 @@ class _ProfileCard extends StatefulWidget {
   final AudioService audioService;
   final VoidCallback onTap;
   final int index;
+  final double sf;
 
   const _ProfileCard({
     required this.profile,
     required this.audioService,
     required this.onTap,
     required this.index,
+    required this.sf,
   });
 
   @override
@@ -417,10 +423,12 @@ class _ProfileCardState extends State<_ProfileCard>
 
   @override
   Widget build(BuildContext context) {
+    final sf = widget.sf;
     final color = widget.profile.color;
     final initial = widget.profile.name.isNotEmpty
         ? widget.profile.name[0].toUpperCase()
         : '?';
+    final cardSize = (140 * sf).roundToDouble();
 
     return GestureDetector(
       onTap: _onTap,
@@ -431,11 +439,11 @@ class _ProfileCardState extends State<_ProfileCard>
           return Transform.scale(
             scale: 1.0 + glow * 0.08,
             child: Container(
-              width: 140,
-              height: 140,
+              width: cardSize,
+              height: cardSize,
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.15),
-                borderRadius: BorderRadius.circular(24),
+                borderRadius: BorderRadius.circular(24 * sf),
                 border: Border.all(
                   color: color.withValues(alpha: 0.5 + glow * 0.5),
                   width: 2.5,
@@ -453,8 +461,8 @@ class _ProfileCardState extends State<_ProfileCard>
                 children: [
                   // Large avatar circle with initial
                   Container(
-                    width: 64,
-                    height: 64,
+                    width: 64 * sf,
+                    height: 64 * sf,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
@@ -478,8 +486,8 @@ class _ProfileCardState extends State<_ProfileCard>
                     child: Center(
                       child: Text(
                         initial,
-                        style: GoogleFonts.fredoka(
-                          fontSize: 32,
+                        style: AppFonts.fredoka(
+                          fontSize: 32 * sf,
                           fontWeight: FontWeight.w700,
                           color: Colors.white,
                         ),
@@ -487,24 +495,27 @@ class _ProfileCardState extends State<_ProfileCard>
                     ),
                   ),
 
-                  const SizedBox(height: 8),
+                  SizedBox(height: 8 * sf),
 
                   // Name
-                  Text(
-                    widget.profile.name,
-                    style: GoogleFonts.fredoka(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white,
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 8 * sf),
+                    child: Text(
+                      widget.profile.name,
+                      style: AppFonts.fredoka(
+                        fontSize: 16 * sf,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
                   ),
 
                   // Small speaker hint
                   Icon(
                     Icons.volume_up_rounded,
-                    size: 14,
+                    size: 14 * sf,
                     color: AppColors.secondaryText.withValues(alpha: 0.4),
                   ),
                 ],

@@ -22,6 +22,7 @@ class StarCatcherGame extends StatefulWidget {
   final AudioService audioService;
   final String playerName;
   final ProfileService? profileService;
+  final bool hintsEnabled;
 
   const StarCatcherGame({
     super.key,
@@ -29,6 +30,7 @@ class StarCatcherGame extends StatefulWidget {
     required this.audioService,
     required this.playerName,
     this.profileService,
+    this.hintsEnabled = true,
   });
 
   @override
@@ -641,7 +643,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
               const SizedBox(height: 16),
               Text(
                 'Star Catcher',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 42,
                   fontWeight: FontWeight.w700,
                   color: Colors.white,
@@ -717,7 +719,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
                       const SizedBox(width: 8),
                       Text(
                         'Play!',
-                        style: GoogleFonts.fredoka(
+                        style: AppFonts.fredoka(
                           fontSize: 28,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -812,7 +814,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
                 const SizedBox(width: 4),
                 Text(
                   '$_score',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: AppColors.starGold,
@@ -840,7 +842,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
               ),
               child: Text(
                 '${_combo}x',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: AppColors.electricBlue,
@@ -862,7 +864,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
             ),
             child: Text(
               '${_timeRemaining}s',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: _timeRemaining <= 10
@@ -913,7 +915,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
                 padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: Text(
                   letter,
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 26,
                     fontWeight: FontWeight.w700,
                     color: isCaught
@@ -948,7 +950,8 @@ class _StarCatcherGameState extends State<StarCatcherGame>
         ? sin(star.wobbleTimer * 30) * star.wobbleAmount
         : 0.0;
 
-    final isNextTarget = star.isCorrect &&
+    final isNextTarget = widget.hintsEnabled &&
+        star.isCorrect &&
         star.correctIndex == _nextLetterIndex &&
         !star.caught;
     final starColor = star.caught
@@ -976,7 +979,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
             child: Center(
               child: Text(
                 star.letter,
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 22,
                   fontWeight: FontWeight.w700,
                   color: star.caught
@@ -1036,7 +1039,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
                 const SizedBox(height: 16),
                 Text(
                   title,
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 38,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
@@ -1092,7 +1095,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
           const SizedBox(width: 10),
           Text(
             label,
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 14,
               color: AppColors.secondaryText,
             ),
@@ -1100,7 +1103,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
           const SizedBox(width: 12),
           Text(
             value,
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 20,
               fontWeight: FontWeight.w700,
               color: AppColors.primaryText,
@@ -1131,7 +1134,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
             const SizedBox(width: 8),
             Text(
               label,
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: AppColors.primaryText,

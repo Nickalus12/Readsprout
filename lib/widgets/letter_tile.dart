@@ -86,7 +86,7 @@ class LetterTile extends StatelessWidget {
       return Text(
         letter.toUpperCase(),
         key: ValueKey('revealed_$letter'),
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 30,
           fontWeight: FontWeight.w600,
           color: color,
@@ -108,7 +108,7 @@ class LetterTile extends StatelessWidget {
       return Text(
         '_',
         key: const ValueKey('cursor'),
-        style: GoogleFonts.fredoka(
+        style: AppFonts.fredoka(
           fontSize: 30,
           fontWeight: FontWeight.w400,
           color: AppColors.electricBlue,

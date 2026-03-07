@@ -42,6 +42,16 @@ class AlphabetScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
+
+    // Calculate card width: 4 columns with padding & spacing
+    final gridPadding = 16.0 * sf;
+    final gridSpacing = 10.0 * sf;
+    final cardW = ((screenW - gridPadding * 2 - gridSpacing * 3) / 4)
+        .clamp(60.0, 100.0);
+    final cardH = cardW * 1.15; // keep aspect ratio
+
     return Scaffold(
       body: Stack(
         children: [
@@ -70,50 +80,51 @@ class AlphabetScreen extends StatelessWidget {
               children: [
                 // Header
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
+                  padding: EdgeInsets.fromLTRB(8 * sf, 8 * sf, 16 * sf, 0),
                   child: Row(
                     children: [
                       IconButton(
                         onPressed: () => Navigator.pop(context),
-                        icon: const Icon(
+                        icon: Icon(
                           Icons.arrow_back_rounded,
                           color: AppColors.primaryText,
-                          size: 28,
+                          size: 28 * sf,
                         ),
                       ),
-                      const SizedBox(width: 4),
+                      SizedBox(width: 4 * sf),
                       Text(
                         'Alphabet',
-                        style: GoogleFonts.fredoka(
-                          fontSize: 28,
+                        style: AppFonts.fredoka(
+                          fontSize: 28 * sf,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
                       ),
-                      const SizedBox(width: 8),
+                      SizedBox(width: 8 * sf),
                       GestureDetector(
                         onTap: () => audioService.playWord('alphabet'),
                         child: Icon(
                           Icons.volume_up_rounded,
                           color: AppColors.electricBlue.withValues(alpha: 0.8),
-                          size: 26,
+                          size: 26 * sf,
                         ),
                       ),
                     ],
                   ),
                 ),
 
-                const SizedBox(height: 8),
+                SizedBox(height: 8 * sf),
 
                 // Letter grid
                 Expanded(
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
-                    padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
+                    padding: EdgeInsets.fromLTRB(
+                        gridPadding, 0, gridPadding, 24 * sf),
                     child: Center(
                       child: Wrap(
-                        spacing: 10,
-                        runSpacing: 10,
+                        spacing: gridSpacing,
+                        runSpacing: gridSpacing,
                         alignment: WrapAlignment.center,
                         children: [
                           for (int i = 0; i < _letters.length; i++)
@@ -122,6 +133,9 @@ class AlphabetScreen extends StatelessWidget {
                               color: _colorForIndex(i),
                               index: i,
                               audioService: audioService,
+                              cardWidth: cardW,
+                              cardHeight: cardH,
+                              scaleFactor: sf,
                             ),
                         ],
                       ),
@@ -144,12 +158,18 @@ class _LetterCard extends StatefulWidget {
   final Color color;
   final int index;
   final AudioService audioService;
+  final double cardWidth;
+  final double cardHeight;
+  final double scaleFactor;
 
   const _LetterCard({
     required this.letter,
     required this.color,
     required this.index,
     required this.audioService,
+    required this.cardWidth,
+    required this.cardHeight,
+    required this.scaleFactor,
   });
 
   @override
@@ -184,6 +204,7 @@ class _LetterCardState extends State<_LetterCard>
   Widget build(BuildContext context) {
     // Staggered fade-in on load
     final delay = (widget.index * 50).ms;
+    final sf = widget.scaleFactor;
 
     return GestureDetector(
       onTap: _onTap,
@@ -198,29 +219,29 @@ class _LetterCardState extends State<_LetterCard>
             scale: bounce,
             child: RepaintBoundary(
               child: Container(
-                width: 80,
-                height: 92,
+                width: widget.cardWidth,
+                height: widget.cardHeight,
                 decoration: BoxDecoration(
                   color: widget.color.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(16 * sf),
                   border: Border.all(
                     color: glow > 0.01
                         ? AppColors.electricBlue.withValues(alpha: 0.4 + glow * 0.4)
                         : widget.color.withValues(alpha: 0.35),
-                    width: 1.5,
+                    width: 1.5 * sf,
                   ),
                   boxShadow: [
                     if (glow > 0.01)
                       BoxShadow(
                         color: AppColors.electricBlue.withValues(alpha: glow * 0.35),
-                        blurRadius: 16 * glow,
-                        spreadRadius: 2 * glow,
+                        blurRadius: 16 * glow * sf,
+                        spreadRadius: 2 * glow * sf,
                       )
                     else
                       BoxShadow(
                         color: widget.color.withValues(alpha: 0.1),
-                        blurRadius: 8,
-                        spreadRadius: 1,
+                        blurRadius: 8 * sf,
+                        spreadRadius: 1 * sf,
                       ),
                   ],
                 ),
@@ -230,8 +251,8 @@ class _LetterCardState extends State<_LetterCard>
                     // Uppercase letter
                     Text(
                       widget.letter,
-                      style: GoogleFonts.fredoka(
-                        fontSize: 34,
+                      style: AppFonts.fredoka(
+                        fontSize: 34 * sf,
                         fontWeight: FontWeight.w600,
                         color: glow > 0.01
                             ? Color.lerp(Colors.white, AppColors.electricBlue, glow * 0.4)
@@ -241,11 +262,11 @@ class _LetterCardState extends State<_LetterCard>
                             ? [
                                 Shadow(
                                   color: AppColors.electricBlue.withValues(alpha: glow * 0.8),
-                                  blurRadius: 20 * glow,
+                                  blurRadius: 20 * glow * sf,
                                 ),
                                 Shadow(
                                   color: AppColors.violet.withValues(alpha: glow * 0.4),
-                                  blurRadius: 32 * glow,
+                                  blurRadius: 32 * glow * sf,
                                 ),
                               ]
                             : null,
@@ -254,8 +275,8 @@ class _LetterCardState extends State<_LetterCard>
                     // Lowercase letter
                     Text(
                       widget.letter.toLowerCase(),
-                      style: GoogleFonts.fredoka(
-                        fontSize: 22,
+                      style: AppFonts.fredoka(
+                        fontSize: 22 * sf,
                         fontWeight: FontWeight.w400,
                         color: glow > 0.01
                             ? Color.lerp(
@@ -269,7 +290,7 @@ class _LetterCardState extends State<_LetterCard>
                             ? [
                                 Shadow(
                                   color: AppColors.electricBlue.withValues(alpha: glow * 0.5),
-                                  blurRadius: 12 * glow,
+                                  blurRadius: 12 * glow * sf,
                                 ),
                               ]
                             : null,

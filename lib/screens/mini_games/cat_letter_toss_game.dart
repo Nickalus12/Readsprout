@@ -23,6 +23,7 @@ class CatLetterTossGame extends StatefulWidget {
   final AudioService audioService;
   final String playerName;
   final ProfileService? profileService;
+  final bool hintsEnabled;
 
   const CatLetterTossGame({
     super.key,
@@ -30,6 +31,7 @@ class CatLetterTossGame extends StatefulWidget {
     required this.audioService,
     required this.playerName,
     this.profileService,
+    this.hintsEnabled = true,
   });
 
   @override
@@ -645,6 +647,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
                   painter: _LettersPainter(
                     letters: _letters,
                     sparkles: _sparkles,
+                    hintsEnabled: widget.hintsEnabled,
                   ),
                 ),
               ),
@@ -682,7 +685,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
                   child: Center(
                     child: Text(
                       _feedbackText,
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 28,
                         fontWeight: FontWeight.w700,
                         color: _feedbackColor
@@ -716,7 +719,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
           children: [
             Text(
               'Cat Letter Toss',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 36,
                 fontWeight: FontWeight.w700,
                 color: AppColors.magenta,
@@ -732,7 +735,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
             Text(
               'Drag the basket to catch\nthe right letters!',
               textAlign: TextAlign.center,
-              style: GoogleFonts.nunito(
+              style: AppFonts.nunito(
                 fontSize: 18,
                 color: AppColors.secondaryText,
                 height: 1.4,
@@ -757,7 +760,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
               ),
               child: Text(
                 'Tap to Start',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 22,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -816,7 +819,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
                     const SizedBox(width: 4),
                     Text(
                       '$_score',
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: AppColors.starGold,
@@ -840,7 +843,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
                 ),
                 child: Text(
                   '${_wordsCompleted + 1}/$_wordsPerRound',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 14,
                     fontWeight: FontWeight.w500,
                     color: AppColors.electricBlue,
@@ -863,7 +866,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
                   ),
                   child: Text(
                     '${_combo}x',
-                    style: GoogleFonts.fredoka(
+                    style: AppFonts.fredoka(
                       fontSize: 14,
                       fontWeight: FontWeight.w600,
                       color: AppColors.magenta,
@@ -972,7 +975,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
               child: filled
                   ? Text(
                       _currentWord[i].toUpperCase(),
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 22,
                         fontWeight: FontWeight.w600,
                         color: textColor,
@@ -1006,7 +1009,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
         children: [
           Text(
             _wordsCompleted >= _wordsPerRound ? 'AMAZING!' : 'GAME OVER',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 42,
               fontWeight: FontWeight.w700,
               color: _wordsCompleted >= _wordsPerRound
@@ -1051,7 +1054,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
                     const SizedBox(width: 8),
                     Text(
                       '$_score',
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 36,
                         fontWeight: FontWeight.w700,
                         color: AppColors.starGold,
@@ -1062,7 +1065,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
                 const SizedBox(height: 8),
                 Text(
                   '$_wordsCompleted words completed',
-                  style: GoogleFonts.nunito(
+                  style: AppFonts.nunito(
                     fontSize: 16,
                     color: AppColors.secondaryText,
                   ),
@@ -1071,7 +1074,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
                   const SizedBox(height: 4),
                   Text(
                     'Best combo: ${_bestCombo}x',
-                    style: GoogleFonts.nunito(
+                    style: AppFonts.nunito(
                       fontSize: 14,
                       color: AppColors.magenta,
                     ),
@@ -1104,7 +1107,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
               ),
               child: Text(
                 'Play Again',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 20,
                   fontWeight: FontWeight.w600,
                   color: Colors.white,
@@ -1120,7 +1123,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
             onTap: () => Navigator.of(context).pop(),
             child: Text(
               'Back to Menu',
-              style: GoogleFonts.nunito(
+              style: AppFonts.nunito(
                 fontSize: 16,
                 color: AppColors.secondaryText,
                 decoration: TextDecoration.underline,
@@ -1401,8 +1404,9 @@ class _CatPainter extends CustomPainter {
 class _LettersPainter extends CustomPainter {
   final List<_TossedLetter> letters;
   final List<_Sparkle> sparkles;
+  final bool hintsEnabled;
 
-  _LettersPainter({required this.letters, required this.sparkles});
+  _LettersPainter({required this.letters, required this.sparkles, required this.hintsEnabled});
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1429,9 +1433,10 @@ class _LettersPainter extends CustomPainter {
       if (!l.caught) canvas.rotate(l.rotation);
 
       // Block background
+      final showHint = hintsEnabled && l.isCorrect;
       final blockColor =
-          l.isCorrect ? const Color(0xFF2D1650) : const Color(0xFF1A1A2E);
-      final borderCol = l.isCorrect
+          showHint ? const Color(0xFF2D1650) : const Color(0xFF1A1A2E);
+      final borderCol = showHint
           ? const Color(0xFFEC4899).withValues(alpha: 0.7)
           : const Color(0xFF4A4A6A).withValues(alpha: 0.5);
 
@@ -1455,7 +1460,7 @@ class _LettersPainter extends CustomPainter {
       canvas.drawRRect(blockRect, letterPaint);
 
       // Glow for correct letters
-      if (l.isCorrect) {
+      if (showHint) {
         final glowPaint = Paint()
           ..color = const Color(0xFFEC4899).withValues(alpha: 0.15 * opacity)
           ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8);
@@ -1469,7 +1474,7 @@ class _LettersPainter extends CustomPainter {
           fontFamily: 'Fredoka',
           fontSize: 22,
           fontWeight: FontWeight.w600,
-          color: l.isCorrect
+          color: showHint
               ? const Color(0xFFFF69B4).withValues(alpha: opacity)
               : const Color(0xFF8892B0).withValues(alpha: opacity),
         ),

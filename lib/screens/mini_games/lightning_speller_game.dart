@@ -20,6 +20,7 @@ class LightningSpellerGame extends StatefulWidget {
   final AudioService audioService;
   final String playerName;
   final ProfileService? profileService;
+  final bool hintsEnabled;
 
   const LightningSpellerGame({
     super.key,
@@ -27,6 +28,7 @@ class LightningSpellerGame extends StatefulWidget {
     required this.audioService,
     required this.playerName,
     this.profileService,
+    this.hintsEnabled = true,
   });
 
   @override
@@ -595,7 +597,7 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
               const SizedBox(height: 12),
               Text(
                 'Storm Over!',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 32,
                   fontWeight: FontWeight.w700,
                   color: AppColors.primaryText,
@@ -640,14 +642,14 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
         const SizedBox(width: 8),
         Text(
           '$label: ',
-          style: GoogleFonts.fredoka(
+          style: AppFonts.fredoka(
             fontSize: 16,
             color: AppColors.secondaryText,
           ),
         ),
         Text(
           value,
-          style: GoogleFonts.fredoka(
+          style: AppFonts.fredoka(
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: color,
@@ -669,7 +671,7 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
         ),
         child: Text(
           text,
-          style: GoogleFonts.fredoka(
+          style: AppFonts.fredoka(
             fontSize: 18,
             fontWeight: FontWeight.w600,
             color: color == const Color(0xFF3A3A5C)
@@ -710,7 +712,7 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
                 const SizedBox(width: 6),
                 Text(
                   '$_score',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 20,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryText,
@@ -738,7 +740,7 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
                   const SizedBox(width: 4),
                   Text(
                     '${_combo}x',
-                    style: GoogleFonts.fredoka(
+                    style: AppFonts.fredoka(
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                       color: AppColors.starGold,
@@ -859,7 +861,7 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
         padding: const EdgeInsets.symmetric(vertical: 20),
         child: Text(
           'Get Ready!',
-          style: GoogleFonts.fredoka(
+          style: AppFonts.fredoka(
             fontSize: 28,
             fontWeight: FontWeight.w600,
             color: AppColors.electricBlue,
@@ -875,7 +877,7 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
         duration: const Duration(milliseconds: 400),
         child: Text(
           _currentWord.toUpperCase(),
-          style: GoogleFonts.fredoka(
+          style: AppFonts.fredoka(
             fontSize: 40,
             fontWeight: FontWeight.w600,
             color: AppColors.electricBlue,
@@ -920,16 +922,23 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
     List<BoxShadow> shadows = [];
 
     if (isCorrect) {
-      bgColor = const Color(0xFF0A2A4A);
-      borderColor = AppColors.electricBlue;
-      textColor = AppColors.electricBlue;
-      shadows = [
-        BoxShadow(
-          color: AppColors.electricBlue.withValues(alpha: 0.5),
-          blurRadius: 12,
-          spreadRadius: 2,
-        ),
-      ];
+      if (widget.hintsEnabled) {
+        bgColor = const Color(0xFF0A2A4A);
+        borderColor = AppColors.electricBlue;
+        textColor = AppColors.electricBlue;
+        shadows = [
+          BoxShadow(
+            color: AppColors.electricBlue.withValues(alpha: 0.5),
+            blurRadius: 12,
+            spreadRadius: 2,
+          ),
+        ];
+      } else {
+        // Subtle feedback: slightly darker background, muted border, no glow
+        bgColor = const Color(0xFF151528);
+        borderColor = const Color(0xFF4A4A6A);
+        textColor = AppColors.secondaryText;
+      }
     } else if (isError) {
       bgColor = AppColors.error.withValues(alpha: 0.2);
       borderColor = AppColors.error;
@@ -954,7 +963,7 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
       child: Center(
         child: Text(
           letter.toUpperCase(),
-          style: GoogleFonts.fredoka(
+          style: AppFonts.fredoka(
             fontSize: 28,
             fontWeight: FontWeight.w600,
             color: textColor,

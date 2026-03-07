@@ -103,7 +103,7 @@ class _StickerBookState extends State<StickerBook> {
                 onTap: () => widget.audioService?.playWord('stickers'),
                 child: Text(
                   'Stickers',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
                     color: AppColors.starGold,
@@ -119,7 +119,7 @@ class _StickerBookState extends State<StickerBook> {
                 ),
                 child: Text(
                   '$totalEarned / $totalAvailable',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 13,
                     fontWeight: FontWeight.w500,
                     color: AppColors.starGold.withValues(alpha: 0.8),
@@ -189,7 +189,7 @@ class _StickerBookState extends State<StickerBook> {
               const SizedBox(width: 6),
               Text(
                 section.title,
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 14,
                   fontWeight: FontWeight.w500,
                   color: section.color,
@@ -198,7 +198,7 @@ class _StickerBookState extends State<StickerBook> {
               const SizedBox(width: 6),
               Text(
                 '$earnedInCategory/${section.stickers.length}',
-                style: GoogleFonts.nunito(
+                style: AppFonts.nunito(
                   fontSize: 11,
                   color: AppColors.secondaryText.withValues(alpha: 0.5),
                 ),
@@ -398,7 +398,7 @@ class _StickerTileState extends State<_StickerTile>
                   child: Center(
                     child: Text(
                       '?',
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                         color: AppColors.secondaryText.withValues(alpha: 0.25),
@@ -501,7 +501,7 @@ class _StickerDetailsDialog extends StatelessWidget {
                     child: Text(
                       definition.name,
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.fredoka(
+                      style: AppFonts.fredoka(
                         fontSize: 18,
                         fontWeight: FontWeight.w600,
                         color: definition.color,
@@ -526,7 +526,7 @@ class _StickerDetailsDialog extends StatelessWidget {
               Text(
                 definition.description,
                 textAlign: TextAlign.center,
-                style: GoogleFonts.nunito(
+                style: AppFonts.nunito(
                   fontSize: 13,
                   color: AppColors.secondaryText,
                   height: 1.3,
@@ -537,7 +537,7 @@ class _StickerDetailsDialog extends StatelessWidget {
               // Date earned
               Text(
                 'Earned ${_formatDate(record.dateEarned)}',
-                style: GoogleFonts.nunito(
+                style: AppFonts.nunito(
                   fontSize: 11,
                   color: AppColors.secondaryText.withValues(alpha: 0.6),
                 ),

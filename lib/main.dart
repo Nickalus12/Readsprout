@@ -13,8 +13,8 @@ import 'services/profile_service.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Use bundled fonts — don't fetch from network (works offline on kid devices)
-  GoogleFonts.config.allowRuntimeFetching = false;
+  // Allow runtime font fetching when online; fonts are also bundled in pubspec.yaml
+  // as fallback so the app works fully offline on kid devices.
 
   // Initialize Hive for local storage (cross-platform path resolution)
   await Hive.initFlutter();

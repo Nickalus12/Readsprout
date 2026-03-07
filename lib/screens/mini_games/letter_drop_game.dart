@@ -22,6 +22,7 @@ class LetterDropGame extends StatefulWidget {
   final AudioService audioService;
   final String playerName;
   final ProfileService? profileService;
+  final bool hintsEnabled;
 
   const LetterDropGame({
     super.key,
@@ -29,6 +30,7 @@ class LetterDropGame extends StatefulWidget {
     required this.audioService,
     required this.playerName,
     this.profileService,
+    this.hintsEnabled = true,
   });
 
   @override
@@ -900,6 +902,7 @@ class _LetterDropGameState extends State<LetterDropGame>
                   themeColor: _themeColors[0],
                   particles: _particles,
                   trails: _trails,
+                  hintsEnabled: widget.hintsEnabled,
                 ),
               ),
             ),
@@ -940,7 +943,7 @@ class _LetterDropGameState extends State<LetterDropGame>
     const radius = 22.0;
 
     final isDragging = lb == _dragging;
-    final color = lb.isBouncing
+    final color = lb.isBouncing && widget.hintsEnabled
         ? AppColors.error
         : lb.isDropping
             ? _themeColors[0]
@@ -979,7 +982,7 @@ class _LetterDropGameState extends State<LetterDropGame>
           child: Center(
             child: Text(
               lb.letter.toUpperCase(),
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 22,
                 fontWeight: FontWeight.w600,
                 color: Colors.white,
@@ -1031,7 +1034,7 @@ class _LetterDropGameState extends State<LetterDropGame>
         child: Center(
           child: Text(
             lb.letter.toUpperCase(),
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 22,
               fontWeight: FontWeight.w700,
               color: Colors.white,
@@ -1095,7 +1098,7 @@ class _LetterDropGameState extends State<LetterDropGame>
                 const SizedBox(width: 4),
                 Text(
                   '$_score',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: AppColors.primaryText,
@@ -1132,7 +1135,7 @@ class _LetterDropGameState extends State<LetterDropGame>
                 const SizedBox(width: 4),
                 Text(
                   '${_timeRemaining}s',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                     color: _timeRemaining <= 15
@@ -1179,7 +1182,7 @@ class _LetterDropGameState extends State<LetterDropGame>
           // Word counter
           Text(
             '${_wordsCompleted + 1} / $_wordsPerRound',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 12,
               color: AppColors.secondaryText.withValues(alpha: 0.6),
             ),
@@ -1215,7 +1218,7 @@ class _LetterDropGameState extends State<LetterDropGame>
                   const SizedBox(width: 8),
                   Text(
                     _currentWord,
-                    style: GoogleFonts.fredoka(
+                    style: AppFonts.fredoka(
                       fontSize: 28,
                       fontWeight: FontWeight.w600,
                       color: AppColors.primaryText,
@@ -1255,7 +1258,7 @@ class _LetterDropGameState extends State<LetterDropGame>
             ),
             child: Text(
               'Drag & fling letters into the slots!',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 14,
                 color: AppColors.secondaryText,
               ),
@@ -1275,7 +1278,7 @@ class _LetterDropGameState extends State<LetterDropGame>
             opacity: opacity,
             child: Text(
               'Great job!',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 40,
                 fontWeight: FontWeight.w700,
                 color: AppColors.starGold,
@@ -1300,7 +1303,7 @@ class _LetterDropGameState extends State<LetterDropGame>
         children: [
           Text(
             _lives <= 0 ? 'Game Over' : 'Time\'s Up!',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 36,
               fontWeight: FontWeight.w700,
               color: AppColors.primaryText,
@@ -1309,7 +1312,7 @@ class _LetterDropGameState extends State<LetterDropGame>
           const SizedBox(height: 16),
           Text(
             '$_wordsCompleted words completed',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 18,
               color: AppColors.secondaryText,
             ),
@@ -1322,7 +1325,7 @@ class _LetterDropGameState extends State<LetterDropGame>
               const SizedBox(width: 6),
               Text(
                 '$_score',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 28,
                   fontWeight: FontWeight.w600,
                   color: AppColors.starGold,
@@ -1348,7 +1351,7 @@ class _LetterDropGameState extends State<LetterDropGame>
         children: [
           Text(
             'Round Complete!',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 36,
               fontWeight: FontWeight.w700,
               color: AppColors.starGold,
@@ -1363,7 +1366,7 @@ class _LetterDropGameState extends State<LetterDropGame>
           const SizedBox(height: 16),
           Text(
             '$_wordsCompleted words completed',
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 18,
               color: AppColors.secondaryText,
             ),
@@ -1376,7 +1379,7 @@ class _LetterDropGameState extends State<LetterDropGame>
               const SizedBox(width: 6),
               Text(
                 '$_score',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 28,
                   fontWeight: FontWeight.w600,
                   color: AppColors.starGold,
@@ -1420,7 +1423,7 @@ class _LetterDropGameState extends State<LetterDropGame>
             const SizedBox(width: 8),
             Text(
               label,
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 18,
                 fontWeight: FontWeight.w500,
                 color: AppColors.primaryText,
@@ -1468,6 +1471,7 @@ class _ShelfPainter extends CustomPainter {
   final Color themeColor;
   final List<_Particle> particles;
   final List<_TrailDot> trails;
+  final bool hintsEnabled;
 
   _ShelfPainter({
     required this.slots,
@@ -1478,6 +1482,7 @@ class _ShelfPainter extends CustomPainter {
     required this.themeColor,
     required this.particles,
     required this.trails,
+    required this.hintsEnabled,
   });
 
   @override
@@ -1530,10 +1535,10 @@ class _ShelfPainter extends CustomPainter {
       );
     }
 
-    // Draw slot hint letters (faded)
+    // Draw slot hint letters (faded) — only when hints are enabled
     for (int i = 0; i < slotCount; i++) {
       final slot = slots[i];
-      if (!slot.filled) {
+      if (!slot.filled && hintsEnabled) {
         final textPainter = TextPainter(
           text: TextSpan(
             text: slot.expectedLetter.toUpperCase(),

@@ -9,6 +9,7 @@ import '../../models/player_profile.dart';
 import '../../services/audio_service.dart';
 import '../../services/profile_service.dart';
 import '../../services/progress_service.dart';
+import '../../theme/app_theme.dart';
 import '../../utils/haptics.dart';
 // ---------------------------------------------------------------------------
 // Paint Splash -- Art-themed color mixing letter game
@@ -20,6 +21,7 @@ class PaintSplashGame extends StatefulWidget {
   final AudioService audioService;
   final String playerName;
   final ProfileService? profileService;
+  final bool hintsEnabled;
 
   const PaintSplashGame({
     super.key,
@@ -27,6 +29,7 @@ class PaintSplashGame extends StatefulWidget {
     required this.audioService,
     required this.playerName,
     this.profileService,
+    this.hintsEnabled = true,
   });
 
   @override
@@ -335,7 +338,9 @@ class _PaintSplashGameState extends State<PaintSplashGame>
         vy: (_rng.nextDouble() - 0.5) * 0.06,
         radius: 32,
         wobblePhase: _rng.nextDouble() * pi * 2,
-        color: Colors.grey.withValues(alpha: 0.5),
+        color: widget.hintsEnabled
+            ? Colors.grey.withValues(alpha: 0.5)
+            : _paintColors[_rng.nextInt(_paintColors.length)],
       ));
     }
     _blobs.shuffle(_rng);
@@ -627,7 +632,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
               const SizedBox(height: 16),
               Text(
                 'Paint Splash',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 42,
                   fontWeight: FontWeight.w700,
                   color: const Color(0xFF333333),
@@ -688,7 +693,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
                       const SizedBox(width: 8),
                       Text(
                         'Play!',
-                        style: GoogleFonts.fredoka(
+                        style: AppFonts.fredoka(
                           fontSize: 28,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
@@ -782,7 +787,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
                 const SizedBox(width: 4),
                 Text(
                   '$_score',
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFFFFAA00),
@@ -810,7 +815,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
               ),
               child: Text(
                 '${_combo}x',
-                style: GoogleFonts.fredoka(
+                style: AppFonts.fredoka(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: const Color(0xFFFF4D6A),
@@ -835,7 +840,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
             ),
             child: Text(
               '${_timeRemaining}s',
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
                 color: _timeRemaining <= 10
@@ -894,7 +899,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
                 padding: const EdgeInsets.symmetric(horizontal: 2),
                 child: Text(
                   letter,
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 26,
                     fontWeight: FontWeight.w700,
                     color: isDone
@@ -954,7 +959,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
                 child: Center(
                   child: Text(
                     blob.letter,
-                    style: GoogleFonts.fredoka(
+                    style: AppFonts.fredoka(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
@@ -1017,7 +1022,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
                 const SizedBox(height: 16),
                 Text(
                   title,
-                  style: GoogleFonts.fredoka(
+                  style: AppFonts.fredoka(
                     fontSize: 38,
                     fontWeight: FontWeight.w700,
                     color: const Color(0xFF333333),
@@ -1079,7 +1084,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
           const SizedBox(width: 10),
           Text(
             label,
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 14,
               color: const Color(0xFF888888),
             ),
@@ -1087,7 +1092,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
           const SizedBox(width: 12),
           Text(
             value,
-            style: GoogleFonts.fredoka(
+            style: AppFonts.fredoka(
               fontSize: 20,
               fontWeight: FontWeight.w700,
               color: const Color(0xFF333333),
@@ -1122,7 +1127,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
             const SizedBox(width: 8),
             Text(
               label,
-              style: GoogleFonts.fredoka(
+              style: AppFonts.fredoka(
                 fontSize: 16,
                 fontWeight: FontWeight.w600,
                 color: const Color(0xFF555555),
