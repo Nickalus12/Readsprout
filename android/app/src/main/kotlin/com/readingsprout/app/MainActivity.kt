@@ -1,4 +1,4 @@
-package com.sightwords.sight_words
+package com.readingsprout.app
 
 import io.flutter.embedding.android.FlutterActivity
 

@@ -52,6 +52,25 @@ class ProfileService {
   ReadingLevel get readingLevel =>
       ReadingLevel.forWordCount(totalWordsEverCompleted);
 
+  // ── Words Played Today ────────────────────────────────────────────
+
+  int get wordsPlayedToday {
+    final lastDate = _profileBox.get('wordsPlayedDate') as DateTime?;
+    if (lastDate == null) return 0;
+    final now = DateTime.now();
+    if (lastDate.year == now.year &&
+        lastDate.month == now.month &&
+        lastDate.day == now.day) {
+      return _profileBox.get('wordsPlayedToday', defaultValue: 0) as int;
+    }
+    return 0; // Different day, reset
+  }
+
+  Future<void> setWordsPlayedToday(int count) async {
+    await _profileBox.put('wordsPlayedToday', count);
+    await _profileBox.put('wordsPlayedDate', DateTime.now());
+  }
+
   // ── Streaks ────────────────────────────────────────────────────────
 
   int get currentStreak =>
@@ -141,23 +160,107 @@ class ProfileService {
   int get newStickerCount =>
       _stickerBox.values.where((s) => s.isNew).length;
 
-  // ── Daily Chest ────────────────────────────────────────────────────
+  // ── Activity Chest ─────────────────────────────────────────────────
+  // Tiered daily chests: 1st at 10 words, 2nd at 25, 3rd at 50.
+  // Max 3 chests per day. Chests should feel special, not spammable.
 
-  bool get dailyChestOpened {
-    final lastDate = _dailyBox.get('lastChestDate') as DateTime?;
-    if (lastDate == null) return false;
-    final today = DateTime.now();
-    return lastDate.year == today.year &&
-        lastDate.month == today.month &&
-        lastDate.day == today.day;
+  /// Word thresholds for each daily chest (cumulative words played today).
+  static const List<int> chestThresholds = [10, 25, 50];
+
+  /// Maximum chests earnable per day.
+  static const int maxDailyChests = 3;
+
+  /// Total chests the player has ever opened (lifetime).
+  int get chestsOpenedTotal =>
+      _dailyBox.get('chestsOpenedTotal', defaultValue: 0) as int;
+
+  /// Number of chests already claimed today out of what was earned.
+  int get _chestsClaimedToday {
+    final lastDate = _dailyBox.get('chestsClaimedDate') as DateTime?;
+    if (lastDate == null) return 0;
+    final now = DateTime.now();
+    if (lastDate.year == now.year &&
+        lastDate.month == now.month &&
+        lastDate.day == now.day) {
+      return _dailyBox.get('chestsClaimedToday', defaultValue: 0) as int;
+    }
+    return 0; // New day, reset claimed count
   }
 
-  Future<void> openDailyChest() async {
-    await _dailyBox.put('lastChestDate', DateTime.now());
-    await _dailyBox.put('opened', true);
+  /// How many chests have been earned today based on word thresholds.
+  int get _chestsEarnedToday {
+    final words = wordsPlayedToday;
+    int earned = 0;
+    for (final threshold in chestThresholds) {
+      if (words >= threshold) earned++;
+    }
+    return earned;
   }
 
-  /// Get the last reward item from the chest (if any).
+  /// How many chests are currently available to open.
+  int get chestsAvailable {
+    final earned = _chestsEarnedToday;
+    final claimed = _chestsClaimedToday;
+    return (earned - claimed).clamp(0, maxDailyChests);
+  }
+
+  /// Which chest number the player is working toward (0-indexed into thresholds).
+  /// Returns maxDailyChests if all chests are earned.
+  int get currentChestIndex => _chestsEarnedToday;
+
+  /// Whether all daily chests have been earned and claimed.
+  bool get allDailyChestsComplete =>
+      _chestsEarnedToday >= maxDailyChests &&
+      _chestsClaimedToday >= maxDailyChests;
+
+  /// Words needed to reach the next chest threshold, or 0 if all earned.
+  int get wordsUntilNextChest {
+    final idx = _chestsEarnedToday;
+    if (idx >= maxDailyChests) return 0;
+    return chestThresholds[idx] - wordsPlayedToday;
+  }
+
+  /// Progress toward the current chest threshold (0.0 to 1.0).
+  double get chestProgress {
+    final idx = _chestsEarnedToday;
+    if (idx >= maxDailyChests) return 1.0;
+    final target = chestThresholds[idx];
+    final previousTarget = idx > 0 ? chestThresholds[idx - 1] : 0;
+    final range = target - previousTarget;
+    if (range <= 0) return 1.0;
+    return ((wordsPlayedToday - previousTarget) / range).clamp(0.0, 1.0);
+  }
+
+  /// Whether at least one chest is ready to open.
+  bool get hasChestReady => chestsAvailable > 0;
+
+  /// Legacy compatibility — true if any chest was opened today.
+  bool get dailyChestOpened => _chestsClaimedToday > 0;
+
+  /// Mark one chest as opened. Returns the new total.
+  Future<int> markChestOpened() async {
+    final newTotal = chestsOpenedTotal + 1;
+    await _dailyBox.put('chestsOpenedTotal', newTotal);
+
+    // Track claims for today
+    final newClaimed = _chestsClaimedToday + 1;
+    await _dailyBox.put('chestsClaimedToday', newClaimed);
+    await _dailyBox.put('chestsClaimedDate', DateTime.now());
+
+    return newTotal;
+  }
+
+  /// Legacy — still supports old callers.
+  Future<void> openDailyChest() => markChestOpened();
+
+  /// The ID of the last reward received from a chest.
+  String? get lastChestRewardId =>
+      _dailyBox.get('lastChestRewardId') as String?;
+
+  Future<void> setLastChestRewardId(String rewardId) =>
+      _dailyBox.put('lastChestRewardId', rewardId);
+
+  /// Legacy string-based reward (for backward compat).
   String? get lastChestReward =>
       _dailyBox.get('lastReward') as String?;
 

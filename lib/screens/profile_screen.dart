@@ -9,21 +9,20 @@ import '../services/profile_service.dart';
 import '../services/progress_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/avatar_widget.dart';
-import '../widgets/bookworm_companion.dart';
 import '../widgets/daily_treasure.dart';
-import '../widgets/evolution_path.dart';
 import '../widgets/sticker_book.dart';
 import '../widgets/word_constellation.dart';
 import '../widgets/word_garden.dart';
 import 'avatar_editor_screen.dart';
 
-/// Main profile screen ("My Garden") showing avatar, stats,
+/// Main profile screen ("Garden") showing avatar, stats,
 /// companion, treasure, garden, stickers, and word constellation.
 class ProfileScreen extends StatefulWidget {
   final ProfileService profileService;
   final ProgressService progressService;
   final AudioService audioService;
   final String playerName;
+  final VoidCallback? onSignOut;
 
   const ProfileScreen({
     super.key,
@@ -31,26 +30,37 @@ class ProfileScreen extends StatefulWidget {
     required this.progressService,
     required this.audioService,
     required this.playerName,
+    this.onSignOut,
   });
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
-class _ProfileScreenState extends State<ProfileScreen> {
+class _ProfileScreenState extends State<ProfileScreen>
+    with SingleTickerProviderStateMixin {
   late AvatarConfig _avatar;
+  late AnimationController _avatarGlowController;
 
   @override
   void initState() {
     super.initState();
     _avatar = widget.profileService.avatar;
+    _avatarGlowController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2000),
+    )..repeat(reverse: true);
+  }
+
+  @override
+  void dispose() {
+    _avatarGlowController.dispose();
+    super.dispose();
   }
 
   int get _wordCount => widget.profileService.totalWordsEverCompleted;
   int get _masteredCount => widget.progressService.totalStars;
   int get _streak => widget.profileService.currentStreak;
-
-  ReadingLevel get _readingLevel => widget.profileService.readingLevel;
 
   void _openAvatarEditor() async {
     final result = await Navigator.push<AvatarConfig>(
@@ -100,29 +110,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       children: [
                         const SizedBox(height: 8),
                         _buildHeroSection(),
-                        const SizedBox(height: 24),
-                        _buildCompanionCard(),
-                        const SizedBox(height: 20),
+                        const SizedBox(height: 18),
                         DailyTreasure(
                           profileService: widget.profileService,
-                          wordsPlayedToday: 0,
+                          wordsPlayedToday: widget.profileService.wordsPlayedToday,
                           currentStreak: _streak,
-                        ),
-                        const SizedBox(height: 20),
+                        ).animate().fadeIn(delay: 100.ms, duration: 400.ms)
+                            .slideY(begin: 0.05, end: 0, duration: 300.ms),
+                        const SizedBox(height: 18),
                         WordGarden(
                           progressService: widget.progressService,
                           audioService: widget.audioService,
-                        ),
-                        const SizedBox(height: 20),
+                        ).animate().fadeIn(delay: 200.ms, duration: 400.ms)
+                            .slideY(begin: 0.05, end: 0, duration: 300.ms),
+                        const SizedBox(height: 18),
                         StickerBook(
                           profileService: widget.profileService,
-                        ),
-                        const SizedBox(height: 20),
+                          audioService: widget.audioService,
+                        ).animate().fadeIn(delay: 300.ms, duration: 400.ms)
+                            .slideY(begin: 0.05, end: 0, duration: 300.ms),
+                        const SizedBox(height: 18),
                         WordConstellation(
                           progressService: widget.progressService,
                           audioService: widget.audioService,
-                        ),
-                        const SizedBox(height: 40),
+                        ).animate().fadeIn(delay: 400.ms, duration: 400.ms)
+                            .slideY(begin: 0.05, end: 0, duration: 300.ms),
+                        const SizedBox(height: 28),
                       ],
                     ),
                   ),
@@ -149,24 +162,70 @@ class _ProfileScreenState extends State<ProfileScreen> {
             iconSize: 28,
           ),
           Expanded(
-            child: Text(
-              'My Garden',
-              textAlign: TextAlign.center,
-              style: GoogleFonts.fredoka(
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primaryText,
+            child: GestureDetector(
+              onTap: () => widget.audioService.playWord('garden'),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    Icons.local_florist_rounded,
+                    size: 20,
+                    color: AppColors.emerald.withValues(alpha: 0.7),
+                  ),
+                  const SizedBox(width: 6),
+                  Text(
+                    'My Garden',
+                    textAlign: TextAlign.center,
+                    style: GoogleFonts.fredoka(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryText,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
-          IconButton(
-            onPressed: () {
-              // Settings placeholder
-            },
-            icon: const Icon(Icons.settings_rounded),
-            color: AppColors.secondaryText,
-            iconSize: 24,
-          ),
+          if (widget.onSignOut != null)
+            GestureDetector(
+              onTap: () {
+                // Pop back to home, then trigger sign-out to go to picker
+                Navigator.of(context).pop();
+                widget.onSignOut!();
+              },
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.violet.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.violet.withValues(alpha: 0.3),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.swap_horiz_rounded,
+                      size: 18,
+                      color: AppColors.violet.withValues(alpha: 0.8),
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Switch',
+                      style: GoogleFonts.fredoka(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.violet.withValues(alpha: 0.8),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            const SizedBox(width: 48),
         ],
       ),
     );
@@ -175,352 +234,219 @@ class _ProfileScreenState extends State<ProfileScreen> {
   // ── Hero Section ───────────────────────────────────────────────────
 
   Widget _buildHeroSection() {
-    final level = _readingLevel;
-
     return Column(
       children: [
-        // Reading level title with gold glow
-        GestureDetector(
-          onTap: () => EvolutionPath.showAsBottomSheet(
-            context,
-            wordCount: _wordCount,
-          ),
-          child: Text(
-            level.title,
-            style: GoogleFonts.fredoka(
-              fontSize: 16,
-              fontWeight: FontWeight.w600,
-              color: AppColors.starGold,
-              shadows: [
-                Shadow(
-                  color: AppColors.starGold.withValues(alpha: 0.6),
-                  blurRadius: 12,
+        // Avatar + name row — compact side-by-side layout
+        Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Avatar — tap opens editor, with animated glow
+            GestureDetector(
+              onTap: _openAvatarEditor,
+              child: AnimatedBuilder(
+                animation: _avatarGlowController,
+                builder: (context, child) {
+                  final glowAlpha = 0.2 + _avatarGlowController.value * 0.2;
+                  final blurRadius = 16.0 + _avatarGlowController.value * 12;
+                  return Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Container(
+                        width: 100,
+                        height: 100,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.violet.withValues(alpha: 0.4 + _avatarGlowController.value * 0.2),
+                            width: 2.5,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.violet.withValues(alpha: glowAlpha),
+                              blurRadius: blurRadius,
+                              spreadRadius: 3,
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(2),
+                        child: AvatarWidget(config: _avatar, size: 90),
+                      ),
+                      // Edit badge — small pencil icon
+                      Positioned(
+                        right: -2,
+                        bottom: -2,
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: AppColors.violet,
+                            border: Border.all(
+                              color: AppColors.background,
+                              width: 2,
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: AppColors.violet.withValues(alpha: 0.4),
+                                blurRadius: 8,
+                              ),
+                            ],
+                          ),
+                          child: const Icon(
+                            Icons.edit_rounded,
+                            size: 14,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ],
+                  );
+                },
+              ),
+            ),
+
+            const SizedBox(width: 16),
+
+            // Name + stats stacked
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (widget.playerName.isNotEmpty)
+                  GestureDetector(
+                    onTap: () => widget.audioService.playWelcome(widget.playerName),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          widget.playerName,
+                          style: GoogleFonts.fredoka(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.white,
+                            shadows: [
+                              Shadow(
+                                color: AppColors.magenta.withValues(alpha: 0.5),
+                                blurRadius: 16,
+                              ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Icon(
+                          Icons.volume_up_rounded,
+                          color: AppColors.secondaryText.withValues(alpha: 0.4),
+                          size: 16,
+                        ),
+                      ],
+                    ),
+                  ),
+
+                const SizedBox(height: 10),
+
+                // Inline stats chips with labels
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _StatChip(Icons.local_florist_rounded, AppColors.emerald, '$_wordCount',
+                      label: 'Words',
+                      onTap: () => widget.audioService.playWord('words'),
+                    ),
+                    const SizedBox(width: 8),
+                    _StatChip(Icons.star_rounded, AppColors.starGold, '$_masteredCount',
+                      label: 'Stars',
+                      onTap: () => widget.audioService.playWord('stars'),
+                    ),
+                    const SizedBox(width: 8),
+                    _StatChip(Icons.local_fire_department_rounded, AppColors.flameOrange, '$_streak',
+                      label: 'Streak',
+                      animate: _streak > 0,
+                      onTap: () => widget.audioService.playWord('streak'),
+                    ),
+                  ],
                 ),
               ],
             ),
-          )
-              .animate()
-              .fadeIn(duration: 600.ms)
-              .then()
-              .shimmer(
-                duration: 2500.ms,
-                color: AppColors.starGold.withValues(alpha: 0.3),
-              ),
-        ),
-
-        const SizedBox(height: 12),
-
-        // Avatar with glow ring — long press opens editor
-        GestureDetector(
-          onTap: _openAvatarEditor,
-          onLongPress: _openAvatarEditor,
-          child: Container(
-            width: 96,
-            height: 96,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.violet.withValues(alpha: 0.35),
-                  blurRadius: 20,
-                  spreadRadius: 4,
-                ),
-              ],
-            ),
-            child: Container(
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: AppColors.violet.withValues(alpha: 0.6),
-                  width: 3,
-                ),
-              ),
-              padding: const EdgeInsets.all(3),
-              child: AvatarWidget(config: _avatar, size: 80),
-            ),
-          )
-              .animate()
-              .fadeIn(duration: 500.ms)
-              .scale(
-                begin: const Offset(0.8, 0.8),
-                end: const Offset(1.0, 1.0),
-                duration: 500.ms,
-                curve: Curves.easeOutBack,
-              ),
-        ),
-
-        const SizedBox(height: 8),
-
-        // Bookworm companion below avatar
-        BookwormCompanion(
-          wordCount: _wordCount,
-          size: 64,
-          onTap: () {},
-        ),
-
-        const SizedBox(height: 8),
-
-        // Player name
-        if (widget.playerName.isNotEmpty)
-          Text(
-            widget.playerName,
-            style: GoogleFonts.fredoka(
-              fontSize: 28,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
-              shadows: [
-                Shadow(
-                  color: AppColors.magenta.withValues(alpha: 0.6),
-                  blurRadius: 20,
-                ),
-                Shadow(
-                  color: AppColors.violet.withValues(alpha: 0.4),
-                  blurRadius: 40,
-                ),
-              ],
-            ),
-          ).animate().fadeIn(duration: 600.ms),
-
-        const SizedBox(height: 16),
-
-        // Stats row: 3 glass-morphism cards
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 24),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              _GlassStatCard(
-                icon: Icons.local_florist_rounded,
-                iconColor: AppColors.emerald,
-                value: '$_wordCount',
-                label: 'Flowers',
-              ),
-              const SizedBox(width: 12),
-              _GlassStatCard(
-                icon: Icons.star_rounded,
-                iconColor: AppColors.starGold,
-                value: '$_masteredCount',
-                label: 'Stars',
-              ),
-              const SizedBox(width: 12),
-              _GlassStatCard(
-                icon: Icons.local_fire_department_rounded,
-                iconColor: AppColors.flameOrange,
-                value: '$_streak',
-                label: 'Streak',
-              ),
-            ],
-          )
-              .animate()
-              .fadeIn(delay: 300.ms, duration: 500.ms),
-        ),
+          ],
+        ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1, end: 0, duration: 400.ms),
       ],
     );
   }
 
-  // ── Companion Card ─────────────────────────────────────────────────
+}
 
-  Widget _buildCompanionCard() {
-    final stage = BookwormStage.fromWordCount(_wordCount);
-    final level = _readingLevel;
-    final progress = level.progressToNext(_wordCount);
-    final nextLevel = level.next;
+// ── Compact stat chip ─────────────────────────────────────────────────
 
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: stage.primaryColor.withValues(alpha: 0.3),
+class _StatChip extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String value;
+  final String? label;
+  final bool animate;
+  final VoidCallback? onTap;
+
+  const _StatChip(this.icon, this.color, this.value, {this.label, this.animate = false, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    Widget chip = GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: color.withValues(alpha: 0.25),
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.1),
+              blurRadius: 8,
+              spreadRadius: 0,
+            ),
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: stage.primaryColor.withValues(alpha: 0.08),
-            blurRadius: 16,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          BookwormCompanion(
-            wordCount: _wordCount,
-            size: 72,
-            onTap: () {},
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 4),
                 Text(
-                  stage.title,
+                  value,
                   style: GoogleFonts.fredoka(
-                    fontSize: 18,
+                    fontSize: 15,
                     fontWeight: FontWeight.w600,
-                    color: stage.primaryColor,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                // Progress bar
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: SizedBox(
-                    height: 8,
-                    child: Stack(
-                      children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: AppColors.border.withValues(alpha: 0.4),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                        ),
-                        FractionallySizedBox(
-                          widthFactor: progress.clamp(0.0, 1.0),
-                          child: Container(
-                            decoration: BoxDecoration(
-                              gradient: LinearGradient(
-                                colors: [
-                                  stage.primaryColor,
-                                  stage.primaryColor.withValues(alpha: 0.7),
-                                ],
-                              ),
-                              borderRadius: BorderRadius.circular(4),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: stage.primaryColor
-                                      .withValues(alpha: 0.4),
-                                  blurRadius: 6,
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  nextLevel != null
-                      ? '${(_wordCount - level.minWords)} / ${level.maxWords - level.minWords + 1} to ${nextLevel.title}'
-                      : 'Max level reached!',
-                  style: GoogleFonts.nunito(
-                    fontSize: 12,
-                    color: AppColors.secondaryText,
-                  ),
-                ),
-                const SizedBox(height: 10),
-                GestureDetector(
-                  onTap: () => EvolutionPath.showAsBottomSheet(
-                    context,
-                    wordCount: _wordCount,
-                  ),
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 6,
-                    ),
-                    decoration: BoxDecoration(
-                      color: stage.primaryColor.withValues(alpha: 0.12),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: stage.primaryColor.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(
-                          Icons.route_rounded,
-                          size: 14,
-                          color: stage.primaryColor,
-                        ),
-                        const SizedBox(width: 6),
-                        Text(
-                          'See Evolution Path',
-                          style: GoogleFonts.fredoka(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w500,
-                            color: stage.primaryColor,
-                          ),
-                        ),
-                      ],
-                    ),
+                    color: AppColors.primaryText,
                   ),
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    ).animate().fadeIn(delay: 200.ms, duration: 500.ms).slideY(
-          begin: 0.1,
-          end: 0,
-          duration: 500.ms,
-          curve: Curves.easeOut,
-        );
-  }
-}
-
-// ── Glass-morphism stat card ───────────────────────────────────────────
-
-class _GlassStatCard extends StatelessWidget {
-  final IconData icon;
-  final Color iconColor;
-  final String value;
-  final String label;
-
-  const _GlassStatCard({
-    required this.icon,
-    required this.iconColor,
-    required this.value,
-    required this.label,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-      decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.6),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppColors.border.withValues(alpha: 0.4),
+            if (label != null) ...[
+              const SizedBox(height: 1),
+              Text(
+                label!,
+                style: GoogleFonts.nunito(
+                  fontSize: 9,
+                  fontWeight: FontWeight.w600,
+                  color: color.withValues(alpha: 0.7),
+                ),
+              ),
+            ],
+          ],
         ),
-        boxShadow: [
-          BoxShadow(
-            color: iconColor.withValues(alpha: 0.08),
-            blurRadius: 12,
-            spreadRadius: 1,
-          ),
-        ],
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, size: 22, color: iconColor),
-          const SizedBox(height: 4),
-          Text(
-            value,
-            style: GoogleFonts.fredoka(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: AppColors.primaryText,
-            ),
-          ),
-          Text(
-            label,
-            style: GoogleFonts.nunito(
-              fontSize: 11,
-              color: AppColors.secondaryText,
-            ),
-          ),
-        ],
       ),
     );
+
+    if (animate) {
+      chip = chip
+          .animate(onPlay: (c) => c.repeat(reverse: true))
+          .scaleXY(begin: 1.0, end: 1.05, duration: 1200.ms);
+    }
+
+    return chip;
   }
 }
 

@@ -15,12 +15,21 @@ class ReviewSummary {
 }
 
 class ReviewService {
-  static const _key = 'review_data';
+  static const _baseKey = 'review_data';
   late SharedPreferences _prefs;
   late Map<String, ReviewData> _reviews; // word text -> review data
+  String _profileId = '';
 
-  Future<void> init() async {
-    _prefs = await SharedPreferences.getInstance();
+  String get _key => _profileId.isEmpty ? _baseKey : '${_baseKey}_$_profileId';
+
+  Future<void> init([SharedPreferences? prefs]) async {
+    _prefs = prefs ?? await SharedPreferences.getInstance();
+    _loadReviews();
+  }
+
+  /// Reload review data for a different profile.
+  void switchProfile(String profileId) {
+    _profileId = profileId;
     _loadReviews();
   }
 

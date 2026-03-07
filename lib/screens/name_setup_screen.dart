@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
+import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/floating_hearts_bg.dart';
 
@@ -12,11 +13,13 @@ import '../widgets/floating_hearts_bg.dart';
 class NameSetupScreen extends StatefulWidget {
   final void Function(String name) onNameSubmitted;
   final VoidCallback? onBack;
+  final AudioService? audioService;
 
   const NameSetupScreen({
     super.key,
     required this.onNameSubmitted,
     this.onBack,
+    this.audioService,
   });
 
   @override
@@ -57,6 +60,10 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
     }
   }
 
+  void _playAppName() {
+    widget.audioService?.playWord('reading_sprout');
+  }
+
   KeyEventResult _onKey(FocusNode node, KeyEvent event) {
     if (event is KeyDownEvent &&
         event.logicalKey == LogicalKeyboardKey.escape &&
@@ -95,18 +102,22 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
           // ── Foreground content ───────────────────────────────
           SafeArea(
             child: Center(
-              child: Padding(
+              child: SingleChildScrollView(
+                physics: const BouncingScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 40),
                 child: Column(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Spacer(flex: 3),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.08),
 
-                    // Logo
-                    Image.asset(
-                      'assets/images/logo.png',
-                      width: 120,
-                      height: 120,
+                    // Logo (tappable)
+                    GestureDetector(
+                      onTap: () => _playAppName(),
+                      child: Image.asset(
+                        'assets/images/logo.png',
+                        width: 120,
+                        height: 120,
+                      ),
                     ).animate().scale(
                           begin: const Offset(0.5, 0.5),
                           end: const Offset(1.0, 1.0),
@@ -118,7 +129,7 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
 
                     // Title
                     Text(
-                      'ReadSprout',
+                      'Reading Sprout',
                       style: GoogleFonts.fredoka(
                         fontSize: 40,
                         fontWeight: FontWeight.w600,
@@ -266,7 +277,7 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                       ).animate().fadeIn(delay: 800.ms, duration: 400.ms),
                     ],
 
-                    const Spacer(flex: 4),
+                    SizedBox(height: MediaQuery.of(context).size.height * 0.1),
                   ],
                 ),
               ),

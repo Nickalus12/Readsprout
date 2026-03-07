@@ -6,6 +6,8 @@ import '../data/dolch_words.dart';
 import '../models/progress.dart';
 import '../services/progress_service.dart';
 import '../services/audio_service.dart';
+import '../services/profile_service.dart';
+import '../services/stats_service.dart';
 import '../widgets/zone_background.dart';
 import '../widgets/tier_stars_display.dart';
 import '../widgets/tier_selection_sheet.dart';
@@ -14,12 +16,16 @@ import 'game_screen.dart';
 class LevelSelectScreen extends StatefulWidget {
   final ProgressService progressService;
   final AudioService audioService;
+  final ProfileService? profileService;
+  final StatsService? statsService;
   final String playerName;
 
   const LevelSelectScreen({
     super.key,
     required this.progressService,
     required this.audioService,
+    this.profileService,
+    this.statsService,
     this.playerName = '',
   });
 
@@ -43,7 +49,13 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
     _expanded = {};
     for (int i = 0; i < DolchWords.zones.length; i++) {
       final zone = DolchWords.zones[i];
-      _expanded[i] = zone.containsLevel(highestUnlocked);
+      // Only expand if the zone contains the highest unlocked level
+      // AND the zone is actually unlocked
+      final zoneHasUnlocked = List.generate(
+        zone.levelCount,
+        (j) => widget.progressService.isLevelUnlocked(zone.startLevel + j),
+      ).any((u) => u);
+      _expanded[i] = zoneHasUnlocked && zone.containsLevel(highestUnlocked);
     }
     // If nothing matched (shouldn't happen), open the first zone.
     if (!_expanded.values.any((v) => v)) {
@@ -78,19 +90,22 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      Text(
-                        'Choose a Level',
-                        style: GoogleFonts.fredoka(
-                          fontSize: 26,
-                          fontWeight: FontWeight.w600,
-                          color: AppColors.primaryText,
-                          shadows: [
-                            Shadow(
-                              color: AppColors.electricBlue
-                                  .withValues(alpha: 0.3),
-                              blurRadius: 12,
-                            ),
-                          ],
+                      GestureDetector(
+                        onTap: () => widget.audioService.playWord('adventure_path'),
+                        child: Text(
+                          'Adventure Path',
+                          style: GoogleFonts.fredoka(
+                            fontSize: 22,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primaryText,
+                            shadows: [
+                              Shadow(
+                                color: AppColors.electricBlue
+                                    .withValues(alpha: 0.3),
+                                blurRadius: 12,
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       const Spacer(),
@@ -156,9 +171,11 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
         children: [
           // Zone header (tappable to expand/collapse)
           GestureDetector(
-            onTap: () => setState(() {
-              _expanded[zoneIndex] = !isExpanded;
-            }),
+            onTap: zoneUnlocked
+                ? () => setState(() {
+                      _expanded[zoneIndex] = !isExpanded;
+                    })
+                : null,
             child: AnimatedOpacity(
               opacity: zoneUnlocked ? 1.0 : 0.55,
               duration: const Duration(milliseconds: 250),
@@ -213,15 +230,20 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
-                            zone.name,
-                            style: GoogleFonts.fredoka(
-                              fontSize: 17,
-                              fontWeight: FontWeight.w600,
-                              color: zoneUnlocked
-                                  ? AppColors.primaryText
-                                  : AppColors.secondaryText
-                                      .withValues(alpha: 0.7),
+                          GestureDetector(
+                            onTap: () => widget.audioService.playWord(
+                              zone.name.toLowerCase().replaceAll(' ', '_'),
+                            ),
+                            child: Text(
+                              zone.name,
+                              style: GoogleFonts.fredoka(
+                                fontSize: 17,
+                                fontWeight: FontWeight.w600,
+                                color: zoneUnlocked
+                                    ? AppColors.primaryText
+                                    : AppColors.secondaryText
+                                        .withValues(alpha: 0.7),
+                              ),
                             ),
                           ),
                           const SizedBox(height: 4),
@@ -301,16 +323,17 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                 duration: 400.ms,
               ),
 
-          // Level cards (collapsible)
-          AnimatedCrossFade(
-            firstChild: const SizedBox(width: double.infinity, height: 0),
-            secondChild: _buildLevelCards(zone, zoneIndex),
-            crossFadeState: isExpanded
-                ? CrossFadeState.showSecond
-                : CrossFadeState.showFirst,
-            duration: const Duration(milliseconds: 300),
-            sizeCurve: Curves.easeInOut,
-          ),
+          // Level cards (collapsible) — only show for unlocked zones
+          if (zoneUnlocked)
+            AnimatedCrossFade(
+              firstChild: const SizedBox(width: double.infinity, height: 0),
+              secondChild: _buildLevelCards(zone, zoneIndex),
+              crossFadeState: isExpanded
+                  ? CrossFadeState.showSecond
+                  : CrossFadeState.showFirst,
+              duration: const Duration(milliseconds: 300),
+              sizeCurve: Curves.easeInOut,
+            ),
         ],
       ),
     );
@@ -348,14 +371,15 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
               .animate()
               .fadeIn(
                 delay: Duration(
-                    milliseconds: zoneIndex * 80 + (i + 1) * 40),
+                    milliseconds: zoneIndex * 80 + (i + 1) * 50),
                 duration: 350.ms,
               )
-              .slideX(
-                begin: 0.05,
-                end: 0,
+              .scaleXY(
+                begin: 0.95,
+                end: 1.0,
                 delay: Duration(
-                    milliseconds: zoneIndex * 80 + (i + 1) * 40),
+                    milliseconds: zoneIndex * 80 + (i + 1) * 50),
+                duration: 350.ms,
                 curve: Curves.easeOutCubic,
               );
         }),
@@ -389,6 +413,8 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
           level: level,
           progressService: widget.progressService,
           audioService: widget.audioService,
+          profileService: widget.profileService,
+          statsService: widget.statsService,
           playerName: widget.playerName,
           tier: selectedTier.value,
         ),
@@ -409,7 +435,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
 
 // ── Level Card ──────────────────────────────────────────────────────────
 
-class _LevelCard extends StatelessWidget {
+class _LevelCard extends StatefulWidget {
   final int level;
   final String name;
   final bool unlocked;
@@ -433,101 +459,140 @@ class _LevelCard extends StatelessWidget {
   });
 
   @override
+  State<_LevelCard> createState() => _LevelCardState();
+}
+
+class _LevelCardState extends State<_LevelCard> {
+  double _scale = 1.0;
+
+  void _onTapDown(TapDownDetails _) {
+    if (widget.onTap == null) return;
+    setState(() => _scale = 0.95);
+  }
+
+  void _onTapUp(TapUpDetails _) {
+    setState(() => _scale = 1.0);
+  }
+
+  void _onTapCancel() {
+    setState(() => _scale = 1.0);
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final isComplete = levelProgress.isComplete;
-    final starsEarned = levelProgress.starsEarned;
+    final isComplete = widget.levelProgress.isComplete;
+    final starsEarned = widget.levelProgress.starsEarned;
     final hasAnyStars = starsEarned > 0;
+    // "Next to play" = unlocked, not complete, and has no stars yet
+    final isNextToPlay = widget.unlocked && !hasAnyStars && !isComplete;
 
     return Padding(
       padding: const EdgeInsets.only(bottom: 8),
       child: GestureDetector(
-        onTap: onTap,
-        child: AnimatedOpacity(
-          opacity: unlocked ? 1.0 : 0.45,
-          duration: const Duration(milliseconds: 200),
-          child: Container(
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: hasAnyStars
-                  ? accentColor.withValues(alpha: 0.06)
-                  : AppColors.surface.withValues(alpha: 0.75),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
+        onTap: widget.onTap,
+        onTapDown: _onTapDown,
+        onTapUp: _onTapUp,
+        onTapCancel: _onTapCancel,
+        child: AnimatedScale(
+          scale: _scale,
+          duration: const Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+          child: AnimatedOpacity(
+            opacity: widget.unlocked ? 1.0 : 0.45,
+            duration: const Duration(milliseconds: 200),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
                 color: hasAnyStars
-                    ? accentColor.withValues(alpha: 0.25)
-                    : unlocked
-                        ? accentColor.withValues(alpha: 0.15)
-                        : AppColors.border.withValues(alpha: 0.5),
-                width: 1.5,
+                    ? widget.accentColor.withValues(alpha: 0.06)
+                    : isNextToPlay
+                        ? widget.accentColor.withValues(alpha: 0.04)
+                        : AppColors.surface.withValues(alpha: 0.75),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: hasAnyStars
+                      ? widget.accentColor.withValues(alpha: 0.25)
+                      : isNextToPlay
+                          ? widget.accentColor.withValues(alpha: 0.3)
+                          : widget.unlocked
+                              ? widget.accentColor.withValues(alpha: 0.15)
+                              : AppColors.border.withValues(alpha: 0.5),
+                  width: isNextToPlay ? 1.8 : 1.5,
+                ),
+                boxShadow: [
+                  if (isComplete)
+                    BoxShadow(
+                      color: widget.accentColor.withValues(alpha: 0.08),
+                      blurRadius: 14,
+                      spreadRadius: 1,
+                    ),
+                  if (isNextToPlay)
+                    BoxShadow(
+                      color: widget.accentColor.withValues(alpha: 0.1),
+                      blurRadius: 12,
+                    ),
+                ],
               ),
-              boxShadow: isComplete
-                  ? [
-                      BoxShadow(
-                        color: accentColor.withValues(alpha: 0.06),
-                        blurRadius: 12,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Row(
-              children: [
-                // Left: Level number badge
-                _LevelBadge(
-                  level: level,
-                  unlocked: unlocked,
-                  accentColor: accentColor,
-                  overallProgress: levelProgress.overallProgress,
-                  starsEarned: starsEarned,
-                ),
-                const SizedBox(width: 14),
-
-                // Center: Level name + word preview
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        name,
-                        style: GoogleFonts.fredoka(
-                          fontSize: 15,
-                          fontWeight: FontWeight.w600,
-                          color: unlocked
-                              ? AppColors.primaryText
-                              : AppColors.secondaryText,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        wordPreview,
-                        style: GoogleFonts.nunito(
-                          fontSize: 12,
-                          color: AppColors.secondaryText
-                              .withValues(alpha: 0.7),
-                          fontStyle: FontStyle.italic,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
+              child: Row(
+                children: [
+                  // Left: Level number badge
+                  _LevelBadge(
+                    level: widget.level,
+                    unlocked: widget.unlocked,
+                    accentColor: widget.accentColor,
+                    overallProgress: widget.levelProgress.overallProgress,
+                    starsEarned: starsEarned,
                   ),
-                ),
-                const SizedBox(width: 10),
+                  const SizedBox(width: 14),
 
-                // Right: 3-star tier display or lock icon
-                if (unlocked)
-                  TierStarsDisplay(
-                    levelProgress: levelProgress,
-                    isTier2Unlocked: isTier2Unlocked,
-                    isTier3Unlocked: isTier3Unlocked,
-                    starSize: 18,
-                  )
-                else
-                  Icon(
-                    Icons.lock_rounded,
-                    color: AppColors.secondaryText.withValues(alpha: 0.4),
-                    size: 18,
+                  // Center: Level name + word preview
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          widget.name,
+                          style: GoogleFonts.fredoka(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                            color: widget.unlocked
+                                ? AppColors.primaryText
+                                : AppColors.secondaryText,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          widget.wordPreview,
+                          style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            color: AppColors.secondaryText
+                                .withValues(alpha: 0.7),
+                            fontStyle: FontStyle.italic,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
-              ],
+                  const SizedBox(width: 10),
+
+                  // Right: 3-star tier display or lock icon
+                  if (widget.unlocked)
+                    TierStarsDisplay(
+                      levelProgress: widget.levelProgress,
+                      isTier2Unlocked: widget.isTier2Unlocked,
+                      isTier3Unlocked: widget.isTier3Unlocked,
+                      starSize: 18,
+                    )
+                  else
+                    Icon(
+                      Icons.lock_rounded,
+                      color: AppColors.secondaryText.withValues(alpha: 0.4),
+                      size: 18,
+                    ),
+                ],
+              ),
             ),
           ),
         ),

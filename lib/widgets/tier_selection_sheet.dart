@@ -324,23 +324,43 @@ class _TierOptionCard extends StatelessWidget {
                 if (unlocked)
                   Container(
                     padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 8,
+                      horizontal: 18,
+                      vertical: 9,
                     ),
                     decoration: BoxDecoration(
                       color: accentColor.withValues(alpha: 0.15),
-                      borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(
-                        color: accentColor.withValues(alpha: 0.3),
+                        color: accentColor.withValues(alpha: 0.35),
                       ),
+                      boxShadow: [
+                        if (isSuggested && !isComplete)
+                          BoxShadow(
+                            color: accentColor.withValues(alpha: 0.15),
+                            blurRadius: 10,
+                          ),
+                      ],
                     ),
-                    child: Text(
-                      isComplete ? 'REPLAY' : 'PLAY',
-                      style: GoogleFonts.fredoka(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
-                        color: accentColor,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          isComplete
+                              ? Icons.replay_rounded
+                              : Icons.play_arrow_rounded,
+                          size: 16,
+                          color: accentColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          isComplete ? 'REPLAY' : 'PLAY',
+                          style: GoogleFonts.fredoka(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: accentColor,
+                          ),
+                        ),
+                      ],
                     ),
                   )
                 else

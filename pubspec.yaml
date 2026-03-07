@@ -1,4 +1,4 @@
-name: sight_words
+name: reading_sprout
 description: A beautiful sight word learning app for kids — hear it, type it, learn it.
 publish_to: 'none'
 version: 1.0.0+1
@@ -11,19 +11,20 @@ dependencies:
     sdk: flutter
   audioplayers: ^6.1.0          # Play pre-generated TTS audio clips
   shared_preferences: ^2.3.0    # Persist progress & settings locally
-  confetti: ^0.7.0              # Celebration confetti animations
-  google_fonts: ^6.2.1          # Beautiful typography
+  confetti: ^0.8.0              # Celebration confetti animations
+  google_fonts: ^8.0.2          # Beautiful typography
   flutter_animate: ^4.5.0       # Smooth, declarative animations
   path_provider: ^2.1.0         # Find app directories for audio storage
   uuid: ^4.0.0                  # Unique IDs for custom words
-  window_manager: ^0.4.0         # Desktop window control (hide title bar, fullscreen)
+  window_manager: ^0.5.1         # Desktop window control (hide title bar, fullscreen)
   hive: ^2.2.3                   # Local key-value database (cross-platform, no native deps)
   hive_flutter: ^1.1.0           # Platform-agnostic Hive initialization
+  forge2d: ^0.14.2               # 2D physics engine
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^6.0.0
   hive_generator: ^2.0.1         # Code-gen for Hive TypeAdapters
   build_runner: ^2.4.0           # Runs hive_generator
 
@@ -33,5 +34,31 @@ flutter:
     - assets/images/
     - assets/audio/words/
     - assets/audio/letters/
+    - assets/audio/phonics/
+    - assets/audio/letter_names/
     - assets/audio/effects/
     - assets/audio/phrases/
+    - assets/google_fonts/
+  fonts:
+    - family: Fredoka
+      fonts:
+        - asset: assets/google_fonts/Fredoka-Light.ttf
+          weight: 300
+        - asset: assets/google_fonts/Fredoka-Regular.ttf
+          weight: 400
+        - asset: assets/google_fonts/Fredoka-Medium.ttf
+          weight: 500
+        - asset: assets/google_fonts/Fredoka-SemiBold.ttf
+          weight: 600
+        - asset: assets/google_fonts/Fredoka-Bold.ttf
+          weight: 700
+    - family: Nunito
+      fonts:
+        - asset: assets/google_fonts/Nunito-Regular.ttf
+          weight: 400
+        - asset: assets/google_fonts/Nunito-Medium.ttf
+          weight: 500
+        - asset: assets/google_fonts/Nunito-SemiBold.ttf
+          weight: 600
+        - asset: assets/google_fonts/Nunito-Bold.ttf
+          weight: 700

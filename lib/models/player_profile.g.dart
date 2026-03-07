@@ -61,6 +61,9 @@ class PlayerProfileAdapter extends TypeAdapter<PlayerProfile> {
 }
 
 // ── AvatarConfig adapter (typeId: 1) ──────────────────────────────
+//
+// Fields 11-18 added in the avatar overhaul. Old profiles that only have
+// fields 0-10 will get default values (0) for the new fields.
 
 class AvatarConfigAdapter extends TypeAdapter<AvatarConfig> {
   @override
@@ -84,13 +87,22 @@ class AvatarConfigAdapter extends TypeAdapter<AvatarConfig> {
       hasSparkle: fields[8] as bool,
       hasRainbowSparkle: fields[9] as bool,
       hasGoldenGlow: fields[10] as bool,
+      // New fields default to 0 for old profiles
+      eyeColor: (fields[11] as int?) ?? 0,
+      eyelashStyle: (fields[12] as int?) ?? 0,
+      eyebrowStyle: (fields[13] as int?) ?? 0,
+      lipColor: (fields[14] as int?) ?? 0,
+      cheekStyle: (fields[15] as int?) ?? 0,
+      noseStyle: (fields[16] as int?) ?? 0,
+      glassesStyle: (fields[17] as int?) ?? 0,
+      facePaint: (fields[18] as int?) ?? 0,
     );
   }
 
   @override
   void write(BinaryWriter writer, AvatarConfig obj) {
     writer
-      ..writeByte(11) // number of fields
+      ..writeByte(19) // number of fields
       ..writeByte(0)
       ..write(obj.faceShape)
       ..writeByte(1)
@@ -112,7 +124,23 @@ class AvatarConfigAdapter extends TypeAdapter<AvatarConfig> {
       ..writeByte(9)
       ..write(obj.hasRainbowSparkle)
       ..writeByte(10)
-      ..write(obj.hasGoldenGlow);
+      ..write(obj.hasGoldenGlow)
+      ..writeByte(11)
+      ..write(obj.eyeColor)
+      ..writeByte(12)
+      ..write(obj.eyelashStyle)
+      ..writeByte(13)
+      ..write(obj.eyebrowStyle)
+      ..writeByte(14)
+      ..write(obj.lipColor)
+      ..writeByte(15)
+      ..write(obj.cheekStyle)
+      ..writeByte(16)
+      ..write(obj.noseStyle)
+      ..writeByte(17)
+      ..write(obj.glassesStyle)
+      ..writeByte(18)
+      ..write(obj.facePaint);
   }
 
   @override

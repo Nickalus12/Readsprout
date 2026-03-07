@@ -146,6 +146,66 @@ BONUS_WORDS = sorted(set(w.lower() for w in [
 # Remove any that are already in Dolch
 BONUS_WORDS = sorted(set(BONUS_WORDS) - set(DOLCH_WORDS))
 
+# ── Sticker Audio Names ─────────────────────────────────────────────────
+# Maps audioKey -> spoken sticker name. Files go to assets/audio/words/<audioKey>.mp3
+
+STICKER_NAMES = {
+    # Level completion (22 levels)
+    **{f"level_{i}": f"Level {i}" for i in range(1, 23)},
+
+    # Milestones
+    "first_word": "First Word",
+    "ten_words": "Ten Words",
+    "twenty_five_words": "Twenty-Five Words",
+    "fifty_words": "Fifty Words",
+    "one_hundred_words": "One Hundred Words",
+    "one_hundred_fifty_words": "One Hundred Fifty Words",
+    "two_hundred_words": "Two Hundred Words",
+    "all_words": "All Words",
+
+    # Streaks
+    "three_day_streak": "Three Day Streak",
+    "seven_day_streak": "Seven Day Streak",
+    "fourteen_day_streak": "Fourteen Day Streak",
+    "thirty_day_streak": "Thirty Day Streak",
+
+    # Perfect
+    "perfect_level": "Perfect Level",
+
+    # Evolution
+    "word_sprout": "Word Sprout",
+    "word_explorer": "Word Explorer",
+    "word_wizard": "Word Wizard",
+    "word_champion": "Word Champion",
+    "reading_superstar": "Reading Superstar",
+
+    # Special
+    "speed_reader": "Speed Reader",
+
+    # Mini-game stickers
+    "first_flight": "First Flight",
+    "unicorn_rider": "Unicorn Rider",
+    "sky_champion": "Sky Champion",
+    "storm_speller": "Storm Speller",
+    "lightning_fast": "Lightning Fast",
+    "thunder_brain": "Thunder Brain",
+    "bubble_popper": "Bubble Popper",
+    "bubble_master": "Bubble Master",
+    "memory_maker": "Memory Maker",
+    "sharp_memory": "Sharp Memory",
+    "perfect_recall": "Perfect Recall",
+    "letter_catcher": "Letter Catcher",
+    "falling_star": "Falling Star",
+    "cat_tosser": "Cat Tosser",
+    "purrfect_aim": "Purrfect Aim",
+    "cat_champion": "Cat Champion",
+    "letter_dropper": "Letter Dropper",
+    "drop_expert": "Drop Expert",
+    "rhyme_rookie": "Rhyme Rookie",
+    "rhyme_master": "Rhyme Master",
+    "super_poet": "Super Poet",
+}
+
 # ── Phrase Templates ─────────────────────────────────────────────────────
 # Each category has phrases with {name} placeholder.
 # These match the Dart PhraseTemplates class exactly.
@@ -207,6 +267,38 @@ LETTER_PHONETIC_PROMPTS = {
     'z': 'zzz',
 }
 
+# ── Letter NAME prompts (alphabet names, not phonetic sounds) ────────────
+# Each prompt is a full sentence to avoid ambiguity with short utterances.
+
+LETTER_NAME_PROMPTS = {
+    'a': 'Say the letter name "A", as in the English alphabet. Pronounce it as "ay". Just the single letter name, nothing else.',
+    'b': 'Say the letter name "B", as in the English alphabet. Pronounce it as "bee". Just the single letter name, nothing else.',
+    'c': 'Say the letter name "C", as in the English alphabet. Pronounce it as "see". Just the single letter name, nothing else.',
+    'd': 'Say the letter name "D", as in the English alphabet. Pronounce it as "dee". Just the single letter name, nothing else.',
+    'e': 'Say the letter name "E", as in the English alphabet. Pronounce it as "ee". Just the single letter name, nothing else.',
+    'f': 'Say the letter name "F", as in the English alphabet. Pronounce it as "eff". Just the single letter name, nothing else.',
+    'g': 'Say the letter name "G", as in the English alphabet. Pronounce it as "jee". Just the single letter name, nothing else.',
+    'h': 'Say the letter name "H", as in the English alphabet. Pronounce it as "aych". Just the single letter name, nothing else.',
+    'i': 'Say the letter name "I", as in the English alphabet. Pronounce it as "eye". Just the single letter name, nothing else.',
+    'j': 'Say the letter name "J", as in the English alphabet. Pronounce it as "jay". Just the single letter name, nothing else.',
+    'k': 'Say the letter name "K", as in the English alphabet. Pronounce it as "kay". Just the single letter name, nothing else.',
+    'l': 'Say the letter name "L", as in the English alphabet. Pronounce it as "ell". Just the single letter name, nothing else.',
+    'm': 'Say the letter name "M", as in the English alphabet. Pronounce it as "em". Just the single letter name, nothing else.',
+    'n': 'Say the letter name "N", as in the English alphabet. Pronounce it as "en". Just the single letter name, nothing else.',
+    'o': 'Say the letter name "O", as in the English alphabet. Pronounce it as "oh". Just the single letter name, nothing else.',
+    'p': 'Say the letter name "P", as in the English alphabet. Pronounce it as "pee". Just the single letter name, nothing else.',
+    'q': 'Say the letter name "Q", as in the English alphabet. Pronounce it as "kyoo". Just the single letter name, nothing else.',
+    'r': 'Say the letter name "R", as in the English alphabet. Pronounce it as "ar". Just the single letter name, nothing else.',
+    's': 'Say the letter name "S", as in the English alphabet. Pronounce it as "ess". Just the single letter name, nothing else.',
+    't': 'Say the letter name "T", as in the English alphabet. Pronounce it as "tee". Just the single letter name, nothing else.',
+    'u': 'Say the letter name "U", as in the English alphabet. Pronounce it as "yoo". Just the single letter name, nothing else.',
+    'v': 'Say the letter name "V", as in the English alphabet. Pronounce it as "vee". Just the single letter name, nothing else.',
+    'w': 'Say the letter name "W", as in the English alphabet. Pronounce it as "double-yoo". Just the single letter name, nothing else.',
+    'x': 'Say the letter name "X", as in the English alphabet. Pronounce it as "ex". Just the single letter name, nothing else.',
+    'y': 'Say the letter name "Y", as in the English alphabet. Pronounce it as "why". Just the single letter name, nothing else.',
+    'z': 'Say the letter name "Z", as in the English alphabet. Pronounce it as "zee". Just the single letter name, nothing else.',
+}
+
 # Special word prompts for short/ambiguous words that TTS may misinterpret.
 # These words are EXCLUDED from batch mode and generated individually.
 WORD_SPECIAL_PROMPTS = {
@@ -220,8 +312,10 @@ WORD_SPECIAL_PROMPTS = {
         'Pronounce it clearly as "eye". Just the single word, nothing else.'
     ),
     'an': (
-        'Say the English article word "an", as used in "I see an apple." '
-        'Pronounce it clearly. Just the single word, nothing else.'
+        'Say the English article word "an", as used in "I ate an apple." '
+        'It rhymes with "can" and "pan". The ending sound is the letter N, '
+        'not M. Pronounce it clearly as "ann" with a strong N at the end. '
+        'Just the single word, nothing else.'
     ),
     'as': (
         'Say the English word "as", as used in "as big as a house." '
@@ -526,6 +620,7 @@ def ensure_dirs(base_path: Path):
     """Create output directories."""
     (base_path / "words").mkdir(parents=True, exist_ok=True)
     (base_path / "letters").mkdir(parents=True, exist_ok=True)
+    (base_path / "letter_names").mkdir(parents=True, exist_ok=True)
     (base_path / "effects").mkdir(parents=True, exist_ok=True)
     (base_path / "phrases").mkdir(parents=True, exist_ok=True)
     print(f"Output directory: {base_path}")
@@ -845,6 +940,121 @@ def generate_letters(api_key: str, voice: str, base_path: Path):
     print(f"Letters complete!")
 
 
+def generate_letter_names(api_key: str, voice: str, base_path: Path, batch_size: int):
+    """Generate spoken letter NAME audio using batch mode for efficiency."""
+    names_dir = base_path / "letter_names"
+    all_letters = list("abcdefghijklmnopqrstuvwxyz")
+
+    already_done = [l for l in all_letters if (names_dir / f"{l}.mp3").exists()]
+    remaining = [l for l in all_letters if not (names_dir / f"{l}.mp3").exists()]
+
+    batch_count = (len(remaining) + batch_size - 1) // batch_size if remaining else 0
+
+    print(f"\n{'='*56}")
+    print(f"  Generating letter NAME audio -- BATCH MODE")
+    print(f"{'='*56}")
+    print(f"  Total letters:  26")
+    print(f"  Already done:   {len(already_done)} (skipped)")
+    print(f"  Remaining:      {len(remaining)} -> {batch_count} batches of <={batch_size}")
+    print(f"  Voice: {voice}")
+    print()
+
+    if not remaining:
+        print("  All letter names already generated!")
+        return
+
+    generated = 0
+    failed_letters = []
+
+    # Use batch mode: 10-13 letters per call = 2-3 calls for all 26
+    batches = [remaining[i:i+batch_size] for i in range(0, len(remaining), batch_size)]
+
+    for batch_idx, batch in enumerate(batches):
+        batch = [l for l in batch if not (names_dir / f"{l}.mp3").exists()]
+        if not batch:
+            continue
+        if _quota_exhausted:
+            failed_letters.extend(batch)
+            continue
+
+        print(f"  Batch {batch_idx+1}/{len(batches)} ({len(batch)} letters): {', '.join(batch)}")
+
+        # Build batch prompt for letter names
+        letter_list = "\n".join(f"{i+1}. {l.upper()}" for i, l in enumerate(batch))
+        prompt = (
+            f'You are a warm, patient reading teacher with a clear, gentle voice.\n'
+            f'You are in a quiet classroom helping a young child learn the alphabet.\n\n'
+            f'Say each of the following {len(batch)} letter NAMES ONE AT A TIME.\n'
+            f'- Say the standard English alphabet name for each letter\n'
+            f'- Pronounce each clearly and slowly\n'
+            f'- Use a warm, encouraging tone\n'
+            f'- Take a FULL 3-second silent pause between each letter\n'
+            f'- Say ONLY the letter names — no numbers, no commentary, no extra sounds\n\n'
+            f'Letters to say in order:\n{letter_list}'
+        )
+
+        batch_timeout = max(120, len(batch) * 15)
+        pcm = generate_speech_raw(api_key, prompt, voice, timeout=batch_timeout)
+        if pcm is None:
+            print(f"    API FAILED -- queuing {len(batch)} letters for fallback")
+            failed_letters.extend(batch)
+            time.sleep(DELAY_BETWEEN_REQUESTS)
+            continue
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            tmp = Path(tmpdir)
+            batch_wav = tmp / "batch.wav"
+            pcm_to_wav(pcm, batch_wav)
+
+            dur = get_audio_duration(batch_wav)
+            print(f"    Audio: {dur:.1f}s ({dur/len(batch):.1f}s avg/letter)")
+
+            results, threshold_label = _try_split_with_cascade(
+                batch_wav, batch, names_dir
+            )
+
+            if results:
+                for letter, path in results:
+                    print(f"    OK  {letter}")
+                if threshold_label != "default":
+                    print(f"    (used {threshold_label} threshold)")
+                generated += len(results)
+            else:
+                for letter in batch:
+                    p = names_dir / f"{letter}.mp3"
+                    p.unlink(missing_ok=True)
+                print(f"    SPLIT FAILED at all thresholds")
+                failed_letters.extend(batch)
+
+        time.sleep(DELAY_BETWEEN_REQUESTS)
+
+    # Fallback: generate failed letters individually
+    if failed_letters:
+        remaining_fails = [l for l in dict.fromkeys(failed_letters) if not (names_dir / f"{l}.mp3").exists()]
+        if remaining_fails and not _quota_exhausted:
+            print(f"\n  Fallback: generating {len(remaining_fails)} letter names individually...")
+            for letter in remaining_fails:
+                if _quota_exhausted:
+                    break
+                out = names_dir / f"{letter}.mp3"
+                prompt = LETTER_NAME_PROMPTS[letter]
+                print(f"    {letter}...", end=" ", flush=True)
+                ok = generate_speech(api_key, prompt, voice, out)
+                print("OK" if ok else "FAILED")
+                if ok:
+                    generated += 1
+                time.sleep(DELAY_BETWEEN_REQUESTS)
+
+    final_count = len(list(names_dir.glob("*.mp3")))
+    print(f"\n  Letter names summary:")
+    print(f"    Already had:   {len(already_done)}")
+    print(f"    Generated:     {generated}")
+    print(f"    Total on disk: {final_count}")
+    still_missing = [l for l in all_letters if not (names_dir / f"{l}.mp3").exists()]
+    if still_missing:
+        print(f"    Still missing: {len(still_missing)} -- {', '.join(still_missing)}")
+
+
 def generate_phrases(api_key: str, voice: str, base_path: Path, name: str):
     """Generate personalized encouragement phrases with the player's name."""
     phrases_dir = base_path / "phrases"
@@ -898,6 +1108,39 @@ def generate_phrases(api_key: str, voice: str, base_path: Path, name: str):
     print(f"Phrases complete! ({generated} new)")
 
 
+def generate_stickers(api_key: str, voice: str, base_path: Path):
+    """Generate TTS audio for all sticker names."""
+    words_dir = base_path / "words"
+    total = len(STICKER_NAMES)
+    print(f"\nGenerating {total} sticker name audio clips...")
+
+    skipped = 0
+    generated = 0
+    for audio_key, spoken_name in STICKER_NAMES.items():
+        out = words_dir / f"{audio_key}.mp3"
+        if out.exists():
+            skipped += 1
+            continue
+
+        prompt = (
+            f'Say "{spoken_name}" clearly and enthusiastically, as if announcing '
+            f'a fun reward or achievement to a young child. '
+            f'Use a warm, celebratory tone. Just the phrase, nothing else.'
+        )
+
+        print(f"  [sticker] \"{spoken_name}\" -> {audio_key}.mp3...", end=" ", flush=True)
+        ok = generate_speech(api_key, prompt, voice, out)
+        print("OK" if ok else "FAILED")
+        if ok:
+            generated += 1
+
+        time.sleep(DELAY_BETWEEN_REQUESTS)
+
+    if skipped:
+        print(f"  Skipped {skipped} existing files")
+    print(f"Sticker audio complete! ({generated} new)")
+
+
 def generate_effects_placeholder(base_path: Path):
     """Remind about sound effects."""
     effects_dir = base_path / "effects"
@@ -941,7 +1184,7 @@ def main():
     )
     parser.add_argument(
         "--only",
-        choices=["words", "letters", "phrases", "bonus"],
+        choices=["words", "letters", "letter_names", "phrases", "bonus", "stickers"],
         help="Generate only a specific category",
     )
     parser.add_argument(
@@ -1040,15 +1283,21 @@ def main():
         gen_words(args.api_key, args.voice, base_path, bonus_with_custom, "bonus word")
     elif args.only == "letters":
         generate_letters(args.api_key, args.voice, base_path)
+    elif args.only == "letter_names":
+        generate_letter_names(args.api_key, args.voice, base_path, args.batch_size)
     elif args.only == "phrases":
         if not args.name:
             print("Error: --name is required for phrase generation")
             sys.exit(1)
         generate_phrases(args.api_key, args.voice, base_path, args.name)
+    elif args.only == "stickers":
+        generate_stickers(args.api_key, args.voice, base_path)
     else:
         # Generate everything
         gen_words(args.api_key, args.voice, base_path, all_words, "word")
         generate_letters(args.api_key, args.voice, base_path)
+        generate_letter_names(args.api_key, args.voice, base_path, args.batch_size)
+        generate_stickers(args.api_key, args.voice, base_path)
         if args.name:
             generate_phrases(args.api_key, args.voice, base_path, args.name)
 
@@ -1057,15 +1306,20 @@ def main():
     # Final summary
     word_count = len(list((base_path / "words").glob("*.mp3")))
     letter_count = len(list((base_path / "letters").glob("*.mp3")))
+    letter_name_count = len(list((base_path / "letter_names").glob("*.mp3")))
     phrase_count = len(list((base_path / "phrases").glob("*.mp3")))
+    sticker_keys = set(STICKER_NAMES.keys())
+    sticker_count = sum(1 for f in (base_path / "words").glob("*.mp3") if f.stem in sticker_keys)
 
     print(f"\n{'='*52}")
     print(f"  GENERATION COMPLETE")
     print(f"{'='*52}")
-    print(f"  Words:   {word_count}")
-    print(f"  Letters: {letter_count}")
-    print(f"  Phrases: {phrase_count}")
-    print(f"  Output:  {base_path.resolve()}")
+    print(f"  Words:        {word_count}")
+    print(f"  Letters:      {letter_count}")
+    print(f"  Letter Names: {letter_name_count}")
+    print(f"  Stickers:     {sticker_count}/{len(STICKER_NAMES)}")
+    print(f"  Phrases:      {phrase_count}")
+    print(f"  Output:       {base_path.resolve()}")
     print(f"{'='*52}")
 
 

@@ -1,17 +1,30 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/progress.dart';
 import '../data/dolch_words.dart';
 
 class ProgressService {
-  static const _key = 'sight_words_progress';
+  static const _baseKey = 'sight_words_progress';
   late SharedPreferences _prefs;
   late Map<int, LevelProgress> _progress;
+  String _profileId = '';
+
+  String get _key => _profileId.isEmpty ? _baseKey : '${_baseKey}_$_profileId';
 
   Map<int, LevelProgress> get progress => Map.unmodifiable(_progress);
 
-  Future<void> init() async {
-    _prefs = await SharedPreferences.getInstance();
+  Future<void> init([SharedPreferences? prefs]) async {
+    _prefs = prefs ?? await SharedPreferences.getInstance();
+    _loadProgress();
+  }
+
+  /// Reload progress for a different profile.
+  /// Flushes any pending saves for the previous profile first.
+  void switchProfile(String profileId) {
+    _saveTimer?.cancel();
+    if (_dirty) _flushSave();
+    _profileId = profileId;
     _loadProgress();
   }
 
@@ -59,7 +72,20 @@ class ProgressService {
     }
   }
 
+  Timer? _saveTimer;
+  bool _dirty = false;
+
+  /// Debounced save — coalesces rapid writes (e.g., multiple words in a session).
+  /// Flushes after 500ms of inactivity or immediately on profile switch.
   Future<void> _save() async {
+    _dirty = true;
+    _saveTimer?.cancel();
+    _saveTimer = Timer(const Duration(milliseconds: 500), _flushSave);
+  }
+
+  Future<void> _flushSave() async {
+    if (!_dirty) return;
+    _dirty = false;
     final encoded = jsonEncode(
       _progress.map((key, value) => MapEntry(key.toString(), value.toJson())),
     );
@@ -149,6 +175,7 @@ class ProgressService {
       perfectAttempts:
           mistakes == 0 ? stats.perfectAttempts + 1 : stats.perfectAttempts,
       totalMistakes: stats.totalMistakes + mistakes,
+      bestMistakes: mistakes < stats.bestMistakes ? mistakes : stats.bestMistakes,
     );
 
     final newWordStats = Map<String, WordStats>.from(currentTier.wordStats);
@@ -157,9 +184,9 @@ class ProgressService {
     // Count completed words for this tier
     int completedCount;
     if (isChampion) {
-      // For champion, only count words that have at least one attempt with <= 1 mistake
+      // For champion, count words that have at least one attempt with <= 1 mistake
       completedCount = newWordStats.values
-          .where((s) => s.attempts > 0 && s.perfectAttempts > 0)
+          .where((s) => s.attempts > 0 && s.bestMistakes <= 1)
           .length
           .clamp(0, 10);
     } else {

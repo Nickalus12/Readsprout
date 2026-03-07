@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.sightwords" "\0"
-            VALUE "FileDescription", "sight_words" "\0"
+            VALUE "CompanyName", "com.readingsprout" "\0"
+            VALUE "FileDescription", "ReadingSprout" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "sight_words" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2026 com.sightwords. All rights reserved." "\0"
-            VALUE "OriginalFilename", "sight_words.exe" "\0"
-            VALUE "ProductName", "sight_words" "\0"
+            VALUE "InternalName", "reading_sprout" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2026 com.readingsprout. All rights reserved." "\0"
+            VALUE "OriginalFilename", "reading_sprout.exe" "\0"
+            VALUE "ProductName", "ReadingSprout" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

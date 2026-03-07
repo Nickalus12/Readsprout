@@ -229,24 +229,30 @@ class WordStats {
   final int attempts;
   final int perfectAttempts; // No mistakes
   final int totalMistakes;
+  final int bestMistakes; // Fewest mistakes in any single attempt
 
   const WordStats({
     this.attempts = 0,
     this.perfectAttempts = 0,
     this.totalMistakes = 0,
+    this.bestMistakes = 999,
   });
 
-  bool get mastered => perfectAttempts >= 3; // Mastered after 3 perfect runs
+  /// Legacy per-word mastery check. Prefer checking level's
+  /// highestCompletedTier >= 3 for true mastery (all 3 tiers done).
+  bool get mastered => perfectAttempts >= 3;
 
   WordStats copyWith({
     int? attempts,
     int? perfectAttempts,
     int? totalMistakes,
+    int? bestMistakes,
   }) {
     return WordStats(
       attempts: attempts ?? this.attempts,
       perfectAttempts: perfectAttempts ?? this.perfectAttempts,
       totalMistakes: totalMistakes ?? this.totalMistakes,
+      bestMistakes: bestMistakes ?? this.bestMistakes,
     );
   }
 
@@ -254,11 +260,13 @@ class WordStats {
         'attempts': attempts,
         'perfectAttempts': perfectAttempts,
         'totalMistakes': totalMistakes,
+        'bestMistakes': bestMistakes,
       };
 
   factory WordStats.fromJson(Map<String, dynamic> json) => WordStats(
         attempts: json['attempts'] as int? ?? 0,
         perfectAttempts: json['perfectAttempts'] as int? ?? 0,
         totalMistakes: json['totalMistakes'] as int? ?? 0,
+        bestMistakes: json['bestMistakes'] as int? ?? 999,
       );
 }

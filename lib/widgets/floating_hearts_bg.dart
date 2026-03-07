@@ -19,10 +19,10 @@ class FloatingHeartsBackground extends StatefulWidget {
 
   @override
   State<FloatingHeartsBackground> createState() =>
-      _FloatingHeartsBackgroundState();
+      FloatingHeartsBackgroundState();
 }
 
-class _FloatingHeartsBackgroundState extends State<FloatingHeartsBackground>
+class FloatingHeartsBackgroundState extends State<FloatingHeartsBackground>
     with SingleTickerProviderStateMixin {
   late Ticker _ticker;
   late _HeartsSimulation _sim;
@@ -41,11 +41,11 @@ class _FloatingHeartsBackgroundState extends State<FloatingHeartsBackground>
     super.dispose();
   }
 
+  /// Tap at a screen position — bursts the nearest heart with a purple flash.
+  void tapAt(Offset pos) => _sim.tapAt(pos);
+
   @override
   Widget build(BuildContext context) {
-    // Build runs only ONCE (or on hot reload). The Ticker drives
-    // _sim.notifyListeners() which triggers CustomPaint.repaint directly —
-    // no setState, no widget rebuild.
     return RepaintBoundary(
       child: LayoutBuilder(builder: (context, constraints) {
         _sim.size = constraints.biggest;
@@ -93,6 +93,27 @@ class _HeartsSimulation extends ChangeNotifier {
   ];
 
   _HeartsSimulation({required this.cloudZoneHeight});
+
+  void tapAt(Offset pos) {
+    if (size == Size.zero) return;
+
+    _Heart? closest;
+    double closestDist = double.infinity;
+
+    for (final h in hearts) {
+      final dist = (Offset(h.x, h.y) - pos).distance;
+      if (dist < 50 && dist < closestDist) {
+        closestDist = dist;
+        closest = h;
+      }
+    }
+
+    if (closest != null) {
+      // Purple flash at heart position
+      flashes.add(_CloudFlash(x: closest.x, y: closest.y));
+      hearts.remove(closest);
+    }
+  }
 
   void tick(Duration elapsed) {
     final dtRaw = (elapsed - _lastElapsed).inMicroseconds / 1e6;

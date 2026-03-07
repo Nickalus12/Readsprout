@@ -14,9 +14,13 @@ class Word {
   /// Audio asset path for the full word pronunciation
   String get wordAudioPath => 'assets/audio/words/${text.toLowerCase()}.mp3';
 
-  /// Audio asset path for a specific letter's phonetic sound
+  /// Audio asset path for a specific letter's name
   String letterAudioPath(String letter) =>
-      'assets/audio/letters/${letter.toLowerCase()}.mp3';
+      'assets/audio/letter_names/${letter.toLowerCase()}.mp3';
+
+  /// Audio asset path for a specific letter's phonetic sound
+  String letterPhonicsPath(String letter) =>
+      'assets/audio/phonics/${letter.toLowerCase()}.mp3';
 
   Map<String, dynamic> toJson() => {
         'id': id,

@@ -5,14 +5,14 @@
   <img src="https://img.shields.io/badge/License-MIT-yellow" alt="MIT License">
 </p>
 
-<h1 align="center">ReadingSprout</h1>
+<h1 align="center">Reading Sprout</h1>
 
 <p align="center">
-  <em>A beautiful, immersive sight word learning app for early readers.</em>
+  <em>Hear. Type. Learn.</em>
 </p>
 
 <p align="center">
-  Hear the word. Type it letter by letter. Get phonetic feedback on every keystroke.<br>
+  A beautiful, immersive sight word learning app for early readers.<br>
   Built with Flutter for a smooth, cross-platform experience.
 </p>
 
@@ -20,35 +20,79 @@
 
 ## Overview
 
-ReadSprout teaches children to read through the complete **Dolch Sight Word** list &mdash; 220 essential words organized into 22 progressive levels, plus 49 bonus words. Every word comes with pre-generated audio so the app works **completely offline** with zero latency.
+Reading Sprout teaches children to read through the complete **Dolch Sight Word** list — 220 essential words organized into 22 progressive levels across 5 adventure zones, plus 49 bonus words. Every word comes with pre-generated audio so the app works **completely offline** with zero latency.
 
-The app personalizes the experience by asking for the child's name on first launch, then uses it for spoken encouragement phrases throughout gameplay.
+The app supports **multiple player profiles**, so siblings can each have their own progress, avatar, and stats. It's designed for kids who can't read yet — all navigation is visual and tappable with audio cues.
 
 ## Features
 
-- **269 sight words** with professional-quality audio pronunciation
-- **Phonetic letter sounds** &mdash; hear each letter's sound as you type it
+### Core Learning
+- **269 sight words** with professional-quality TTS audio pronunciation
+- **Letter name audio** — hear each letter's name as you type it
+- **Phonetic letter sounds** — optional phonics mode for deeper learning
+- **3-tier mastery system** — Explorer, Adventurer, and Champion tiers per level
+- **Gentle error handling** — wrong letters trigger a shake animation and haptic feedback, never harsh penalties
+
+### Adventure Mode
 - **22 unlockable levels** with progressive difficulty
-- **Personalized encouragement** &mdash; the app cheers your child on by name
+- **5 themed zones** — Whispering Woods, Shimmer Shore, Crystal Peaks, Skyward Kingdom, Celestial Crown
 - **On-screen keyboard** optimized for small hands, plus full hardware keyboard support
-- **Gentle error handling** &mdash; wrong letters trigger a shake animation, never harsh penalties
-- **Celebration animations** &mdash; confetti, glow effects, and praise on every completed word
-- **Progress tracking** &mdash; stars for mastery, level completion stats
+- **Celebration animations** — confetti, glow effects, and praise on every completed word
+
+### Mini Games (10 games)
+- **Unicorn Flight** — Fly through clouds collecting letters to spell words
+- **Lightning Speller** — Race against the clock in a storm-themed spelling challenge
+- **Word Bubbles** — Pop floating bubbles in the right order to spell words
+- **Memory Match** — Classic memory card game with sight words
+- **Falling Letters** — Catch letters as they fall from the sky
+- **Cat Toss** — Toss letter balls to a cat to spell words
+- **Letter Drop** — Physics-based letter dropping with forge2d — aim and fling letters into slots
+- **Rhyme Time** — Match rhyming words together
+- **Star Catcher** — Tap stars in a constellation to spell words in space
+- **Paint Splash** — Tap paint blobs in the right order on an art canvas
+- **High score tracking** per game
+
+### Multi-Profile System
+- **Profile picker** — "Who's Playing?" screen with large, kid-friendly profile cards
+- **Per-player progress** — each child has their own levels, stats, and achievements
+- **Voice feedback** — tapping a profile says the child's name aloud
+
+### Garden & Profile
+- **Customizable avatar** with unlockable accessories (hats, face paint, glasses)
+- **Word Garden** — watch flowers grow as you master words
+- **Stickers** — earn collectible stickers for achievements
+- **Words Mastered** — an interactive star-map constellation showing all mastered words
+- **Daily Treasure** — tiered chest system (3 chests/day) with rarity-based rewards
+- **Streak tracking** — build daily streaks for bonus rewards
+
+### Stats & Tracking
+- **Per-letter tap tracking** — how many times each letter has been tapped
+- **Confusion tracking** — which letters get mixed up (e.g., tapping "b" when "d" was expected)
+- **Word attempt stats** — attempts, mistakes, and accuracy per word
+- **Mini game stats** — games played, scores, and completion tracking
+- **Session time tracking** — automatic play time recording
+- **Haptic feedback** — tactile responses on correct, wrong, and completion events
+
+### Polish
+- **Responsive UI** — scales properly across different phone sizes (tested on S24, tablets, desktop)
+- **Tappable UI** — tap words, labels, zone names, and the logo to hear them spoken aloud
+- **Bundled fonts** — Fredoka font included offline, no internet needed
 - **Dark mode UI** with a calming color palette designed for focus
-- **Fully offline** &mdash; no internet required after initial setup
-- **Cross-platform** &mdash; Android, iOS, Windows, macOS, Linux
+- **Fully offline** — no internet required after initial setup
+- **Cross-platform** — Android, iOS, Windows, macOS, Linux
 
 ## How It Works
 
-1. **First Launch** &mdash; A parent enters the child's name for personalized encouragement
-2. **Home Screen** &mdash; Tap "Let's Go!" to begin
-3. **Level Select** &mdash; Pick an unlocked level (starts at Level 1)
-4. **Gameplay** &mdash; A word is spoken aloud. The child types each letter:
-   - **Correct letter** &rarr; reveals with a phonetic sound and green glow
-   - **Wrong letter** &rarr; gentle shake, tile flashes red, try again
-5. **Word Complete** &mdash; Confetti burst + personalized praise phrase
-6. **Level Complete** &mdash; Fanfare animation, next level unlocks
-7. **Mastery** &mdash; Complete a word 3 times with zero mistakes to earn a star
+1. **First Launch** — A parent enters the child's name for personalized encouragement
+2. **Profile Picker** — Tap your name card to sign in (supports multiple kids)
+3. **Home Screen** — Tap "Adventure Mode" to begin, or explore Mini Games and the Alphabet
+4. **Zone Select** — Pick an unlocked zone and level
+5. **Gameplay** — A word is spoken aloud. The child types each letter:
+   - **Correct letter** — reveals with a letter name sound, green glow, and light haptic
+   - **Wrong letter** — gentle shake, tile flashes red, haptic buzz, try again
+6. **Word Complete** — Confetti burst + success sound
+7. **Level Complete** — Fanfare animation, next level unlocks
+8. **Mastery** — Complete all 3 tiers (Explorer, Adventurer, Champion) to earn 3 stars
 
 ## Quick Start
 
@@ -75,11 +119,14 @@ python scripts/generate_tts_gemini.py --api-key "YOUR_KEY" --name YourChildsName
 flutter run
 ```
 
-### Build
+### Build & Deploy
 
 ```bash
 # Android APK
 flutter build apk --release
+
+# Install via ADB
+adb install -r build/app/outputs/flutter-apk/app-release.apk
 
 # Windows
 flutter build windows --release
@@ -90,14 +137,14 @@ flutter build ios --release
 
 ## Audio Generation
 
-ReadSprout uses **pre-generated audio clips** for instant, offline playback. The included script uses Google's Gemini TTS to generate all audio files.
+Reading Sprout uses **pre-generated audio clips** for instant, offline playback. The included script supports both Gemini 2.5 Flash and Pro TTS models.
 
 ### Generate All Audio
 
 ```bash
 pip install requests
 
-# Generate word pronunciations, letter sounds, and personalized phrases
+# Generate word pronunciations, letter names, and personalized phrases
 python scripts/generate_tts_gemini.py \
   --api-key "YOUR_GEMINI_API_KEY" \
   --name YourChildsName
@@ -107,7 +154,7 @@ python scripts/generate_tts_gemini.py --api-key "YOUR_KEY" --preview "hello"
 
 # Generate only specific categories
 python scripts/generate_tts_gemini.py --api-key "YOUR_KEY" --only words
-python scripts/generate_tts_gemini.py --api-key "YOUR_KEY" --only letters
+python scripts/generate_tts_gemini.py --api-key "YOUR_KEY" --only letter_names
 python scripts/generate_tts_gemini.py --api-key "YOUR_KEY" --only phrases --name YourChildsName
 ```
 
@@ -130,8 +177,9 @@ Change the voice with `--voice Puck`.
 
 ```
 assets/audio/
-├── words/           # 269 word pronunciations (one .mp3 per word)
-├── letters/         # 26 phonetic letter sounds (a.mp3 = "ah", b.mp3 = "buh", ...)
+├── words/           # 269+ word pronunciations (one .mp3 per word)
+├── letter_names/    # 26 letter name sounds (a.mp3 = "ay", b.mp3 = "bee", ...)
+├── phonics/         # 26 phonetic letter sounds (a.mp3 = "ah", b.mp3 = "buh", ...)
 ├── phrases/         # Personalized encouragement (generated with --name)
 └── effects/         # UI sound effects (success, error, level_complete)
 ```
@@ -142,40 +190,63 @@ assets/audio/
 
 ```
 lib/
-├── main.dart                    # Entry point, window setup
-├── app.dart                     # Root widget, service initialization
+├── main.dart                    # Entry point, window setup, font config
+├── app.dart                     # Root widget, service init, text scaling
 ├── theme/
 │   └── app_theme.dart           # Colors, typography, dark theme
 ├── models/
 │   ├── word.dart                # Word data model
-│   └── progress.dart            # Level progress & word stats
+│   ├── progress.dart            # Level progress, tiers, & word stats
+│   └── player_profile.dart      # Avatar config & profile data (Hive)
 ├── data/
-│   ├── dolch_words.dart         # 220 Dolch words across 22 levels
-│   ├── bonus_words.dart         # 49 additional common words
-│   └── phrase_templates.dart    # Encouragement phrase templates
+│   ├── dolch_words.dart         # 220 Dolch words across 22 levels + 5 zones
+│   ├── avatar_options.dart      # Avatar customization & treasure rewards
+│   ├── phrase_templates.dart    # Encouragement phrase templates
+│   ├── rhyme_words.dart         # Rhyme word pairs for Rhyme Time game
+│   └── sticker_definitions.dart # Sticker collection & mini game thresholds
 ├── services/
-│   ├── audio_service.dart       # Audio playback (words, letters, phrases, effects)
-│   ├── progress_service.dart    # Persist/load progress (SharedPreferences)
-│   └── player_settings_service.dart  # Player name persistence
+│   ├── audio_service.dart       # Audio playback (words, letters, phonics, effects)
+│   ├── progress_service.dart    # Level & tier progress persistence
+│   ├── profile_service.dart     # Player profile, avatar, daily treasure
+│   ├── player_settings_service.dart # Multi-profile management
+│   ├── stats_service.dart       # Per-letter/word/game interaction stats
+│   ├── streak_service.dart      # Daily streak tracking
+│   ├── review_service.dart      # Spaced repetition review scheduling
+│   └── high_score_service.dart  # Mini game high scores
 ├── screens/
-│   ├── home_screen.dart         # Welcome screen with greeting
+│   ├── home_screen.dart         # Main menu with tappable tagline & stats
+│   ├── profile_picker_screen.dart # Multi-profile "Who's Playing?" screen
 │   ├── name_setup_screen.dart   # First-launch name entry
-│   ├── level_select_screen.dart # Level grid with lock/unlock states
-│   └── game_screen.dart         # Core typing gameplay
+│   ├── level_select_screen.dart # Zone-based level selection
+│   ├── game_screen.dart         # Core typing gameplay with 3 tiers
+│   ├── profile_screen.dart      # Garden profile with avatar & stats
+│   ├── avatar_editor_screen.dart # Avatar customization
+│   ├── alphabet_screen.dart     # Full alphabet explorer
+│   ├── mini_games_screen.dart   # Mini game selection hub
+│   └── mini_games/              # 10 individual mini game screens
+├── utils/
+│   └── haptics.dart             # Centralized haptic feedback
 ├── widgets/
-│   ├── letter_tile.dart         # Individual letter display with glow states
-│   ├── animated_glow_border.dart # Animated border effect
-│   ├── celebration_overlay.dart # Word/level completion celebration
-│   └── floating_hearts_bg.dart  # Animated background
+│   ├── word_garden.dart         # Animated flower garden per level
+│   ├── word_constellation.dart  # Interactive star-map of mastered words
+│   ├── sticker_book.dart        # Collectible sticker display
+│   ├── daily_treasure.dart      # Daily tiered chest reward system
+│   ├── floating_hearts_bg.dart  # Physics-based animated background
+│   ├── streak_badge.dart        # Streak display widget
+│   └── ...                      # Additional UI components
+assets/
+├── audio/                       # Pre-generated TTS audio files
+├── images/                      # Logo and app images
+└── google_fonts/                # Bundled Fredoka font (offline)
 scripts/
-└── generate_tts_gemini.py       # TTS audio generation (Gemini API)
+└── generate_tts_gemini.py       # TTS audio generation (Gemini Flash/Pro)
 ```
 
 ## Customization
 
 ### Adding Words
 
-Edit `lib/data/dolch_words.dart` to modify levels, or `lib/data/bonus_words.dart` to add bonus words. Then regenerate audio:
+Edit `lib/data/dolch_words.dart` to modify levels, or add bonus words. Then regenerate audio:
 
 ```bash
 python scripts/generate_tts_gemini.py --api-key "YOUR_KEY" --only words
@@ -183,7 +254,7 @@ python scripts/generate_tts_gemini.py --api-key "YOUR_KEY" --only words
 
 ### Adjusting Difficulty
 
-Words are grouped into 22 levels of 10 words each in `dolch_words.dart`. Reorder or regroup them to change the progression.
+Words are grouped into 22 levels of 10 words each in `dolch_words.dart`, organized across 5 themed zones. Reorder or regroup them to change the progression.
 
 ### Changing the Theme
 
@@ -195,9 +266,11 @@ All colors and typography are centralized in `lib/theme/app_theme.dart`.
 |---------|---------|
 | [audioplayers](https://pub.dev/packages/audioplayers) | Audio playback |
 | [shared_preferences](https://pub.dev/packages/shared_preferences) | Progress & settings persistence |
+| [hive](https://pub.dev/packages/hive) / [hive_flutter](https://pub.dev/packages/hive_flutter) | Local key-value database for profiles |
 | [flutter_animate](https://pub.dev/packages/flutter_animate) | Smooth animations |
 | [confetti](https://pub.dev/packages/confetti) | Celebration effects |
-| [google_fonts](https://pub.dev/packages/google_fonts) | Fredoka + Nunito typography |
+| [google_fonts](https://pub.dev/packages/google_fonts) | Fredoka typography (bundled offline) |
+| [forge2d](https://pub.dev/packages/forge2d) | 2D physics engine (Letter Drop game) |
 | [window_manager](https://pub.dev/packages/window_manager) | Desktop window control |
 
 ## License

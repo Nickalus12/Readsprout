@@ -1,6 +1,6 @@
 {
-    "name": "sight_words",
-    "short_name": "sight_words",
+    "name": "ReadingSprout",
+    "short_name": "ReadingSprout",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -6,9 +6,12 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Data is stored as a JSON string in SharedPreferences, matching
 /// the existing persistence pattern used by [ProgressService].
 class StreakService {
-  static const _key = 'streak_data';
+  static const _baseKey = 'streak_data';
 
   late SharedPreferences _prefs;
+  String _profileId = '';
+
+  String get _key => _profileId.isEmpty ? _baseKey : '${_baseKey}_$_profileId';
 
   int _currentStreak = 0;
   int _longestStreak = 0;
@@ -21,8 +24,14 @@ class StreakService {
   bool get streakFreezeAvailable => _streakFreezeAvailable;
   bool get hasStreak => _currentStreak >= 1;
 
-  Future<void> init() async {
-    _prefs = await SharedPreferences.getInstance();
+  Future<void> init([SharedPreferences? prefs]) async {
+    _prefs = prefs ?? await SharedPreferences.getInstance();
+    _load();
+  }
+
+  /// Reload streak data for a different profile.
+  void switchProfile(String profileId) {
+    _profileId = profileId;
     _load();
   }
 

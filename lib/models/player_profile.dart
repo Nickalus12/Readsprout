@@ -70,28 +70,32 @@ class PlayerProfile extends HiveObject {
 }
 
 /// Avatar customization configuration.
+///
+/// Fields 0-10 are the original avatar properties (backwards compatible).
+/// Fields 11-18 were added in the avatar overhaul update and default to 0
+/// for existing saved profiles.
 @HiveType(typeId: 1)
 class AvatarConfig extends HiveObject {
   @HiveField(0)
-  final int faceShape; // 0-2 (circle, rounded square, oval)
+  final int faceShape; // 0-4
 
   @HiveField(1)
-  final int skinTone; // 0-5
+  final int skinTone; // 0-9
 
   @HiveField(2)
-  final int hairStyle; // 0-7
+  final int hairStyle; // 0-15
 
   @HiveField(3)
-  final int hairColor; // 0-7 (includes unlockable)
+  final int hairColor; // 0-13
 
   @HiveField(4)
-  final int eyeStyle; // 0-4
+  final int eyeStyle; // 0-7
 
   @HiveField(5)
-  final int mouthStyle; // 0-3
+  final int mouthStyle; // 0-7
 
   @HiveField(6)
-  final int accessory; // 0-8 (includes unlockable)
+  final int accessory; // 0-21
 
   @HiveField(7)
   final int bgColor; // 0-7
@@ -105,6 +109,32 @@ class AvatarConfig extends HiveObject {
   @HiveField(10)
   final bool hasGoldenGlow;
 
+  // ── New fields (avatar overhaul) ──────────────────────────────────
+
+  @HiveField(11)
+  final int eyeColor; // 0-7
+
+  @HiveField(12)
+  final int eyelashStyle; // 0-5
+
+  @HiveField(13)
+  final int eyebrowStyle; // 0-5
+
+  @HiveField(14)
+  final int lipColor; // 0-7
+
+  @HiveField(15)
+  final int cheekStyle; // 0-6
+
+  @HiveField(16)
+  final int noseStyle; // 0-4
+
+  @HiveField(17)
+  final int glassesStyle; // 0-6
+
+  @HiveField(18)
+  final int facePaint; // 0-9
+
   AvatarConfig({
     required this.faceShape,
     required this.skinTone,
@@ -117,6 +147,14 @@ class AvatarConfig extends HiveObject {
     this.hasSparkle = false,
     this.hasRainbowSparkle = false,
     this.hasGoldenGlow = false,
+    this.eyeColor = 0,
+    this.eyelashStyle = 0,
+    this.eyebrowStyle = 0,
+    this.lipColor = 0,
+    this.cheekStyle = 0,
+    this.noseStyle = 0,
+    this.glassesStyle = 0,
+    this.facePaint = 0,
   });
 
   /// Default avatar for first-time users.
@@ -129,9 +167,6 @@ class AvatarConfig extends HiveObject {
         mouthStyle: 0,
         accessory: 0,
         bgColor: 0,
-        hasSparkle: false,
-        hasRainbowSparkle: false,
-        hasGoldenGlow: false,
       );
 
   AvatarConfig copyWith({
@@ -146,6 +181,14 @@ class AvatarConfig extends HiveObject {
     bool? hasSparkle,
     bool? hasRainbowSparkle,
     bool? hasGoldenGlow,
+    int? eyeColor,
+    int? eyelashStyle,
+    int? eyebrowStyle,
+    int? lipColor,
+    int? cheekStyle,
+    int? noseStyle,
+    int? glassesStyle,
+    int? facePaint,
   }) {
     return AvatarConfig(
       faceShape: faceShape ?? this.faceShape,
@@ -159,6 +202,14 @@ class AvatarConfig extends HiveObject {
       hasSparkle: hasSparkle ?? this.hasSparkle,
       hasRainbowSparkle: hasRainbowSparkle ?? this.hasRainbowSparkle,
       hasGoldenGlow: hasGoldenGlow ?? this.hasGoldenGlow,
+      eyeColor: eyeColor ?? this.eyeColor,
+      eyelashStyle: eyelashStyle ?? this.eyelashStyle,
+      eyebrowStyle: eyebrowStyle ?? this.eyebrowStyle,
+      lipColor: lipColor ?? this.lipColor,
+      cheekStyle: cheekStyle ?? this.cheekStyle,
+      noseStyle: noseStyle ?? this.noseStyle,
+      glassesStyle: glassesStyle ?? this.glassesStyle,
+      facePaint: facePaint ?? this.facePaint,
     );
   }
 }

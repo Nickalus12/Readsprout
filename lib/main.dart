@@ -2,6 +2,7 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 
@@ -11,6 +12,9 @@ import 'services/profile_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Use bundled fonts — don't fetch from network (works offline on kid devices)
+  GoogleFonts.config.allowRuntimeFetching = false;
 
   // Initialize Hive for local storage (cross-platform path resolution)
   await Hive.initFlutter();
@@ -57,5 +61,5 @@ void main() async {
     ),
   );
 
-  runApp(const SightWordsApp());
+  runApp(const ReadingSproutApp());
 }

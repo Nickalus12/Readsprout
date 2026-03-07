@@ -79,10 +79,28 @@ class TierStarsDisplay extends StatelessWidget {
       );
     }
 
+    if (filled) {
+      return Container(
+        decoration: BoxDecoration(
+          boxShadow: [
+            BoxShadow(
+              color: color.withValues(alpha: 0.3),
+              blurRadius: 6,
+            ),
+          ],
+        ),
+        child: Icon(
+          Icons.star_rounded,
+          size: starSize,
+          color: color,
+        ),
+      );
+    }
+
     return Icon(
-      filled ? Icons.star_rounded : Icons.star_outline_rounded,
+      Icons.star_outline_rounded,
       size: starSize,
-      color: filled ? color : AppColors.secondaryText.withValues(alpha: 0.3),
+      color: AppColors.secondaryText.withValues(alpha: 0.3),
     );
   }
 }

@@ -91,12 +91,16 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                     fontSize: 56,
                     fontWeight: FontWeight.w700,
                     color: Colors.white,
-                    letterSpacing: 6,
+                    letterSpacing: 8,
                     shadows: [
-                      Shadow(color: glowColor, blurRadius: 24),
+                      Shadow(color: glowColor, blurRadius: 28),
                       Shadow(
                         color: glowColor.withValues(alpha: 0.5),
-                        blurRadius: 48,
+                        blurRadius: 56,
+                      ),
+                      Shadow(
+                        color: glowColor.withValues(alpha: 0.2),
+                        blurRadius: 80,
                       ),
                     ],
                   ),
@@ -104,58 +108,79 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
               },
             )
                 .animate()
-                .scale(
-                  begin: const Offset(0.5, 0.5),
-                  end: const Offset(1.0, 1.0),
+                .scaleXY(
+                  begin: 0.3,
+                  end: 1.0,
                   curve: Curves.elasticOut,
-                  duration: 600.ms,
+                  duration: 700.ms,
+                )
+                .fadeIn(duration: 200.ms)
+                .shimmer(
+                  delay: 700.ms,
+                  duration: 1200.ms,
+                  color: Colors.white.withValues(alpha: 0.3),
                 ),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // ── Praise in a pill badge ───────────────────
             Container(
               padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 8,
+                horizontal: 24,
+                vertical: 10,
               ),
               decoration: BoxDecoration(
-                color: AppColors.success.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(20),
+                color: AppColors.success.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(24),
                 border: Border.all(
-                  color: AppColors.success.withValues(alpha: 0.2),
+                  color: AppColors.success.withValues(alpha: 0.25),
                 ),
+                boxShadow: [
+                  BoxShadow(
+                    color: AppColors.success.withValues(alpha: 0.1),
+                    blurRadius: 16,
+                  ),
+                ],
               ),
               child: Text(
                 _praise,
                 style: GoogleFonts.fredoka(
-                  fontSize: 26,
+                  fontSize: 28,
                   fontWeight: FontWeight.w500,
                   color: AppColors.success,
                   shadows: [
                     Shadow(
                       color: AppColors.success.withValues(alpha: 0.5),
-                      blurRadius: 10,
+                      blurRadius: 12,
                     ),
                   ],
                 ),
               ),
             )
                 .animate()
-                .fadeIn(delay: 250.ms, duration: 400.ms)
-                .slideY(begin: 0.3, end: 0),
+                .scaleXY(
+                  begin: 0.4,
+                  end: 1.0,
+                  delay: 200.ms,
+                  duration: 600.ms,
+                  curve: Curves.elasticOut,
+                )
+                .fadeIn(delay: 200.ms, duration: 250.ms),
 
-            const SizedBox(height: 16),
+            const SizedBox(height: 20),
 
             // ── Star burst (3 stars) ─────────────────────
             Row(
               mainAxisSize: MainAxisSize.min,
               children: List.generate(3, (i) {
+                // Middle star is slightly larger
+                final size = i == 1 ? 28.0 : 22.0;
+                final iconSize = i == 1 ? 18.0 : 14.0;
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 6),
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
                   child: Container(
-                    width: 22,
-                    height: 22,
+                    width: size,
+                    height: size,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
                       gradient: RadialGradient(
@@ -166,24 +191,31 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                       ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.starGold.withValues(alpha: 0.5),
-                          blurRadius: 10,
-                          spreadRadius: 1,
+                          color: AppColors.starGold.withValues(alpha: 0.6),
+                          blurRadius: 14,
+                          spreadRadius: 2,
                         ),
                       ],
                     ),
-                    child: const Icon(
+                    child: Icon(
                       Icons.star_rounded,
-                      size: 14,
+                      size: iconSize,
                       color: Colors.white,
                     ),
                   )
                       .animate()
-                      .scale(
-                        begin: const Offset(0, 0),
-                        end: const Offset(1.0, 1.0),
-                        delay: Duration(milliseconds: 350 + (i * 120)),
-                        duration: 500.ms,
+                      .scaleXY(
+                        begin: 0,
+                        end: 1.0,
+                        delay: Duration(milliseconds: 300 + (i * 140)),
+                        duration: 600.ms,
+                        curve: Curves.elasticOut,
+                      )
+                      .rotate(
+                        begin: -0.1,
+                        end: 0,
+                        delay: Duration(milliseconds: 300 + (i * 140)),
+                        duration: 600.ms,
                         curve: Curves.elasticOut,
                       ),
                 );
@@ -192,6 +224,8 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
           ],
         ),
       ),
-    );
+    )
+        .animate()
+        .fadeIn(duration: 200.ms);
   }
 }

@@ -1,14 +1,16 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 
 import '../data/dolch_words.dart';
 import '../services/audio_service.dart';
 import '../services/progress_service.dart';
 import '../theme/app_theme.dart';
 
-/// A "Words I Know" star map showing mastered words as glowing
-/// text chips clustered by level, connected by faint lines.
+/// An interactive star-map constellation showing all levels.
+/// Mastered levels are bright glowing nodes with tappable word-stars.
+/// Locked levels shimmer dimly in the distance, waiting to be discovered.
 class WordConstellation extends StatelessWidget {
   final ProgressService progressService;
   final AudioService audioService;
@@ -21,99 +23,60 @@ class WordConstellation extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // Gather all mastered words with their level info
-    final masteredWords = <_MasteredWord>[];
-
-    for (int level = 1; level <= DolchWords.totalLevels; level++) {
-      final lp = progressService.getLevel(level);
-      final words = DolchWords.wordsForLevel(level);
-
-      for (final word in words) {
-        final stats = lp.wordStats[word.text];
-        if (stats != null && stats.attempts > 0) {
-          if (stats.perfectAttempts > 0) {
-            masteredWords.add(_MasteredWord(
-              text: word.text,
-              level: level,
-              perfectAttempts: stats.perfectAttempts,
-              isMastered: stats.mastered,
-            ));
-          }
-        }
+    // Count mastered words for the subtitle
+    int masteredCount = 0;
+    for (int l = 1; l <= DolchWords.totalLevels; l++) {
+      if (progressService.getLevel(l).highestCompletedTier >= 3) {
+        masteredCount += DolchWords.wordsForLevel(l).length;
       }
     }
-
-    const totalWords = 220; // Dolch word count
-    final remaining = totalWords - masteredWords.length;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-          child: Text(
-            'Words I Know',
-            style: GoogleFonts.fredoka(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-              color: AppColors.electricBlue,
-            ),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => audioService.playWord('words_mastered'),
+                child: Text(
+                  'Words Mastered',
+                  style: GoogleFonts.fredoka(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.electricBlue,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '$masteredCount / 220',
+                style: GoogleFonts.nunito(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.electricBlue.withValues(alpha: 0.4),
+                ),
+              ),
+            ],
           ),
         ),
         Container(
           width: double.infinity,
           margin: const EdgeInsets.symmetric(horizontal: 16),
-          padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: const Color(0xFF080818),
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
-              color: AppColors.electricBlue.withValues(alpha: 0.15),
+              color: AppColors.electricBlue.withValues(alpha: 0.1),
             ),
           ),
-          child: Column(
-            children: [
-              // Star field with word chips
-              SizedBox(
-                height: 240,
-                child: Stack(
-                  children: [
-                    // Background stars
-                    CustomPaint(
-                      size: const Size(double.infinity, 240),
-                      painter: _StarFieldPainter(),
-                    ),
-                    // Word chips by cluster
-                    if (masteredWords.isEmpty)
-                      Center(
-                        child: Text(
-                          'Master words to fill your star map!',
-                          style: GoogleFonts.nunito(
-                            fontSize: 14,
-                            color: AppColors.secondaryText
-                                .withValues(alpha: 0.5),
-                          ),
-                        ),
-                      )
-                    else
-                      _ConstellationLayout(
-                        masteredWords: masteredWords,
-                        audioService: audioService,
-                      ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 12),
-              // Counter
-              Text(
-                '${masteredWords.length} words mastered'
-                '${remaining > 0 ? ' \u00B7 $remaining more to discover!' : ' \u00B7 You know them all!'}',
-                style: GoogleFonts.nunito(
-                  fontSize: 13,
-                  color: AppColors.electricBlue.withValues(alpha: 0.7),
-                ),
-              ),
-            ],
+          clipBehavior: Clip.hardEdge,
+          child: SizedBox(
+            height: 340,
+            child: _ConstellationMap(
+              progressService: progressService,
+              audioService: audioService,
+            ),
           ),
         ),
       ],
@@ -121,228 +84,622 @@ class WordConstellation extends StatelessWidget {
   }
 }
 
-class _MasteredWord {
-  final String text;
-  final int level;
-  final int perfectAttempts;
-  final bool isMastered;
+// ── Main constellation map ──────────────────────────────────────────────
 
-  const _MasteredWord({
-    required this.text,
-    required this.level,
-    required this.perfectAttempts,
-    required this.isMastered,
-  });
-}
-
-/// Lays out mastered word chips in clusters by level, wrapping in
-/// a scrollable area.
-class _ConstellationLayout extends StatelessWidget {
-  final List<_MasteredWord> masteredWords;
+class _ConstellationMap extends StatefulWidget {
+  final ProgressService progressService;
   final AudioService audioService;
 
-  const _ConstellationLayout({
-    required this.masteredWords,
+  const _ConstellationMap({
+    required this.progressService,
     required this.audioService,
   });
 
   @override
+  State<_ConstellationMap> createState() => _ConstellationMapState();
+}
+
+class _ConstellationMapState extends State<_ConstellationMap>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _twinkleController;
+  int? _expandedLevel;
+  String? _tappedWord;
+
+  // Expand word ring radius
+  static const double _wordOrbitRadius = 58.0;
+  // Padding from map edges for node centers
+  static const double _edgePad = 70.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _twinkleController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 10),
+    )..repeat();
+  }
+
+  @override
+  void dispose() {
+    _twinkleController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    // Group words by level
-    final byLevel = <int, List<_MasteredWord>>{};
-    for (final w in masteredWords) {
-      byLevel.putIfAbsent(w.level, () => []).add(w);
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // Make map wide enough so nodes + expanded words never clip
+        final mapWidth = max(constraints.maxWidth,
+            DolchWords.totalLevels * 52.0 + _edgePad * 2);
+        final mapHeight = constraints.maxHeight;
+
+        return SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          child: SizedBox(
+            width: mapWidth,
+            height: mapHeight,
+            child: AnimatedBuilder(
+              animation: _twinkleController,
+              builder: (context, _) {
+                final t = _twinkleController.value;
+                final positions = _getNodePositions(mapWidth, mapHeight);
+                return CustomPaint(
+                  painter: _BackgroundPainter(
+                    time: t,
+                    nodePositions: positions,
+                    progressService: widget.progressService,
+                  ),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: _buildAllWidgets(
+                        positions, mapWidth, mapHeight, t),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  List<Offset> _getNodePositions(double width, double height) {
+    final total = DolchWords.totalLevels;
+    final positions = <Offset>[];
+    final rng = Random(77);
+
+    for (int i = 0; i < total; i++) {
+      final t = i / (total - 1);
+      final x = _edgePad + t * (width - _edgePad * 2);
+      final baseY = height * 0.5;
+      final wave = sin(t * pi * 3.2 + 0.5) * (height * 0.24);
+      final jitter = (rng.nextDouble() - 0.5) * 20;
+      final y = (baseY + wave + jitter).clamp(_edgePad, height - _edgePad);
+      positions.add(Offset(x, y));
+    }
+    return positions;
+  }
+
+  List<Widget> _buildAllWidgets(
+      List<Offset> positions, double mapW, double mapH, double time) {
+    final widgets = <Widget>[];
+
+    // Zone labels (behind everything)
+    _addZoneLabels(widgets, positions, mapH);
+
+    for (int i = 0; i < DolchWords.totalLevels; i++) {
+      final level = i + 1;
+      final pos = positions[i];
+      final lp = widget.progressService.getLevel(level);
+      final isMastered = lp.highestCompletedTier >= 3;
+      final isUnlocked = widget.progressService.isLevelUnlocked(level);
+      final stars = lp.highestCompletedTier;
+      final isExpanded = _expandedLevel == level;
+
+      final gradientColors =
+          AppColors.levelGradients[i % AppColors.levelGradients.length];
+      final color = gradientColors[0];
+
+      // Expanded word chips — clamped inside bounds
+      if (isExpanded) {
+        final words = DolchWords.wordsForLevel(level);
+        for (int j = 0; j < words.length; j++) {
+          final word = words[j];
+          final angle = (j / words.length) * 2 * pi - (pi / 2);
+          final orbitR = _wordOrbitRadius + (j.isEven ? 0 : 10);
+          // Raw position
+          var wx = pos.dx + cos(angle) * orbitR;
+          var wy = pos.dy + sin(angle) * orbitR;
+          // Clamp to stay inside the map container with margin
+          wx = wx.clamp(6.0, mapW - 50.0);
+          wy = wy.clamp(6.0, mapH - 18.0);
+
+          final isTapped = _tappedWord == '${level}_${word.text}';
+
+          widgets.add(Positioned(
+            left: wx - 2,
+            top: wy - 9,
+            child: GestureDetector(
+              onTap: isMastered
+                  ? () {
+                      widget.audioService.playWord(word.text);
+                      setState(
+                          () => _tappedWord = '${level}_${word.text}');
+                      Future.delayed(const Duration(milliseconds: 600),
+                          () {
+                        if (mounted) setState(() => _tappedWord = null);
+                      });
+                    }
+                  : null,
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                decoration: BoxDecoration(
+                  color: isMastered
+                      ? (isTapped
+                          ? color.withValues(alpha: 0.35)
+                          : color.withValues(alpha: 0.1))
+                      : Colors.white.withValues(alpha: 0.03),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: isMastered
+                        ? color.withValues(alpha: isTapped ? 0.9 : 0.35)
+                        : Colors.white.withValues(alpha: 0.06),
+                    width: isTapped ? 1.5 : 0.8,
+                  ),
+                  boxShadow: [
+                    if (isTapped)
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.5),
+                        blurRadius: 14,
+                        spreadRadius: 1,
+                      )
+                    else if (isMastered)
+                      BoxShadow(
+                        color: color.withValues(alpha: 0.12),
+                        blurRadius: 6,
+                      ),
+                  ],
+                ),
+                child: Text(
+                  word.text,
+                  style: GoogleFonts.fredoka(
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                    color: isMastered
+                        ? color.withValues(alpha: isTapped ? 1.0 : 0.85)
+                        : Colors.white.withValues(alpha: 0.12),
+                  ),
+                ),
+              ),
+            ),
+          ).animate().fadeIn(delay: (j * 35).ms, duration: 200.ms).scale(
+                begin: const Offset(0.4, 0.4),
+                delay: (j * 35).ms,
+                duration: 280.ms,
+                curve: Curves.easeOutBack,
+              ));
+        }
+
+        // Draw faint lines from node to each word
+        widgets.insert(
+            0,
+            Positioned.fill(
+              child: CustomPaint(
+                painter: _WordLinePainter(
+                  center: pos,
+                  words: DolchWords.wordsForLevel(level),
+                  wordCount: DolchWords.wordsForLevel(level).length,
+                  orbitRadius: _wordOrbitRadius,
+                  color: color,
+                  mapW: mapW,
+                  mapH: mapH,
+                ),
+              ),
+            ));
+      }
+
+      // Main constellation node
+      final nodeSize = isMastered ? 38.0 : (isUnlocked ? 30.0 : 22.0);
+      widgets.add(Positioned(
+        left: pos.dx - nodeSize / 2,
+        top: pos.dy - nodeSize / 2,
+        child: GestureDetector(
+          onTap: () {
+            setState(() {
+              _expandedLevel = isExpanded ? null : level;
+              _tappedWord = null;
+            });
+          },
+          child: _ConstellationNode(
+            level: level,
+            size: nodeSize,
+            color: color,
+            isMastered: isMastered,
+            isUnlocked: isUnlocked,
+            isExpanded: isExpanded,
+            stars: stars,
+            time: time,
+          ),
+        ),
+      ));
     }
 
-    final sortedLevels = byLevel.keys.toList()..sort();
+    return widgets;
+  }
 
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (final level in sortedLevels)
-              _LevelCluster(
-                level: level,
-                words: byLevel[level]!,
-                audioService: audioService,
+  void _addZoneLabels(
+      List<Widget> widgets, List<Offset> positions, double mapH) {
+    for (final zone in DolchWords.zones) {
+      // Place label at the average x of the zone's levels
+      final startIdx = zone.startLevel - 1;
+      final endIdx = min(zone.endLevel - 1, positions.length - 1);
+      double avgX = 0;
+      double minY = mapH;
+      for (int i = startIdx; i <= endIdx; i++) {
+        avgX += positions[i].dx;
+        if (positions[i].dy < minY) minY = positions[i].dy;
+      }
+      avgX /= (endIdx - startIdx + 1);
+
+      // Place zone name above the highest node
+      final labelY = max(6.0, minY - 50);
+
+      widgets.add(Positioned(
+        left: avgX - 60,
+        top: labelY,
+        child: GestureDetector(
+          onTap: () => widget.audioService.playWord(
+            zone.name.toLowerCase().replaceAll(' ', '_'),
+          ),
+          child: SizedBox(
+            width: 120,
+            child: Text(
+              '${zone.icon} ${zone.name}',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(
+                fontSize: 9,
+                fontWeight: FontWeight.w700,
+                color: Colors.white.withValues(alpha: 0.18),
+                letterSpacing: 1.2,
               ),
-          ],
+            ),
+          ),
         ),
-      ),
-    );
+      ));
+    }
   }
 }
 
-/// A cluster of word chips for a single level.
-class _LevelCluster extends StatelessWidget {
-  final int level;
-  final List<_MasteredWord> words;
-  final AudioService audioService;
+// ── Individual constellation node ──────────────────────────────────────
 
-  const _LevelCluster({
+class _ConstellationNode extends StatelessWidget {
+  final int level;
+  final double size;
+  final Color color;
+  final bool isMastered;
+  final bool isUnlocked;
+  final bool isExpanded;
+  final int stars;
+  final double time;
+
+  const _ConstellationNode({
     required this.level,
-    required this.words,
-    required this.audioService,
+    required this.size,
+    required this.color,
+    required this.isMastered,
+    required this.isUnlocked,
+    required this.isExpanded,
+    required this.stars,
+    required this.time,
   });
 
   @override
   Widget build(BuildContext context) {
-    final gradientColors = AppColors.levelGradients[
-        (level - 1) % AppColors.levelGradients.length];
+    final pulse = isMastered
+        ? 0.55 + sin(time * 2 * pi * 1.2 + level * 0.7) * 0.3
+        : (isUnlocked
+            ? 0.2 + sin(time * 2 * pi * 0.7 + level) * 0.1
+            : 0.06 + sin(time * 2 * pi * 0.35 + level * 1.3) * 0.04);
 
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // Level label
-          Padding(
-            padding: const EdgeInsets.only(left: 4, bottom: 4),
-            child: Text(
-              'Level $level',
-              style: GoogleFonts.nunito(
-                fontSize: 10,
-                fontWeight: FontWeight.w600,
-                color: gradientColors[0].withValues(alpha: 0.5),
-              ),
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
+      width: isExpanded ? size + 6 : size,
+      height: isExpanded ? size + 6 : size,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        gradient: isMastered
+            ? RadialGradient(
+                colors: [
+                  color.withValues(alpha: 0.3),
+                  color.withValues(alpha: 0.08),
+                ],
+              )
+            : null,
+        color: isMastered
+            ? null
+            : (isUnlocked
+                ? color.withValues(alpha: 0.06)
+                : Colors.white.withValues(alpha: 0.02)),
+        border: Border.all(
+          color: isMastered
+              ? color.withValues(alpha: pulse)
+              : (isUnlocked
+                  ? color.withValues(alpha: 0.18)
+                  : Colors.white.withValues(alpha: 0.05)),
+          width: isMastered ? 1.5 : 0.8,
+        ),
+        boxShadow: [
+          if (isMastered) ...[
+            BoxShadow(
+              color: color.withValues(alpha: pulse * 0.4),
+              blurRadius: isExpanded ? 28 : 18,
+              spreadRadius: isExpanded ? 5 : 2,
             ),
-          ),
-          // Connected word chips
-          CustomPaint(
-            painter: _ConnectionLinePainter(
-              color: gradientColors[0].withValues(alpha: 0.15),
+            BoxShadow(
+              color: color.withValues(alpha: pulse * 0.15),
+              blurRadius: 40,
+              spreadRadius: 8,
             ),
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: words.map((w) {
-                return _WordChip(
-                  word: w,
-                  color: gradientColors[0],
-                  audioService: audioService,
-                );
-              }).toList(),
+          ],
+          if (isUnlocked && !isMastered)
+            BoxShadow(
+              color: color.withValues(alpha: 0.08),
+              blurRadius: 10,
             ),
-          ),
         ],
       ),
-    );
-  }
-}
-
-/// A single word chip in the constellation.
-class _WordChip extends StatefulWidget {
-  final _MasteredWord word;
-  final Color color;
-  final AudioService audioService;
-
-  const _WordChip({
-    required this.word,
-    required this.color,
-    required this.audioService,
-  });
-
-  @override
-  State<_WordChip> createState() => _WordChipState();
-}
-
-class _WordChipState extends State<_WordChip> {
-  bool _tapped = false;
-
-  void _onTap() async {
-    setState(() => _tapped = true);
-    widget.audioService.playWord(widget.word.text);
-    await Future.delayed(const Duration(milliseconds: 800));
-    if (mounted) setState(() => _tapped = false);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // Brightness based on mastery level
-    final glowAlpha =
-        widget.word.isMastered ? 0.6 : 0.3;
-    final textAlpha =
-        widget.word.isMastered ? 1.0 : 0.7;
-
-    return GestureDetector(
-      onTap: _onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 300),
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-        decoration: BoxDecoration(
-          color: _tapped
-              ? widget.color.withValues(alpha: 0.25)
-              : widget.color.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: widget.color.withValues(alpha: _tapped ? 0.7 : 0.25),
-          ),
-          boxShadow: [
-            BoxShadow(
-              color: widget.color
-                  .withValues(alpha: _tapped ? glowAlpha : glowAlpha * 0.3),
-              blurRadius: _tapped ? 12 : 4,
+      child: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '$level',
+              style: GoogleFonts.fredoka(
+                fontSize: isMastered ? 14 : (isUnlocked ? 11 : 9),
+                fontWeight: FontWeight.w600,
+                color: isMastered
+                    ? Colors.white.withValues(alpha: 0.95)
+                    : (isUnlocked
+                        ? color.withValues(alpha: 0.45)
+                        : Colors.white.withValues(alpha: 0.1)),
+                shadows: isMastered
+                    ? [
+                        Shadow(
+                          color: color.withValues(alpha: 0.6),
+                          blurRadius: 8,
+                        ),
+                      ]
+                    : null,
+              ),
             ),
+            if (stars > 0 && size > 28)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: List.generate(
+                  3,
+                  (idx) => Icon(
+                    Icons.star_rounded,
+                    size: 7,
+                    color: idx < stars
+                        ? AppColors.starGold.withValues(alpha: 0.85)
+                        : Colors.white.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
           ],
-        ),
-        child: Text(
-          widget.word.text,
-          style: GoogleFonts.fredoka(
-            fontSize: 12,
-            fontWeight: FontWeight.w500,
-            color: widget.color.withValues(alpha: textAlpha),
-          ),
         ),
       ),
     );
   }
 }
 
-/// Paints tiny white dots as a star field background.
-class _StarFieldPainter extends CustomPainter {
+// ── Background: star field + nebulae + constellation lines ──────────────
+
+class _BackgroundPainter extends CustomPainter {
+  final double time;
+  final List<Offset> nodePositions;
+  final ProgressService progressService;
+
+  _BackgroundPainter({
+    required this.time,
+    required this.nodePositions,
+    required this.progressService,
+  });
+
   @override
   void paint(Canvas canvas, Size size) {
-    final rng = Random(42); // Fixed seed for consistent star positions
-    final paint = Paint()..color = Colors.white;
+    // Deep space background
+    canvas.drawRect(
+      Offset.zero & size,
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color(0xFF050510),
+            Color(0xFF080820),
+            Color(0xFF060614),
+          ],
+        ).createShader(Offset.zero & size),
+    );
 
-    for (int i = 0; i < 60; i++) {
+    final rng = Random(42);
+
+    // Nebula clouds
+    final nebulaData = [
+      (const Color(0xFF1a0a3a), 0.18),
+      (const Color(0xFF0a1530), 0.15),
+      (const Color(0xFF180828), 0.12),
+      (const Color(0xFF0c1e30), 0.10),
+      (const Color(0xFF200a20), 0.08),
+    ];
+    for (final (color, alpha) in nebulaData) {
+      final cx = rng.nextDouble() * size.width;
+      final cy = rng.nextDouble() * size.height;
+      final r = 60.0 + rng.nextDouble() * 80;
+      canvas.drawCircle(
+        Offset(cx, cy),
+        r,
+        Paint()
+          ..color = color.withValues(alpha: alpha)
+          ..maskFilter = MaskFilter.blur(BlurStyle.normal, r * 0.6),
+      );
+    }
+
+    // Twinkling stars
+    final starPaint = Paint();
+    for (int i = 0; i < 120; i++) {
       final x = rng.nextDouble() * size.width;
       final y = rng.nextDouble() * size.height;
-      final radius = rng.nextDouble() * 1.2 + 0.3;
-      paint.color =
-          Colors.white.withValues(alpha: rng.nextDouble() * 0.3 + 0.1);
-      canvas.drawCircle(Offset(x, y), radius, paint);
+      final baseR = rng.nextDouble() * 1.0 + 0.15;
+      final phase = rng.nextDouble() * 2 * pi;
+      final speed = 0.4 + rng.nextDouble() * 1.8;
+      final twinkle =
+          (0.25 + (sin(time * 2 * pi * speed + phase) + 1) * 0.375)
+              .clamp(0.0, 1.0);
+
+      starPaint.color = Colors.white.withValues(alpha: twinkle);
+      canvas.drawCircle(Offset(x, y), baseR, starPaint);
+
+      if (baseR > 0.85 && twinkle > 0.65) {
+        final rayPaint = Paint()
+          ..color = Colors.white.withValues(alpha: twinkle * 0.25)
+          ..strokeWidth = 0.4
+          ..strokeCap = StrokeCap.round;
+        final r = baseR * 3;
+        canvas.drawLine(Offset(x - r, y), Offset(x + r, y), rayPaint);
+        canvas.drawLine(Offset(x, y - r), Offset(x, y + r), rayPaint);
+      }
+    }
+
+    // Constellation path lines
+    _drawConstellationLines(canvas, size);
+  }
+
+  void _drawConstellationLines(Canvas canvas, Size size) {
+    if (nodePositions.length < 2) return;
+
+    for (int i = 0; i < nodePositions.length - 1; i++) {
+      final from = nodePositions[i];
+      final to = nodePositions[i + 1];
+      final level = i + 1;
+      final nextLevel = i + 2;
+
+      final isMastered =
+          progressService.getLevel(level).highestCompletedTier >= 3;
+      final nextMastered =
+          progressService.getLevel(nextLevel).highestCompletedTier >= 3;
+      final bothMastered = isMastered && nextMastered;
+      final eitherUnlocked = progressService.isLevelUnlocked(level) ||
+          progressService.isLevelUnlocked(nextLevel);
+
+      final color = AppColors
+          .levelGradients[i % AppColors.levelGradients.length][0];
+
+      if (bothMastered) {
+        final pulse = 0.25 + sin(time * 2 * pi * 1.2 + i * 0.6) * 0.12;
+        // Glow layer
+        canvas.drawLine(
+          from,
+          to,
+          Paint()
+            ..color = color.withValues(alpha: pulse * 0.25)
+            ..strokeWidth = 5
+            ..strokeCap = StrokeCap.round
+            ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+        );
+        // Core line
+        canvas.drawLine(
+          from,
+          to,
+          Paint()
+            ..color = color.withValues(alpha: pulse)
+            ..strokeWidth = 1.2
+            ..strokeCap = StrokeCap.round,
+        );
+      } else if (eitherUnlocked) {
+        _drawDashedLine(
+            canvas, from, to, color.withValues(alpha: 0.1), 0.8, 4, 7);
+      } else {
+        _drawDashedLine(canvas, from, to,
+            Colors.white.withValues(alpha: 0.035), 0.5, 2, 10);
+      }
+    }
+  }
+
+  void _drawDashedLine(Canvas canvas, Offset from, Offset to, Color color,
+      double width, double dashLen, double gapLen) {
+    final paint = Paint()
+      ..color = color
+      ..strokeWidth = width
+      ..strokeCap = StrokeCap.round;
+
+    final dx = to.dx - from.dx;
+    final dy = to.dy - from.dy;
+    final dist = sqrt(dx * dx + dy * dy);
+    if (dist < 1) return;
+    final ux = dx / dist;
+    final uy = dy / dist;
+
+    double d = 0;
+    while (d < dist) {
+      final end = min(d + dashLen, dist);
+      canvas.drawLine(
+        Offset(from.dx + ux * d, from.dy + uy * d),
+        Offset(from.dx + ux * end, from.dy + uy * end),
+        paint,
+      );
+      d += dashLen + gapLen;
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _BackgroundPainter oldDelegate) => true;
+}
+
+// ── Faint lines from expanded node to word chips ────────────────────────
+
+class _WordLinePainter extends CustomPainter {
+  final Offset center;
+  final List<dynamic> words;
+  final int wordCount;
+  final double orbitRadius;
+  final Color color;
+  final double mapW;
+  final double mapH;
+
+  _WordLinePainter({
+    required this.center,
+    required this.words,
+    required this.wordCount,
+    required this.orbitRadius,
+    required this.color,
+    required this.mapW,
+    required this.mapH,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = color.withValues(alpha: 0.08)
+      ..strokeWidth = 0.6
+      ..strokeCap = StrokeCap.round;
+
+    for (int j = 0; j < wordCount; j++) {
+      final angle = (j / wordCount) * 2 * pi - (pi / 2);
+      final r = orbitRadius + (j.isEven ? 0 : 10);
+      var wx = center.dx + cos(angle) * r;
+      var wy = center.dy + sin(angle) * r;
+      wx = wx.clamp(6.0, mapW - 50.0);
+      wy = wy.clamp(6.0, mapH - 18.0);
+      canvas.drawLine(center, Offset(wx, wy), paint);
     }
   }
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-/// Paints faint connecting lines behind the word chips.
-class _ConnectionLinePainter extends CustomPainter {
-  final Color color;
-
-  _ConnectionLinePainter({required this.color});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    // Draw a subtle horizontal line across the cluster
-    final paint = Paint()
-      ..color = color
-      ..strokeWidth = 1
-      ..style = PaintingStyle.stroke;
-
-    canvas.drawLine(
-      Offset(0, size.height / 2),
-      Offset(size.width, size.height / 2),
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant _ConnectionLinePainter oldDelegate) =>
-      color != oldDelegate.color;
 }

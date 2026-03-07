@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import 'animated_glow_border.dart';
@@ -24,8 +25,10 @@ class LetterTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveColor = revealedColor ?? AppColors.success;
+
     final tile = AnimatedContainer(
-      duration: const Duration(milliseconds: 250),
+      duration: const Duration(milliseconds: 300),
       curve: Curves.easeOutCubic,
       width: 52,
       height: 62,
@@ -36,19 +39,26 @@ class LetterTile extends StatelessWidget {
           color: isActive
               ? AppColors.electricBlue.withValues(alpha: 0.5)
               : _borderColor,
-          width: 1.5,
+          width: isRevealed ? 2.0 : 1.5,
         ),
         boxShadow: [
           if (isRevealed)
             BoxShadow(
-              color: (revealedColor ?? AppColors.success).withValues(alpha: 0.15),
+              color: effectiveColor.withValues(alpha: 0.2),
+              blurRadius: 12,
+              spreadRadius: 1,
+            ),
+          if (isActive && !isError)
+            BoxShadow(
+              color: AppColors.electricBlue.withValues(alpha: 0.1),
               blurRadius: 8,
             ),
         ],
       ),
       child: Center(
         child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 250),
+          duration: const Duration(milliseconds: 300),
+          switchInCurve: Curves.easeOutBack,
           transitionBuilder: (child, animation) {
             return ScaleTransition(scale: animation, child: child);
           },
@@ -82,8 +92,12 @@ class LetterTile extends StatelessWidget {
           color: color,
           shadows: [
             Shadow(
-              color: color.withValues(alpha: 0.5),
-              blurRadius: 8,
+              color: color.withValues(alpha: 0.6),
+              blurRadius: 10,
+            ),
+            Shadow(
+              color: color.withValues(alpha: 0.2),
+              blurRadius: 20,
             ),
           ],
         ),
@@ -99,7 +113,11 @@ class LetterTile extends StatelessWidget {
           fontWeight: FontWeight.w400,
           color: AppColors.electricBlue,
         ),
-      );
+      )
+          .animate(onPlay: (c) => c.repeat(reverse: true))
+          .fadeIn(duration: 600.ms)
+          .then()
+          .fade(begin: 1.0, end: 0.4, duration: 600.ms);
     }
 
     return const Text(
@@ -113,12 +131,12 @@ class LetterTile extends StatelessWidget {
   }
 
   Color get _backgroundColor {
-    if (isError) return AppColors.error.withValues(alpha: 0.1);
+    if (isError) return AppColors.error.withValues(alpha: 0.12);
     if (isRevealed) {
       final color = revealedColor ?? AppColors.success;
-      return color.withValues(alpha: 0.08);
+      return color.withValues(alpha: 0.1);
     }
-    if (isActive) return AppColors.surface.withValues(alpha: 0.8);
+    if (isActive) return AppColors.surface.withValues(alpha: 0.85);
     return AppColors.surface.withValues(alpha: 0.5);
   }
 
@@ -126,7 +144,7 @@ class LetterTile extends StatelessWidget {
     if (isError) return AppColors.error;
     if (isRevealed) {
       final color = revealedColor ?? AppColors.success;
-      return color.withValues(alpha: 0.3);
+      return color.withValues(alpha: 0.4);
     }
     return AppColors.border.withValues(alpha: 0.4);
   }

@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:io' show Platform;
 import 'dart:math';
 import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
@@ -12,9 +11,14 @@ import '../models/progress.dart';
 import '../models/word.dart';
 import '../data/phrase_templates.dart';
 import '../services/audio_service.dart';
+import '../models/player_profile.dart';
+import '../services/profile_service.dart';
 import '../services/progress_service.dart';
+import '../services/stats_service.dart';
+import '../data/sticker_definitions.dart';
 import '../widgets/animated_glow_border.dart';
 import '../widgets/letter_tile.dart';
+import '../utils/haptics.dart';
 import '../widgets/celebration_overlay.dart';
 import '../widgets/zone_background.dart';
 
@@ -23,6 +27,8 @@ class GameScreen extends StatefulWidget {
   final int tier;
   final ProgressService progressService;
   final AudioService audioService;
+  final ProfileService? profileService;
+  final StatsService? statsService;
   final String playerName;
 
   const GameScreen({
@@ -30,6 +36,8 @@ class GameScreen extends StatefulWidget {
     required this.level,
     required this.progressService,
     required this.audioService,
+    this.profileService,
+    this.statsService,
     this.tier = 1,
     this.playerName = '',
   });
@@ -106,8 +114,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   @override
+  late final Stopwatch _sessionTimer;
+
   void initState() {
     super.initState();
+    _sessionTimer = Stopwatch()..start();
 
     // Load words for this level, shuffle for variety
     _words = List.from(DolchWords.wordsForLevel(widget.level))..shuffle();
@@ -170,12 +181,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       // Tier 2: pre-reveal first letter, start typing at index 1
       _revealedLetters[0] = true;
       _currentLetterIndex = 1;
+
+      // 1-letter words are already complete after pre-reveal
+      if (_currentLetterIndex >= _targetText.length) {
+        Future.delayed(const Duration(milliseconds: 800), _onWordComplete);
+      }
     } else {
       _currentLetterIndex = 0;
     }
   }
 
   Future<void> _announceCurrentWord() async {
+    widget.statsService?.recordWordHeard(_currentWord.text);
     setState(() => _isPlayingAudio = true);
     final ok = await widget.audioService.playWord(_currentWord.text);
     if (mounted) {
@@ -199,6 +216,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     if (key.toLowerCase() == expectedLetter.toLowerCase()) {
       // Correct letter!
+      Haptics.correct();
+      widget.statsService?.recordLetterTap(key);
       setState(() {
         _revealedLetters[_currentLetterIndex] = true;
         _currentLetterIndex++;
@@ -215,11 +234,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       }
     } else {
       // Wrong letter — shake and retry
-      _onWrongLetter();
+      _onWrongLetter(key);
     }
   }
 
-  void _onWrongLetter() {
+  void _onWrongLetter(String tappedKey) {
+    // Track the wrong tap with what was expected
+    final expected = _targetText[_currentLetterIndex];
+    widget.statsService?.recordWrongTap(tappedKey, expected);
     setState(() {
       _shaking = true;
       _mistakesThisWord++;
@@ -227,7 +249,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     });
     _shakeController.forward();
     widget.audioService.playError();
-    if (Platform.isAndroid || Platform.isIOS) HapticFeedback.mediumImpact();
+    Haptics.wrong();
 
     // Tier 2 nudge: after 2 consecutive wrong guesses at same position,
     // briefly pulse the correct key.
@@ -238,7 +260,90 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     }
   }
 
+  /// Update ProfileService with word completion data, stickers, etc.
+  void _updateProfile() {
+    final ps = widget.profileService;
+    if (ps == null) return;
+
+    // Increment total words ever completed
+    final newTotal = ps.totalWordsEverCompleted + 1;
+    ps.setTotalWordsEverCompleted(newTotal);
+
+    // Record play session for streak
+    ps.recordPlaySession();
+
+    // Track words played today for chest unlock
+    final todayCount = ps.wordsPlayedToday;
+    ps.setWordsPlayedToday(todayCount + 1);
+
+    // Check milestone stickers
+    final milestoneId = StickerDefinitions.milestoneIdForWordCount(newTotal);
+    if (milestoneId != null && !ps.hasSticker(milestoneId)) {
+      final def = StickerDefinitions.byId(milestoneId);
+      if (def != null) {
+        ps.awardSticker(StickerRecord(
+          stickerId: milestoneId,
+          dateEarned: DateTime.now(),
+          category: def.category.name,
+          isNew: true,
+        ));
+      }
+    }
+
+    // Check perfect level sticker
+    if (_mistakesThisWord == 0 && _isLastWord && _perfectWords == _words.length) {
+      const perfectId = 'perfect_level';
+      if (!ps.hasSticker(perfectId)) {
+        final def = StickerDefinitions.byId(perfectId);
+        if (def != null) {
+          ps.awardSticker(StickerRecord(
+            stickerId: perfectId,
+            dateEarned: DateTime.now(),
+            category: def.category.name,
+            isNew: true,
+          ));
+        }
+      }
+    }
+
+    // Check level completion sticker
+    if (_isLastWord) {
+      final levelStickerId = 'level_${widget.level}';
+      if (!ps.hasSticker(levelStickerId)) {
+        final def = StickerDefinitions.byId(levelStickerId);
+        if (def != null) {
+          ps.awardSticker(StickerRecord(
+            stickerId: levelStickerId,
+            dateEarned: DateTime.now(),
+            category: def.category.name,
+            isNew: true,
+          ));
+        }
+      }
+    }
+
+    // Check evolution stickers
+    final evoId = StickerDefinitions.evolutionIdForWordCount(newTotal);
+    if (evoId != null && !ps.hasSticker(evoId)) {
+      final def = StickerDefinitions.byId(evoId);
+      if (def != null) {
+        ps.awardSticker(StickerRecord(
+          stickerId: evoId,
+          dateEarned: DateTime.now(),
+          category: def.category.name,
+          isNew: true,
+        ));
+      }
+    }
+  }
+
   Future<void> _onWordComplete() async {
+    // Record word stats
+    widget.statsService?.recordWordCompleted(
+      _words[_currentWordIndex].text,
+      _mistakesThisWord,
+    );
+
     // Track perfect words
     if (_mistakesThisWord == 0) _perfectWords++;
 
@@ -266,6 +371,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     );
     if (mounted) setState(() => _savingProgress = false);
 
+    // Update profile: word count, play session, stickers
+    _updateProfile();
+
     // Play success chime
     widget.audioService.playSuccess();
 
@@ -276,7 +384,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     }
     _confettiController.play();
 
-    if (Platform.isAndroid || Platform.isIOS) HapticFeedback.lightImpact();
+    Haptics.success();
 
     setState(() => _showingCelebration = true);
 
@@ -311,6 +419,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   @override
   void dispose() {
+    _sessionTimer.stop();
+    widget.statsService?.recordPlayTime(_sessionTimer.elapsed.inSeconds);
     _shakeController.dispose();
     _nudgeController.dispose();
     _streakPopController.dispose();
@@ -365,38 +475,43 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                       _buildHeader(levelColors),
                       if (_levelComplete)
                         Expanded(child: _buildLevelComplete())
-                      else ...[
-                        const SizedBox(height: 8),
-                        // Progress dots
-                        _buildProgressDots(levelColors),
-                        const Spacer(flex: 2),
+                      else
+                        Expanded(
+                          child: Column(
+                            children: [
+                              const SizedBox(height: 8),
+                              // Progress dots
+                              _buildProgressDots(levelColors),
+                              const Spacer(flex: 2),
 
-                        // Champion: "Keep practicing!" message for failed words
-                        if (_isChampion && _championWordFailed)
-                          Padding(
-                            padding: const EdgeInsets.only(bottom: 8),
-                            child: Text(
-                              'Keep practicing!',
-                              style: GoogleFonts.fredoka(
-                                fontSize: 16,
-                                fontWeight: FontWeight.w500,
-                                color: AppColors.secondaryText,
-                              ),
-                            ),
+                              // Champion: "Keep practicing!" message for failed words
+                              if (_isChampion && _championWordFailed)
+                                Padding(
+                                  padding: const EdgeInsets.only(bottom: 8),
+                                  child: Text(
+                                    'Keep practicing!',
+                                    style: GoogleFonts.fredoka(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w500,
+                                      color: AppColors.secondaryText,
+                                    ),
+                                  ),
+                                ),
+
+                              // Hear word button
+                              _buildHearButton(),
+                              const SizedBox(height: 20),
+
+                              // Letter tiles
+                              _buildLetterTiles(),
+                              const SizedBox(height: 20),
+
+                              // On-screen keyboard
+                              _buildKeyboard(levelColors),
+                              const Spacer(flex: 1),
+                            ],
                           ),
-
-                        // Hear word button
-                        _buildHearButton(),
-                        const SizedBox(height: 28),
-
-                        // Letter tiles
-                        _buildLetterTiles(),
-                        const SizedBox(height: 32),
-
-                        // On-screen keyboard
-                        _buildKeyboard(levelColors),
-                        const Spacer(flex: 1),
-                      ],
+                        ),
                     ],
                   ),
                 ),
@@ -564,8 +679,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         children: List.generate(_words.length, (i) {
           final isDone = i < _currentWordIndex;
           final isCurrent = i == _currentWordIndex;
+          // Just-completed dot gets a brief glow pulse
+          final justCompleted = isDone && i == _currentWordIndex - 1;
 
-          return AnimatedContainer(
+          Widget dot = AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             margin: const EdgeInsets.symmetric(horizontal: 3),
             width: isCurrent ? 20 : 8,
@@ -598,6 +715,20 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   : null,
             ),
           );
+
+          // Brief scale pulse on the most recently completed dot
+          if (justCompleted) {
+            dot = dot
+                .animate(key: ValueKey('dot_done_$i'))
+                .scale(
+                  begin: const Offset(1.5, 1.5),
+                  end: const Offset(1.0, 1.0),
+                  duration: 400.ms,
+                  curve: Curves.easeOut,
+                );
+          }
+
+          return dot;
         }),
       ),
     );
@@ -606,7 +737,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   // ── Hear Word Button ────────────────────────────────────────────
 
   Widget _buildHearButton() {
-    return GestureDetector(
+    final button = GestureDetector(
       onTap: _announceCurrentWord,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -619,17 +750,15 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           border: Border.all(
             color: _isPlayingAudio
                 ? AppColors.electricBlue.withValues(alpha: 0.4)
-                : AppColors.border.withValues(alpha: 0.5),
+                : AppColors.electricBlue.withValues(alpha: 0.2),
           ),
-          boxShadow: _isPlayingAudio
-              ? [
-                  BoxShadow(
-                    color:
-                        AppColors.electricBlue.withValues(alpha: 0.15),
-                    blurRadius: 12,
-                  ),
-                ]
-              : null,
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.electricBlue.withValues(
+                  alpha: _isPlayingAudio ? 0.2 : 0.08),
+              blurRadius: _isPlayingAudio ? 16 : 8,
+            ),
+          ],
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -654,6 +783,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         ),
       ),
     );
+
+    if (_isPlayingAudio) {
+      return button
+          .animate(onPlay: (c) => c.repeat(reverse: true))
+          .scaleXY(begin: 1.0, end: 1.04, duration: 600.ms, curve: Curves.easeInOut);
+    }
+    return button;
   }
 
   // ── Letter Tiles ────────────────────────────────────────────────
@@ -672,6 +808,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         );
       },
       child: Wrap(
+        key: ValueKey('word_$_currentWordIndex'),
         alignment: WrapAlignment.center,
         spacing: 6,
         runSpacing: 6,
@@ -688,7 +825,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 : null,
           );
         }),
-      ),
+      ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.15, end: 0, duration: 300.ms),
     );
   }
 
@@ -790,116 +927,252 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   // ── Level Complete ──────────────────────────────────────────────
 
+  /// Get champion words that still need to pass (bestMistakes > 1).
+  List<String> _getChampionRemainingWords() {
+    if (!_isChampion) return [];
+    final lp = widget.progressService.getLevel(widget.level);
+    final tierProg = lp.tierProgress[3];
+    if (tierProg == null) return [];
+
+    final allWords = DolchWords.wordsForLevel(widget.level);
+    final remaining = <String>[];
+    for (final word in allWords) {
+      final stats = tierProg.wordStats[word.text];
+      if (stats == null || stats.bestMistakes > 1) {
+        remaining.add(word.text);
+      }
+    }
+    return remaining;
+  }
+
   Widget _buildLevelComplete() {
     final tierColor = _wordTier.color;
-    final tierLabel = _isChampion
-        ? 'CHAMPION!'
-        : _isAdventurer
-            ? 'Tier Complete!'
-            : 'Level Complete!';
     final praiseColor = _isChampion
         ? AppColors.starGold
         : _isAdventurer
             ? AppColors.silver
             : AppColors.success;
 
+    // Check if champion tier is actually complete
+    final championRemaining = _getChampionRemainingWords();
+    final championNotDone = _isChampion && championRemaining.isNotEmpty;
+
+    final tierLabel = championNotDone
+        ? 'Almost There!'
+        : _isChampion
+            ? 'CHAMPION!'
+            : _isAdventurer
+                ? 'Tier Complete!'
+                : 'Level Complete!';
+
+    final tierIcon = championNotDone
+        ? Icons.emoji_events_rounded
+        : Icons.star_rounded;
+
+    final tierIconColor = championNotDone
+        ? AppColors.starGold.withValues(alpha: 0.6)
+        : tierColor;
+
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 32),
+      child: SingleChildScrollView(
+        physics: const BouncingScrollPhysics(),
+        padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // Star with glow (tier-colored)
+            // Star/trophy with glow (tier-colored)
             Container(
               decoration: BoxDecoration(
                 boxShadow: [
                   BoxShadow(
-                    color: tierColor.withValues(alpha: 0.5),
-                    blurRadius: 40,
-                    spreadRadius: 8,
+                    color: tierIconColor.withValues(alpha: 0.5),
+                    blurRadius: 50,
+                    spreadRadius: 12,
+                  ),
+                  BoxShadow(
+                    color: tierIconColor.withValues(alpha: 0.2),
+                    blurRadius: 80,
+                    spreadRadius: 20,
                   ),
                 ],
               ),
               child: Icon(
-                Icons.star_rounded,
-                color: tierColor,
-                size: 80,
+                tierIcon,
+                color: tierIconColor,
+                size: 88,
               ),
-            ).animate().scale(
-                  begin: const Offset(0.3, 0.3),
-                  end: const Offset(1.0, 1.0),
+            )
+                .animate()
+                .scaleXY(
+                  begin: 0.0,
+                  end: 1.0,
                   curve: Curves.elasticOut,
-                  duration: 800.ms,
+                  duration: 900.ms,
+                )
+                .rotate(
+                  begin: -0.05,
+                  end: 0,
+                  duration: 900.ms,
+                  curve: Curves.elasticOut,
                 ),
             const SizedBox(height: 20),
 
             Text(
               tierLabel,
               style: GoogleFonts.fredoka(
-                fontSize: 36,
+                fontSize: 38,
                 fontWeight: FontWeight.w700,
                 color: AppColors.primaryText,
                 shadows: [
                   Shadow(
-                    color: tierColor.withValues(alpha: 0.3),
-                    blurRadius: 16,
+                    color: tierIconColor.withValues(alpha: 0.4),
+                    blurRadius: 20,
+                  ),
+                  Shadow(
+                    color: tierIconColor.withValues(alpha: 0.15),
+                    blurRadius: 40,
                   ),
                 ],
               ),
-            ).animate().fadeIn(delay: 300.ms).slideY(begin: 0.3, end: 0),
+            )
+                .animate()
+                .fadeIn(delay: 250.ms, duration: 400.ms)
+                .slideY(begin: 0.3, end: 0, delay: 250.ms, duration: 400.ms, curve: Curves.easeOutCubic),
 
             const SizedBox(height: 8),
 
-            // Personalized phrase
+            // Personalized phrase or "try again" message
             Text(
-              _levelCompletePhrase.isNotEmpty
-                  ? _levelCompletePhrase
-                  : 'Amazing job!',
+              championNotDone
+                  ? '${championRemaining.length} word${championRemaining.length == 1 ? '' : 's'} left to master!'
+                  : _levelCompletePhrase.isNotEmpty
+                      ? _levelCompletePhrase
+                      : 'Amazing job!',
               style: GoogleFonts.fredoka(
                 fontSize: 22,
                 fontWeight: FontWeight.w500,
-                color: praiseColor,
+                color: championNotDone ? AppColors.electricBlue : praiseColor,
                 shadows: [
                   Shadow(
-                    color: praiseColor.withValues(alpha: 0.3),
+                    color: (championNotDone ? AppColors.electricBlue : praiseColor)
+                        .withValues(alpha: 0.3),
                     blurRadius: 8,
                   ),
                 ],
               ),
-            ).animate().fadeIn(delay: 500.ms),
+            )
+                .animate()
+                .fadeIn(delay: 400.ms, duration: 300.ms)
+                .slideY(begin: 0.2, end: 0, delay: 400.ms, duration: 300.ms),
+
+            // Show remaining champion words that need to pass
+            if (championNotDone) ...[
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                runSpacing: 6,
+                alignment: WrapAlignment.center,
+                children: championRemaining.map((word) {
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: AppColors.error.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: AppColors.error.withValues(alpha: 0.3),
+                      ),
+                    ),
+                    child: Text(
+                      word,
+                      style: GoogleFonts.fredoka(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.error.withValues(alpha: 0.9),
+                      ),
+                    ),
+                  );
+                }).toList(),
+              ).animate().fadeIn(delay: 600.ms),
+
+              const SizedBox(height: 8),
+              Text(
+                'Spell with 1 mistake or less!',
+                style: GoogleFonts.nunito(
+                  fontSize: 13,
+                  color: AppColors.secondaryText.withValues(alpha: 0.7),
+                ),
+              ).animate().fadeIn(delay: 650.ms),
+            ],
 
             const SizedBox(height: 16),
 
             // Stats row
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _StatChip(
-                  icon: Icons.check_circle_rounded,
-                  value: '${_words.length}',
-                  label: 'Words',
-                  color: AppColors.success,
-                ),
-                const SizedBox(width: 12),
-                _StatChip(
-                  icon: Icons.star_rounded,
-                  value: '$_perfectWords',
-                  label: 'Perfect',
-                  color: AppColors.starGold,
-                ),
-                if (_isChampion && _perfectStreak > 0) ...[
+            if (!championNotDone)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _StatChip(
+                    icon: Icons.check_circle_rounded,
+                    value: '${_words.length}',
+                    label: 'Words',
+                    color: AppColors.success,
+                  )
+                      .animate()
+                      .fadeIn(delay: 500.ms, duration: 300.ms)
+                      .slideY(begin: 0.3, end: 0, delay: 500.ms, duration: 300.ms),
                   const SizedBox(width: 12),
                   _StatChip(
-                    icon: Icons.local_fire_department_rounded,
-                    value: '$_perfectStreak',
-                    label: 'Streak',
-                    color: _perfectStreak >= 5
-                        ? AppColors.starGold
-                        : AppColors.error,
-                  ),
+                    icon: Icons.star_rounded,
+                    value: '$_perfectWords',
+                    label: 'Perfect',
+                    color: AppColors.starGold,
+                  )
+                      .animate()
+                      .fadeIn(delay: 600.ms, duration: 300.ms)
+                      .slideY(begin: 0.3, end: 0, delay: 600.ms, duration: 300.ms),
+                  if (_isChampion && _perfectStreak > 0) ...[
+                    const SizedBox(width: 12),
+                    _StatChip(
+                      icon: Icons.local_fire_department_rounded,
+                      value: '$_perfectStreak',
+                      label: 'Streak',
+                      color: _perfectStreak >= 5
+                          ? AppColors.starGold
+                          : AppColors.error,
+                    )
+                        .animate()
+                        .fadeIn(delay: 700.ms, duration: 300.ms)
+                        .slideY(begin: 0.3, end: 0, delay: 700.ms, duration: 300.ms),
+                  ],
                 ],
-              ],
-            ).animate().fadeIn(delay: 600.ms),
+              ),
+
+            if (championNotDone)
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _StatChip(
+                    icon: Icons.check_circle_rounded,
+                    value: '${_words.length - championRemaining.length}/10',
+                    label: 'Passed',
+                    color: AppColors.success,
+                  )
+                      .animate()
+                      .fadeIn(delay: 600.ms, duration: 300.ms)
+                      .slideY(begin: 0.3, end: 0, delay: 600.ms, duration: 300.ms),
+                  const SizedBox(width: 12),
+                  _StatChip(
+                    icon: Icons.star_rounded,
+                    value: '$_perfectWords',
+                    label: 'Perfect',
+                    color: AppColors.starGold,
+                  )
+                      .animate()
+                      .fadeIn(delay: 700.ms, duration: 300.ms)
+                      .slideY(begin: 0.3, end: 0, delay: 700.ms, duration: 300.ms),
+                ],
+              ),
 
             const SizedBox(height: 32),
 
@@ -908,9 +1181,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 _RoundButton(
-                  label: 'Replay',
-                  icon: Icons.replay_rounded,
-                  color: AppColors.secondaryText,
+                  label: championNotDone ? 'Try Again' : 'Replay',
+                  icon: championNotDone
+                      ? Icons.refresh_rounded
+                      : Icons.replay_rounded,
+                  color: championNotDone
+                      ? AppColors.electricBlue
+                      : AppColors.secondaryText,
                   onTap: () {
                     setState(() {
                       _words.shuffle();
@@ -923,39 +1200,47 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     Future.delayed(const Duration(milliseconds: 400),
                         _announceCurrentWord);
                   },
-                ),
-                const SizedBox(width: 24),
-                if (widget.level < DolchWords.totalLevels)
-                  _RoundButton(
-                    label: 'Next',
-                    icon: Icons.arrow_forward_rounded,
-                    color: AppColors.success,
-                    onTap: () {
-                      Navigator.pushReplacement(
-                        context,
-                        PageRouteBuilder(
-                          pageBuilder: (_, __, ___) => GameScreen(
-                            level: widget.level + 1,
-                            tier: widget.tier,
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            playerName: widget.playerName,
+                )
+                    .animate()
+                    .fadeIn(delay: 750.ms, duration: 300.ms)
+                    .slideY(begin: 0.3, end: 0, delay: 750.ms, duration: 300.ms),
+                if (!championNotDone) ...[
+                  const SizedBox(width: 24),
+                  if (widget.level < DolchWords.totalLevels)
+                    _RoundButton(
+                      label: 'Next',
+                      icon: Icons.arrow_forward_rounded,
+                      color: AppColors.success,
+                      onTap: () {
+                        Navigator.pushReplacement(
+                          context,
+                          PageRouteBuilder(
+                            pageBuilder: (_, __, ___) => GameScreen(
+                              level: widget.level + 1,
+                              tier: widget.tier,
+                              progressService: widget.progressService,
+                              audioService: widget.audioService,
+                              playerName: widget.playerName,
+                            ),
+                            transitionsBuilder: (_, animation, __, child) {
+                              return FadeTransition(
+                                opacity: CurvedAnimation(
+                                  parent: animation,
+                                  curve: Curves.easeInOut,
+                                ),
+                                child: child,
+                              );
+                            },
                           ),
-                          transitionsBuilder: (_, animation, __, child) {
-                            return FadeTransition(
-                              opacity: CurvedAnimation(
-                                parent: animation,
-                                curve: Curves.easeInOut,
-                              ),
-                              child: child,
-                            );
-                          },
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    )
+                        .animate()
+                        .fadeIn(delay: 850.ms, duration: 300.ms)
+                        .slideY(begin: 0.3, end: 0, delay: 850.ms, duration: 300.ms),
+                ],
               ],
-            ).animate().fadeIn(delay: 700.ms),
+            ),
           ],
         ),
       ),
@@ -1023,55 +1308,64 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
         widget.onTap();
       },
       onTapCancel: () => setState(() => _pressed = false),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 100),
-        margin: const EdgeInsets.symmetric(horizontal: 2.5),
-        width: 34,
-        height: 46,
-        transform: Matrix4.identity()
-          ..setEntry(0, 0, _pressed ? 0.92 : 1.0)
-          ..setEntry(1, 1, _pressed ? 0.92 : 1.0),
-        transformAlignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: showHighlight
-              ? AppColors.electricBlue.withValues(alpha: 0.2)
-              : showNudge
-                  ? AppColors.electricBlue.withValues(alpha: 0.15)
-                  : _pressed
-                      ? AppColors.surface.withValues(alpha: 0.5)
-                      : AppColors.surface.withValues(alpha: 0.7),
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
+      child: AnimatedScale(
+        scale: _pressed ? 0.88 : 1.0,
+        duration: const Duration(milliseconds: 80),
+        curve: Curves.easeOut,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 120),
+          margin: const EdgeInsets.symmetric(horizontal: 2.5),
+          width: 34,
+          height: 46,
+          decoration: BoxDecoration(
             color: showHighlight
-                ? AppColors.electricBlue
+                ? AppColors.electricBlue.withValues(alpha: 0.2)
                 : showNudge
-                    ? AppColors.electricBlue.withValues(alpha: 0.6)
-                    : AppColors.border.withValues(alpha: 0.5),
-            width: showHighlight ? 1.5 : 1,
-          ),
-          boxShadow: [
-            if (showHighlight)
-              BoxShadow(
-                color: AppColors.electricBlue.withValues(alpha: 0.25),
-                blurRadius: 8,
-              ),
-            if (showNudge)
-              BoxShadow(
-                color: AppColors.electricBlue.withValues(alpha: nudgeGlowAlpha * 0.4),
-                blurRadius: 10,
-              ),
-          ],
-        ),
-        child: Center(
-          child: Text(
-            widget.letter,
-            style: GoogleFonts.fredoka(
-              fontSize: 18,
-              fontWeight:
-                  (showHighlight || showNudge) ? FontWeight.w600 : FontWeight.w400,
-              color: (showHighlight || showNudge)
+                    ? AppColors.electricBlue.withValues(alpha: 0.15)
+                    : _pressed
+                        ? AppColors.electricBlue.withValues(alpha: 0.12)
+                        : AppColors.surface.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(
+              color: showHighlight
                   ? AppColors.electricBlue
-                  : AppColors.primaryText,
+                  : showNudge
+                      ? AppColors.electricBlue.withValues(alpha: 0.6)
+                      : _pressed
+                          ? AppColors.electricBlue.withValues(alpha: 0.4)
+                          : AppColors.border.withValues(alpha: 0.5),
+              width: showHighlight ? 1.5 : 1,
+            ),
+            boxShadow: [
+              if (showHighlight)
+                BoxShadow(
+                  color: AppColors.electricBlue.withValues(alpha: 0.3),
+                  blurRadius: 10,
+                  spreadRadius: 1,
+                ),
+              if (showNudge)
+                BoxShadow(
+                  color: AppColors.electricBlue.withValues(alpha: nudgeGlowAlpha * 0.5),
+                  blurRadius: 12,
+                ),
+              if (_pressed)
+                BoxShadow(
+                  color: AppColors.electricBlue.withValues(alpha: 0.15),
+                  blurRadius: 6,
+                ),
+            ],
+          ),
+          child: Center(
+            child: Text(
+              widget.letter,
+              style: GoogleFonts.fredoka(
+                fontSize: 18,
+                fontWeight:
+                    (showHighlight || showNudge) ? FontWeight.w600 : FontWeight.w400,
+                color: (showHighlight || showNudge || _pressed)
+                    ? AppColors.electricBlue
+                    : AppColors.primaryText,
+              ),
             ),
           ),
         ),
@@ -1082,7 +1376,7 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
 
 // ── Round Button ────────────────────────────────────────────────────
 
-class _RoundButton extends StatelessWidget {
+class _RoundButton extends StatefulWidget {
   final String label;
   final IconData icon;
   final Color color;
@@ -1096,39 +1390,57 @@ class _RoundButton extends StatelessWidget {
   });
 
   @override
+  State<_RoundButton> createState() => _RoundButtonState();
+}
+
+class _RoundButtonState extends State<_RoundButton> {
+  bool _pressed = false;
+
+  @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: onTap,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64,
-            height: 64,
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.12),
-              shape: BoxShape.circle,
-              border:
-                  Border.all(color: color.withValues(alpha: 0.4), width: 2),
-              boxShadow: [
-                BoxShadow(
-                  color: color.withValues(alpha: 0.1),
-                  blurRadius: 12,
-                ),
-              ],
+      onTapDown: (_) => setState(() => _pressed = true),
+      onTapUp: (_) {
+        setState(() => _pressed = false);
+        widget.onTap();
+      },
+      onTapCancel: () => setState(() => _pressed = false),
+      child: AnimatedScale(
+        scale: _pressed ? 0.9 : 1.0,
+        duration: const Duration(milliseconds: 100),
+        curve: Curves.easeOut,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 68,
+              height: 68,
+              decoration: BoxDecoration(
+                color: widget.color.withValues(alpha: _pressed ? 0.2 : 0.12),
+                shape: BoxShape.circle,
+                border: Border.all(
+                    color: widget.color.withValues(alpha: 0.4), width: 2),
+                boxShadow: [
+                  BoxShadow(
+                    color: widget.color.withValues(alpha: 0.15),
+                    blurRadius: 16,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Icon(widget.icon, color: widget.color, size: 30),
             ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            label,
-            style: GoogleFonts.fredoka(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: color,
+            const SizedBox(height: 8),
+            Text(
+              widget.label,
+              style: GoogleFonts.fredoka(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+                color: widget.color,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
