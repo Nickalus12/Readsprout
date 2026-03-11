@@ -172,7 +172,8 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
     final rng = Random();
     _updateConfig(AvatarConfig(
       faceShape: rng.nextInt(faceShapeOptions.length),
-      skinTone: rng.nextInt(skinToneOptions.length),
+      skinTone: 0,
+      skinToneValue: rng.nextDouble(),
       hairStyle: rng.nextInt(hairStyleOptions.length),
       hairColor: rng.nextInt(8), // only free colors
       eyeStyle: rng.nextInt(eyeStyleOptions.length),
@@ -346,12 +347,15 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       builder: (index) {
         final opt = faceShapeOptions[index];
         final r = opt.borderRadius * 28;
+        final previewSkin = _config.skinToneValue >= 0.0
+            ? skinColorFromSlider(_config.skinToneValue)
+            : skinColorForIndex(_config.skinTone);
         return Center(
           child: Container(
             width: 34,
             height: (34 * opt.heightRatio).toDouble(),
             decoration: BoxDecoration(
-              color: skinColorForIndex(_config.skinTone),
+              color: previewSkin,
               borderRadius: BorderRadius.circular(r),
             ),
           ),
@@ -361,30 +365,79 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
     );
   }
 
-  // ── Skin Tone ───────────────────────────────────────────────────────
+  // ── Skin Tone (Continuous Slider) ───────────────────────────────────
 
   Widget _buildSkinToneOptions() {
-    return _optionGrid(
-      itemCount: skinToneOptions.length,
-      selectedIndex: _config.skinTone,
-      builder: (index) {
-        final opt = skinToneOptions[index];
-        return Center(
-          child: Container(
-            width: 36,
-            height: 36,
+    // Initialize slider from existing config.
+    final sliderValue = _config.skinToneValue >= 0.0
+        ? _config.skinToneValue
+        : _config.skinTone / (skinToneOptions.length - 1).toDouble();
+    final currentColor = skinColorFromSlider(sliderValue);
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          // Color preview circle
+          Container(
+            width: 52,
+            height: 52,
             decoration: BoxDecoration(
-              color: opt.color,
+              color: currentColor,
               shape: BoxShape.circle,
               border: Border.all(
-                color: Colors.white.withValues(alpha: 0.3),
-                width: 1.5,
+                color: Colors.white.withValues(alpha: 0.4),
+                width: 2,
               ),
+              boxShadow: [
+                BoxShadow(
+                  color: currentColor.withValues(alpha: 0.4),
+                  blurRadius: 12,
+                  spreadRadius: 2,
+                ),
+              ],
             ),
           ),
-        );
-      },
-      onTap: (index) => _updateConfig(_config.copyWith(skinTone: index)),
+          const SizedBox(height: 20),
+          // Custom gradient slider
+          SliderTheme(
+            data: SliderThemeData(
+              trackHeight: 20,
+              trackShape: _SkinToneTrackShape(),
+              thumbShape: _SkinToneThumbShape(color: currentColor),
+              overlayShape: const RoundSliderOverlayShape(overlayRadius: 24),
+              overlayColor: currentColor.withValues(alpha: 0.2),
+            ),
+            child: Slider(
+              value: sliderValue,
+              onChanged: (value) {
+                _updateConfig(_config.copyWith(skinToneValue: value));
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                'Light',
+                style: AppFonts.fredoka(
+                  fontSize: 12,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              Text(
+                'Dark',
+                style: AppFonts.fredoka(
+                  fontSize: 12,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 
@@ -1068,5 +1121,112 @@ class _OptionTileContent extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+// ── Custom Skin Tone Slider Track ──────────────────────────────────
+
+class _SkinToneTrackShape extends SliderTrackShape {
+  @override
+  Rect getPreferredRect({
+    required RenderBox parentBox,
+    Offset offset = Offset.zero,
+    required SliderThemeData sliderTheme,
+    bool isEnabled = false,
+    bool isDiscrete = false,
+  }) {
+    final trackHeight = sliderTheme.trackHeight ?? 20;
+    final trackTop = offset.dy + (parentBox.size.height - trackHeight) / 2;
+    return Rect.fromLTWH(
+      offset.dx + 12,
+      trackTop,
+      parentBox.size.width - 24,
+      trackHeight,
+    );
+  }
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset offset, {
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required Animation<double> enableAnimation,
+    required TextDirection textDirection,
+    required Offset thumbCenter,
+    Offset? secondaryOffset,
+    bool isDiscrete = false,
+    bool isEnabled = false,
+  }) {
+    final rect = getPreferredRect(
+      parentBox: parentBox,
+      offset: offset,
+      sliderTheme: sliderTheme,
+    );
+    final rrect = RRect.fromRectAndRadius(rect, const Radius.circular(10));
+
+    // Paint skin tone gradient as the track background.
+    final gradient = LinearGradient(
+      colors: skinToneGradientColors,
+      stops: skinToneGradientStops,
+    );
+    final paint = Paint()..shader = gradient.createShader(rect);
+    context.canvas.drawRRect(rrect, paint);
+
+    // Subtle border.
+    final borderPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..color = Colors.white.withValues(alpha: 0.2)
+      ..strokeWidth = 1;
+    context.canvas.drawRRect(rrect, borderPaint);
+  }
+}
+
+// ── Custom Skin Tone Slider Thumb ──────────────────────────────────
+
+class _SkinToneThumbShape extends SliderComponentShape {
+  final Color color;
+  const _SkinToneThumbShape({required this.color});
+
+  @override
+  Size getPreferredSize(bool isEnabled, bool isDiscrete) {
+    return const Size(28, 28);
+  }
+
+  @override
+  void paint(
+    PaintingContext context,
+    Offset center, {
+    required Animation<double> activationAnimation,
+    required Animation<double> enableAnimation,
+    required bool isDiscrete,
+    required TextPainter labelPainter,
+    required RenderBox parentBox,
+    required SliderThemeData sliderTheme,
+    required TextDirection textDirection,
+    required double value,
+    required double textScaleFactor,
+    required Size sizeWithOverflow,
+  }) {
+    final canvas = context.canvas;
+
+    // White outer ring
+    final outerPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 14, outerPaint);
+
+    // Skin color fill
+    final fillPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(center, 11, fillPaint);
+
+    // Subtle shadow ring
+    final shadowPaint = Paint()
+      ..color = Colors.black.withValues(alpha: 0.15)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+    canvas.drawCircle(center, 14, shadowPaint);
   }
 }

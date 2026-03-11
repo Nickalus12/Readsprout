@@ -45,6 +45,7 @@ class _ProfileScreenState extends State<ProfileScreen>
   late AvatarConfig _avatar;
   late AnimationController _avatarGlowController;
   late AnimationController _statsAnimController;
+  late AnimationController _homeFrameController;
   final AvatarController _avatarController = AvatarController();
 
   // Animated counter values
@@ -60,6 +61,11 @@ class _ProfileScreenState extends State<ProfileScreen>
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
+
+    _homeFrameController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 6),
+    )..repeat();
 
     _statsAnimController = AnimationController(
       vsync: this,
@@ -110,6 +116,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     _statsAnimController.dispose();
     _avatarController.dispose();
     _avatarGlowController.dispose();
+    _homeFrameController.dispose();
     super.dispose();
   }
 
@@ -306,122 +313,42 @@ class _ProfileScreenState extends State<ProfileScreen>
     final nextLevel = level.next;
     final progressToNext = level.progressToNext(_wordCount);
 
+    // Avatar home frame: ~40% screen width on phone, capped at 300px
+    final frameW = (screenW * 0.40).clamp(120.0, 300.0);
+    final frameH = frameW / 0.75; // 3:4 aspect ratio
+
     return Column(
       children: [
-        // Avatar + name row
         Row(
-          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Avatar -- larger, with level badge and glowing ring
+            SizedBox(width: 16 * sf),
+
+            // ── Avatar Home Frame ──
             GestureDetector(
               onTap: _onAvatarTap,
               onLongPress: _openAvatarEditor,
-              child: AnimatedBuilder(
-                animation: _avatarGlowController,
-                builder: (context, child) {
-                  final glowAlpha = 0.25 + _avatarGlowController.value * 0.25;
-                  final blurRadius = 20.0 + _avatarGlowController.value * 16;
-                  final borderAlpha = 0.4 + _avatarGlowController.value * 0.25;
-                  return Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Main avatar container -- 130px
-                      Container(
-                        width: 136 * sf,
-                        height: 136 * sf,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: AppColors.violet.withValues(alpha: borderAlpha),
-                            width: 3 * sf,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.violet.withValues(alpha: glowAlpha),
-                              blurRadius: blurRadius,
-                              spreadRadius: 4 * sf,
-                            ),
-                            BoxShadow(
-                              color: AppColors.magenta.withValues(alpha: glowAlpha * 0.4),
-                              blurRadius: blurRadius * 1.5,
-                              spreadRadius: 2 * sf,
-                            ),
-                          ],
-                        ),
-                        padding: EdgeInsets.all(3 * sf),
-                        child: AvatarWidget(config: _avatar, size: 124 * sf, controller: _avatarController),
-                      ),
-
-                      // Edit badge
-                      Positioned(
-                        right: 0,
-                        bottom: 0,
-                        child: Container(
-                          width: 32 * sf,
-                          height: 32 * sf,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: AppColors.violet,
-                            border: Border.all(
-                              color: AppColors.background,
-                              width: 2.5 * sf,
-                            ),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.violet.withValues(alpha: 0.4),
-                                blurRadius: 8 * sf,
-                              ),
-                            ],
-                          ),
-                          child: Icon(
-                            Icons.edit_rounded,
-                            size: 16 * sf,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-
-                      // Level badge -- top-left
-                      Positioned(
-                        left: -4 * sf,
-                        top: -4 * sf,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 8 * sf, vertical: 3 * sf),
-                          decoration: BoxDecoration(
-                            gradient: const LinearGradient(
-                              colors: [AppColors.starGold, Color(0xFFFFAA00)],
-                            ),
-                            borderRadius: BorderRadius.circular(10 * sf),
-                            boxShadow: [
-                              BoxShadow(
-                                color: AppColors.starGold.withValues(alpha: 0.4),
-                                blurRadius: 8,
-                              ),
-                            ],
-                          ),
-                          child: Text(
-                            'Lv ${widget.progressService.highestUnlockedLevel}',
-                            style: AppFonts.fredoka(
-                              fontSize: 11 * sf,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.background,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+              child: _AvatarHomeFrame(
+                width: frameW,
+                height: frameH,
+                sf: sf,
+                frameController: _homeFrameController,
+                glowController: _avatarGlowController,
+                avatar: _avatar,
+                avatarController: _avatarController,
+                level: widget.progressService.highestUnlockedLevel,
               ),
             ),
 
-            SizedBox(width: 16 * sf),
+            SizedBox(width: 14 * sf),
 
-            // Name + reading level + stats stacked
-            Flexible(
+            // ── Name + reading level + stats ──
+            Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
+                  SizedBox(height: 8 * sf),
+
                   // Player name
                   if (widget.playerName.isNotEmpty)
                     GestureDetector(
@@ -435,7 +362,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                               overflow: TextOverflow.ellipsis,
                               maxLines: 1,
                               style: AppFonts.fredoka(
-                                fontSize: 28 * sf,
+                                fontSize: 26 * sf,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
                                 shadows: [
@@ -457,7 +384,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                       ),
                     ),
 
-                  SizedBox(height: 4 * sf),
+                  SizedBox(height: 6 * sf),
 
                   // Reading level title with icon
                   Container(
@@ -562,6 +489,8 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ],
               ),
             ),
+
+            SizedBox(width: 12 * sf),
           ],
         ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1, end: 0, duration: 400.ms),
       ],
@@ -1387,4 +1316,261 @@ class _FireflyPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _FireflyPainter oldDelegate) => true;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  AVATAR HOME FRAME
+//  Alive rectangular container with animated gradient, ambient glow,
+//  and floating particles. Replaces the old circular avatar container.
+// ═══════════════════════════════════════════════════════════════════════
+
+class _AvatarHomeFrame extends StatelessWidget {
+  final double width;
+  final double height;
+  final double sf;
+  final AnimationController frameController;
+  final AnimationController glowController;
+  final AvatarConfig avatar;
+  final AvatarController avatarController;
+  final int level;
+
+  const _AvatarHomeFrame({
+    required this.width,
+    required this.height,
+    required this.sf,
+    required this.frameController,
+    required this.glowController,
+    required this.avatar,
+    required this.avatarController,
+    required this.level,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final borderRadius = BorderRadius.circular(16 * sf);
+
+    return AnimatedBuilder(
+      animation: Listenable.merge([frameController, glowController]),
+      builder: (context, child) {
+        final t = frameController.value;
+        final glowT = glowController.value;
+        final glowAlpha = 0.20 + glowT * 0.20;
+        final borderAlpha = 0.35 + glowT * 0.25;
+
+        return Stack(
+          clipBehavior: Clip.none,
+          children: [
+            // Ambient glow behind frame
+            Positioned(
+              left: -8 * sf,
+              top: -8 * sf,
+              right: -8 * sf,
+              bottom: -8 * sf,
+              child: Container(
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(20 * sf),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.violet.withValues(alpha: glowAlpha),
+                      blurRadius: 24 + glowT * 12,
+                      spreadRadius: 2 * sf,
+                    ),
+                    BoxShadow(
+                      color: AppColors.magenta.withValues(alpha: glowAlpha * 0.35),
+                      blurRadius: 36 + glowT * 16,
+                      spreadRadius: 1 * sf,
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Main frame container
+            Container(
+              width: width,
+              height: height,
+              decoration: BoxDecoration(
+                borderRadius: borderRadius,
+                border: Border.all(
+                  color: AppColors.violet.withValues(alpha: borderAlpha),
+                  width: 2.5 * sf,
+                ),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(14 * sf),
+                child: Stack(
+                  children: [
+                    // Animated gradient background
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _HomeFrameBgPainter(phase: t),
+                      ),
+                    ),
+
+                    // Floating particles
+                    Positioned.fill(
+                      child: CustomPaint(
+                        painter: _FloatingParticlePainter(phase: t),
+                      ),
+                    ),
+
+                    // Avatar — centered, full bust, no background
+                    Center(
+                      child: AvatarWidget(
+                        config: avatar,
+                        size: width * 0.88,
+                        controller: avatarController,
+                        showBackground: false,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+            // Edit badge — bottom-right
+            Positioned(
+              right: -6 * sf,
+              bottom: -6 * sf,
+              child: Container(
+                width: 30 * sf,
+                height: 30 * sf,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.violet,
+                  border: Border.all(
+                    color: AppColors.background,
+                    width: 2.5 * sf,
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.violet.withValues(alpha: 0.4),
+                      blurRadius: 8 * sf,
+                    ),
+                  ],
+                ),
+                child: Icon(
+                  Icons.edit_rounded,
+                  size: 14 * sf,
+                  color: Colors.white,
+                ),
+              ),
+            ),
+
+            // Level badge — top-left
+            Positioned(
+              left: -6 * sf,
+              top: -6 * sf,
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 8 * sf, vertical: 3 * sf),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.starGold, Color(0xFFFFAA00)],
+                  ),
+                  borderRadius: BorderRadius.circular(10 * sf),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.starGold.withValues(alpha: 0.4),
+                      blurRadius: 8,
+                    ),
+                  ],
+                ),
+                child: Text(
+                  'Lv $level',
+                  style: AppFonts.fredoka(
+                    fontSize: 11 * sf,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.background,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+}
+
+/// Paints a slowly shifting gradient background for the avatar home frame.
+class _HomeFrameBgPainter extends CustomPainter {
+  final double phase; // 0.0 to 1.0, loops
+
+  const _HomeFrameBgPainter({required this.phase});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    // Shift gradient angle over time for a living feel
+    final angle = phase * 2 * pi;
+    final dx = cos(angle) * 0.4;
+    final dy = sin(angle) * 0.4;
+
+    final rect = Offset.zero & size;
+    final paint = Paint()
+      ..shader = LinearGradient(
+        begin: Alignment(dx - 0.5, dy - 0.8),
+        end: Alignment(-dx + 0.5, -dy + 0.8),
+        colors: const [
+          Color(0xFF1A1040), // deep indigo
+          Color(0xFF0E1A3A), // dark navy
+          Color(0xFF1A1040), // back to indigo
+          Color(0xFF12102A), // very dark purple
+        ],
+        stops: const [0.0, 0.35, 0.7, 1.0],
+      ).createShader(rect);
+
+    canvas.drawRect(rect, paint);
+
+    // Subtle radial highlight at center (avatar spotlight)
+    final centerPaint = Paint()
+      ..shader = RadialGradient(
+        center: Alignment(dx * 0.2, dy * 0.15 - 0.1),
+        radius: 0.9,
+        colors: [
+          const Color(0xFF2A1F5E).withValues(alpha: 0.35),
+          Colors.transparent,
+        ],
+      ).createShader(rect);
+    canvas.drawRect(rect, centerPaint);
+  }
+
+  @override
+  bool shouldRepaint(_HomeFrameBgPainter old) =>
+      (old.phase * 60).round() != (phase * 60).round();
+}
+
+/// Paints 3 slow-moving luminous dots inside the avatar home frame.
+class _FloatingParticlePainter extends CustomPainter {
+  final double phase;
+
+  const _FloatingParticlePainter({required this.phase});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+
+    // 3 particles with different speeds and paths
+    const particles = [
+      (xSpeed: 0.7, ySpeed: 1.0, xOff: 0.25, yOff: 0.30, radius: 2.5),
+      (xSpeed: 1.3, ySpeed: 0.8, xOff: 0.70, yOff: 0.55, radius: 2.0),
+      (xSpeed: 0.9, ySpeed: 1.2, xOff: 0.50, yOff: 0.80, radius: 1.8),
+    ];
+
+    for (final p in particles) {
+      final x = w * (p.xOff + sin(phase * pi * 2 * p.xSpeed) * 0.12);
+      final y = h * (p.yOff + cos(phase * pi * 2 * p.ySpeed) * 0.08);
+      final alpha = 0.15 + sin(phase * pi * 2 * p.xSpeed + 1.5) * 0.10;
+
+      final paint = Paint()
+        ..color = AppColors.violet.withValues(alpha: alpha)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, p.radius * 2);
+
+      canvas.drawCircle(Offset(x, y), p.radius, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_FloatingParticlePainter old) =>
+      (old.phase * 60).round() != (phase * 60).round();
 }

@@ -1,9 +1,10 @@
 // GENERATED CODE - DO NOT MODIFY BY HAND
-// (Manually written TypeAdapters matching @HiveType annotations)
 
 part of 'player_profile.dart';
 
-// ── PlayerProfile adapter (typeId: 0) ─────────────────────────────
+// **************************************************************************
+// TypeAdapterGenerator
+// **************************************************************************
 
 class PlayerProfileAdapter extends TypeAdapter<PlayerProfile> {
   @override
@@ -30,7 +31,7 @@ class PlayerProfileAdapter extends TypeAdapter<PlayerProfile> {
   @override
   void write(BinaryWriter writer, PlayerProfile obj) {
     writer
-      ..writeByte(8) // number of fields
+      ..writeByte(8)
       ..writeByte(0)
       ..write(obj.name)
       ..writeByte(1)
@@ -60,11 +61,6 @@ class PlayerProfileAdapter extends TypeAdapter<PlayerProfile> {
           typeId == other.typeId;
 }
 
-// ── AvatarConfig adapter (typeId: 1) ──────────────────────────────
-//
-// Fields 11-18 added in the avatar overhaul. Old profiles that only have
-// fields 0-10 will get default values (0) for the new fields.
-
 class AvatarConfigAdapter extends TypeAdapter<AvatarConfig> {
   @override
   final int typeId = 1;
@@ -87,24 +83,24 @@ class AvatarConfigAdapter extends TypeAdapter<AvatarConfig> {
       hasSparkle: fields[8] as bool,
       hasRainbowSparkle: fields[9] as bool,
       hasGoldenGlow: fields[10] as bool,
-      // New fields default to 0 for old profiles
-      eyeColor: (fields[11] as int?) ?? 0,
-      eyelashStyle: (fields[12] as int?) ?? 0,
-      eyebrowStyle: (fields[13] as int?) ?? 0,
-      lipColor: (fields[14] as int?) ?? 0,
-      cheekStyle: (fields[15] as int?) ?? 0,
-      noseStyle: (fields[16] as int?) ?? 0,
-      glassesStyle: (fields[17] as int?) ?? 0,
-      facePaint: (fields[18] as int?) ?? 0,
-      shirtColor: (fields[19] as int?) ?? 0,
-      shirtStyle: (fields[20] as int?) ?? 0,
+      eyeColor: fields[11] as int,
+      eyelashStyle: fields[12] as int,
+      eyebrowStyle: fields[13] as int,
+      lipColor: fields[14] as int,
+      cheekStyle: fields[15] as int,
+      noseStyle: fields[16] as int,
+      glassesStyle: fields[17] as int,
+      facePaint: fields[18] as int,
+      shirtColor: fields[19] as int,
+      shirtStyle: fields[20] as int,
+      skinToneValue: fields[21] as double,
     );
   }
 
   @override
   void write(BinaryWriter writer, AvatarConfig obj) {
     writer
-      ..writeByte(21) // number of fields
+      ..writeByte(22)
       ..writeByte(0)
       ..write(obj.faceShape)
       ..writeByte(1)
@@ -146,7 +142,9 @@ class AvatarConfigAdapter extends TypeAdapter<AvatarConfig> {
       ..writeByte(19)
       ..write(obj.shirtColor)
       ..writeByte(20)
-      ..write(obj.shirtStyle);
+      ..write(obj.shirtStyle)
+      ..writeByte(21)
+      ..write(obj.skinToneValue);
   }
 
   @override
@@ -159,8 +157,6 @@ class AvatarConfigAdapter extends TypeAdapter<AvatarConfig> {
           runtimeType == other.runtimeType &&
           typeId == other.typeId;
 }
-
-// ── StickerRecord adapter (typeId: 2) ─────────────────────────────
 
 class StickerRecordAdapter extends TypeAdapter<StickerRecord> {
   @override
@@ -183,7 +179,7 @@ class StickerRecordAdapter extends TypeAdapter<StickerRecord> {
   @override
   void write(BinaryWriter writer, StickerRecord obj) {
     writer
-      ..writeByte(4) // number of fields
+      ..writeByte(4)
       ..writeByte(0)
       ..write(obj.stickerId)
       ..writeByte(1)

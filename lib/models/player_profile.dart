@@ -141,6 +141,11 @@ class AvatarConfig extends HiveObject {
   @HiveField(20)
   final int shirtStyle; // 0-2
 
+  /// Continuous skin tone value: 0.0 (lightest) to 1.0 (darkest).
+  /// A value of -1.0 means "not set" — fall back to index-based [skinTone].
+  @HiveField(21)
+  final double skinToneValue;
+
   AvatarConfig({
     required this.faceShape,
     required this.skinTone,
@@ -163,6 +168,7 @@ class AvatarConfig extends HiveObject {
     this.facePaint = 0,
     this.shirtColor = 0,
     this.shirtStyle = 0,
+    this.skinToneValue = -1.0,
   });
 
   /// Default avatar for first-time users.
@@ -199,6 +205,7 @@ class AvatarConfig extends HiveObject {
     int? facePaint,
     int? shirtColor,
     int? shirtStyle,
+    double? skinToneValue,
   }) {
     return AvatarConfig(
       faceShape: faceShape ?? this.faceShape,
@@ -222,6 +229,7 @@ class AvatarConfig extends HiveObject {
       facePaint: facePaint ?? this.facePaint,
       shirtColor: shirtColor ?? this.shirtColor,
       shirtStyle: shirtStyle ?? this.shirtStyle,
+      skinToneValue: skinToneValue ?? this.skinToneValue,
     );
   }
 }

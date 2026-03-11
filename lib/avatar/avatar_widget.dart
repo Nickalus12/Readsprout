@@ -445,7 +445,12 @@ class _AvatarWidgetState extends State<AvatarWidget>
     return hairColorOptions[idx].color;
   }
 
-  Color get _skinColor => skinColorForIndex(widget.config.skinTone);
+  Color get _skinColor {
+    if (widget.config.skinToneValue >= 0.0) {
+      return skinColorFromSlider(widget.config.skinToneValue);
+    }
+    return skinColorForIndex(widget.config.skinTone);
+  }
 
   Color get _eyeColor {
     final idx = widget.config.eyeColor.clamp(0, eyeColorOptions.length - 1);
@@ -461,8 +466,12 @@ class _AvatarWidgetState extends State<AvatarWidget>
 
   double get _faceTop => 0.12;
 
-  /// Scaled head size (0.82 of widget size) used for face feature positioning.
-  double _headSize(double s) => s * 0.82;
+  /// Scaled head size: 45% of widget height for chibi-realism blend.
+  /// Head bottom aligns with NeckPainter.topProportion (0.65).
+  double _headSize(double s) {
+    final widgetH = s / widget.aspectRatio;
+    return widgetH * 0.45;
+  }
 
   double get _faceHeightFraction {
     final shape = faceShapeOptions[
@@ -519,9 +528,6 @@ class _AvatarWidgetState extends State<AvatarWidget>
     // Head sway derived from skeleton head bone's world rotation
     final headStorage = _skeleton.head.worldTransform.storage;
     final swayAngle = atan2(headStorage[1], headStorage[0]);
-    // Expression-driven transforms
-    final browOffset = _browOffsetY(size);
-    final jawDrop = _jawDrop(size);
 
     // Widget dimensions — bust view (~3:4 aspect ratio)
     final widgetW = size;
@@ -590,260 +596,11 @@ class _AvatarWidgetState extends State<AvatarWidget>
                   ),
                 ),
 
-              // 4. Hair back layer
-              Positioned(
-                left: 0,
-                top: 0,
-                width: widgetW,
-                height: widgetW,
-                child: CustomPaint(
-                  isComplex: true,
-                  willChange: widget.animateEffects,
-                  painter: HairBackPainter(
-                    style: config.hairStyle,
-                    color: _hairColor,
-                    isRainbow: isRainbowHair(config.hairColor),
-                    faceShape: config.faceShape,
-                    swayValue: _idleSwayValue,
-                    repaint: _repaintNotifier,
-                  ),
-                ),
-              ),
-
-              // 5. Hair front layer — rendered AFTER hair back but BEFORE
-              // the head bone so face + all features paint on top of hair.
-              Positioned(
-                left: 0,
-                top: 0,
-                width: widgetW,
-                height: widgetW,
-                child: CustomPaint(
-                  isComplex: true,
-                  willChange: widget.animateEffects,
-                  painter: HairFrontPainter(
-                    style: config.hairStyle,
-                    color: _hairColor,
-                    isRainbow: isRainbowHair(config.hairColor),
-                    faceShape: config.faceShape,
-                    swayValue: _idleSwayValue,
-                    repaint: _repaintNotifier,
-                  ),
-                ),
-              ),
-
-              // 6. Head bone: unified sway rotation for all face features
-              // Scaled down from full widgetW to avoid oversized head
-              Positioned(
-                left: widgetW * 0.09,
-                top: widgetW * -0.04,
-                width: widgetW * 0.82,
-                height: widgetW * 0.82,
-                child: Transform(
-                  transform: Matrix4.identity()
-                    ..translateByDouble(
-                        widgetW * 0.82 / 2, widgetW * 0.82 / 4, 0, 1.0)
-                    ..rotateZ(swayAngle)
-                    ..translateByDouble(
-                        -widgetW * 0.82 / 2, -widgetW * 0.82 / 4, 0, 1.0),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      // Face shape (bottom-most layer inside head)
-                      Positioned(
-                        left: _headSize(size) * 0.15,
-                        top: _headSize(size) * _faceTop,
-                        child: CustomPaint(
-                          size: Size(_headSize(size) * 0.70,
-                              _headSize(size) * _faceHeightFraction),
-                          isComplex: true,
-                          willChange: widget.animateEffects,
-                          painter: FacePainter(
-                            skinColor: _skinColor,
-                            faceShape: config.faceShape,
-                            breathingValue: breathingAnim,
-                            swayValue: swayAnim,
-                            repaint: _repaintNotifier,
-                          ),
-                        ),
-                      ),
-
-                      // Nose
-                      Positioned(
-                        left: _headSize(size) * 0.44,
-                        top: _headSize(size) *
-                            (_faceTop + _faceHeightFraction * 0.52),
-                        child: CustomPaint(
-                          size: Size(
-                              _headSize(size) * 0.12, _headSize(size) * 0.10),
-                          isComplex: true,
-                          willChange: widget.animateEffects,
-                          painter: NosePainter(
-                            style: config.noseStyle,
-                            skinColor: _skinColor,
-                            breathingValue: breathingAnim,
-                            repaint: _repaintNotifier,
-                          ),
-                        ),
-                      ),
-
-                      // Cheeks
-                      if (config.cheekStyle > 0)
-                        Positioned(
-                          left: _headSize(size) * 0.18,
-                          top: _headSize(size) *
-                              (_faceTop + _faceHeightFraction * 0.48),
-                          child: CustomPaint(
-                            size: Size(
-                                _headSize(size) * 0.64, _headSize(size) * 0.20),
-                            isComplex: true,
-                            painter: CheekPainter(
-                              style: config.cheekStyle,
-                              skinColor: _skinColor,
-                            ),
-                          ),
-                        ),
-
-                      // Eyes
-                      Positioned(
-                        left: _headSize(size) * 0.26,
-                        top: _headSize(size) *
-                            (_faceTop + _faceHeightFraction * 0.28),
-                        child: CustomPaint(
-                          size: Size(
-                              _headSize(size) * 0.48, _headSize(size) * 0.16),
-                          isComplex: true,
-                          willChange: widget.animateEffects,
-                          painter: EyesPainter(
-                            style: config.eyeStyle,
-                            eyeColor: _eyeColor,
-                            skinColor: _skinColor,
-                            blinkValue: blinkAnim,
-                            swayValue: swayAnim,
-                            pupilDilationValue: pupilAnim,
-                            expression: widget.controller?.expression ??
-                                AvatarExpression.neutral,
-                            lookTarget: widget.controller?.lookTarget,
-                            avatarSize: _headSize(size),
-                            repaint: _repaintNotifier,
-                          ),
-                        ),
-                      ),
-
-                      // Eyelashes
-                      if (config.eyelashStyle > 0)
-                        Positioned(
-                          left: _headSize(size) * 0.26,
-                          top: _headSize(size) *
-                              (_faceTop + _faceHeightFraction * 0.22),
-                          child: CustomPaint(
-                            size: Size(
-                                _headSize(size) * 0.48, _headSize(size) * 0.20),
-                            painter: EyelashPainter(
-                              style: config.eyelashStyle,
-                              eyeStyle: config.eyeStyle,
-                            ),
-                          ),
-                        ),
-
-                      // Eyebrows (expression-driven offset)
-                      Positioned(
-                        left: _headSize(size) * 0.26,
-                        top: _headSize(size) *
-                            (_faceTop + _faceHeightFraction * 0.16),
-                        child: Transform.translate(
-                          offset: Offset(0, browOffset),
-                          child: CustomPaint(
-                            size: Size(
-                                _headSize(size) * 0.48, _headSize(size) * 0.10),
-                            painter: EyebrowPainter(
-                              style: config.eyebrowStyle,
-                              color: _hairColor,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Mouth (jaw transform)
-                      Positioned(
-                        left: _headSize(size) * 0.35,
-                        top: _headSize(size) *
-                            (_faceTop + _faceHeightFraction * 0.68),
-                        child: Transform.translate(
-                          offset: Offset(0, jawDrop),
-                          child: CustomPaint(
-                            size: Size(
-                                _headSize(size) * 0.30, _headSize(size) * 0.12),
-                            isComplex: true,
-                            willChange: widget.controller != null,
-                            painter: MouthPainter(
-                              style: config.mouthStyle,
-                              lipColor: _lipColor,
-                              expression: widget.controller?.expression ??
-                                  AvatarExpression.neutral,
-                              mouthOpenAmount:
-                                  widget.controller?.mouthOpenAmount ?? 0.0,
-                              repaint: widget.controller != null
-                                  ? _repaintNotifier
-                                  : null,
-                            ),
-                          ),
-                        ),
-                      ),
-
-                      // Face paint
-                      if (config.facePaint > 0)
-                        Positioned(
-                          left: _headSize(size) * 0.15,
-                          top: _headSize(size) * _faceTop,
-                          child: CustomPaint(
-                            size: Size(_headSize(size) * 0.70,
-                                _headSize(size) * _faceHeightFraction),
-                            isComplex: true,
-                            painter: FacePaintPainter(
-                              style: config.facePaint,
-                              skinColor: _skinColor,
-                            ),
-                          ),
-                        ),
-
-                      // Glasses
-                      if (config.glassesStyle > 0)
-                        Positioned(
-                          left: _headSize(size) * 0.26,
-                          top: _headSize(size) *
-                              (_faceTop + _faceHeightFraction * 0.28),
-                          child: CustomPaint(
-                            size: Size(
-                                _headSize(size) * 0.48, _headSize(size) * 0.16),
-                            isComplex: true,
-                            painter: GlassesPainter(
-                              style: config.glassesStyle,
-                            ),
-                          ),
-                        ),
-
-                    ],
-                  ),
-                ),
-              ),
-
-              // 7. Accessories
-              if (config.accessory > 1)
-                Positioned(
-                  left: 0,
-                  top: 0,
-                  width: widgetW,
-                  height: widgetW,
-                  child: CustomPaint(
-                    isComplex: true,
-                    willChange: widget.animateEffects,
-                    painter: accessoryPainter(
-                      config.accessory,
-                      swayValue: _idleSwayValue,
-                      twinklePhase: _twinkleValue,
-                    ),
-                  ),
-                ),
+              // ── Head/hair geometry ──
+              // Head: 45% of widgetH, bottom aligns with neck top (0.65)
+              // Hair: 15% larger than head for volume, centered on head
+              ..._buildHeadAndHair(widgetW, widgetH, size, config, swayAngle,
+                  breathingAnim, swayAnim, blinkAnim, pupilAnim),
 
               // 8. Sparkle effects
               if (config.hasRainbowSparkle || config.hasGoldenGlow)
@@ -862,6 +619,271 @@ class _AvatarWidgetState extends State<AvatarWidget>
         ),
       ),
     );
+  }
+
+  // ── Head/hair/accessories builder ─────────────────────────────────
+  // Returns a list of Positioned widgets for the head bone, hair layers,
+  // and accessories. All positioned relative to NeckPainter.topProportion.
+
+  List<Widget> _buildHeadAndHair(
+    double widgetW,
+    double widgetH,
+    double size,
+    AvatarConfig config,
+    double swayAngle,
+    Animation<double> breathingAnim,
+    Animation<double> swayAnim,
+    Animation<double> blinkAnim,
+    Animation<double> pupilAnim,
+  ) {
+    final headSize = _headSize(size);
+    final headTop = widgetH * 0.65 - headSize; // bottom aligns with neck top
+    final headLeft = (widgetW - headSize) / 2;
+
+    // Hair is 15% larger for volume, centered on head
+    final hairSize = headSize * 1.15;
+    final hairLeft = headLeft - (hairSize - headSize) / 2;
+    final hairTop = headTop - (hairSize - headSize) / 2;
+
+    final browOffset = _browOffsetY(headSize);
+    final jawDrop = _jawDrop(headSize);
+
+    return [
+      // 4. Hair back layer
+      Positioned(
+        left: hairLeft,
+        top: hairTop,
+        width: hairSize,
+        height: hairSize,
+        child: CustomPaint(
+          isComplex: true,
+          willChange: widget.animateEffects,
+          painter: HairBackPainter(
+            style: config.hairStyle,
+            color: _hairColor,
+            isRainbow: isRainbowHair(config.hairColor),
+            faceShape: config.faceShape,
+            swayValue: _idleSwayValue,
+            repaint: _repaintNotifier,
+          ),
+        ),
+      ),
+
+      // 5. Hair front layer
+      Positioned(
+        left: hairLeft,
+        top: hairTop,
+        width: hairSize,
+        height: hairSize,
+        child: CustomPaint(
+          isComplex: true,
+          willChange: widget.animateEffects,
+          painter: HairFrontPainter(
+            style: config.hairStyle,
+            color: _hairColor,
+            isRainbow: isRainbowHair(config.hairColor),
+            faceShape: config.faceShape,
+            swayValue: _idleSwayValue,
+            repaint: _repaintNotifier,
+          ),
+        ),
+      ),
+
+      // 6. Head bone: unified sway rotation for all face features
+      // Pivot at bottom-center (neck connection point)
+      Positioned(
+        left: headLeft,
+        top: headTop,
+        width: headSize,
+        height: headSize,
+        child: Transform(
+          transform: Matrix4.identity()
+            ..translateByDouble(headSize / 2, headSize, 0, 1.0)
+            ..rotateZ(swayAngle)
+            ..translateByDouble(-headSize / 2, -headSize, 0, 1.0),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Face shape
+              Positioned(
+                left: headSize * 0.15,
+                top: headSize * _faceTop,
+                child: CustomPaint(
+                  size: Size(headSize * 0.70, headSize * _faceHeightFraction),
+                  isComplex: true,
+                  willChange: widget.animateEffects,
+                  painter: FacePainter(
+                    skinColor: _skinColor,
+                    faceShape: config.faceShape,
+                    breathingValue: breathingAnim,
+                    swayValue: swayAnim,
+                    repaint: _repaintNotifier,
+                  ),
+                ),
+              ),
+
+              // Nose
+              Positioned(
+                left: headSize * 0.44,
+                top: headSize * (_faceTop + _faceHeightFraction * 0.52),
+                child: CustomPaint(
+                  size: Size(headSize * 0.12, headSize * 0.10),
+                  isComplex: true,
+                  willChange: widget.animateEffects,
+                  painter: NosePainter(
+                    style: config.noseStyle,
+                    skinColor: _skinColor,
+                    breathingValue: breathingAnim,
+                    repaint: _repaintNotifier,
+                  ),
+                ),
+              ),
+
+              // Cheeks
+              if (config.cheekStyle > 0)
+                Positioned(
+                  left: headSize * 0.18,
+                  top: headSize * (_faceTop + _faceHeightFraction * 0.48),
+                  child: CustomPaint(
+                    size: Size(headSize * 0.64, headSize * 0.20),
+                    isComplex: true,
+                    painter: CheekPainter(
+                      style: config.cheekStyle,
+                      skinColor: _skinColor,
+                    ),
+                  ),
+                ),
+
+              // Eyes
+              Positioned(
+                left: headSize * 0.26,
+                top: headSize * (_faceTop + _faceHeightFraction * 0.28),
+                child: CustomPaint(
+                  size: Size(headSize * 0.48, headSize * 0.16),
+                  isComplex: true,
+                  willChange: widget.animateEffects,
+                  painter: EyesPainter(
+                    style: config.eyeStyle,
+                    eyeColor: _eyeColor,
+                    skinColor: _skinColor,
+                    blinkValue: blinkAnim,
+                    swayValue: swayAnim,
+                    pupilDilationValue: pupilAnim,
+                    expression: widget.controller?.expression ??
+                        AvatarExpression.neutral,
+                    lookTarget: widget.controller?.lookTarget,
+                    avatarSize: headSize,
+                    repaint: _repaintNotifier,
+                  ),
+                ),
+              ),
+
+              // Eyelashes
+              if (config.eyelashStyle > 0)
+                Positioned(
+                  left: headSize * 0.26,
+                  top: headSize * (_faceTop + _faceHeightFraction * 0.22),
+                  child: CustomPaint(
+                    size: Size(headSize * 0.48, headSize * 0.20),
+                    painter: EyelashPainter(
+                      style: config.eyelashStyle,
+                      eyeStyle: config.eyeStyle,
+                    ),
+                  ),
+                ),
+
+              // Eyebrows (expression-driven offset)
+              Positioned(
+                left: headSize * 0.26,
+                top: headSize * (_faceTop + _faceHeightFraction * 0.16),
+                child: Transform.translate(
+                  offset: Offset(0, browOffset),
+                  child: CustomPaint(
+                    size: Size(headSize * 0.48, headSize * 0.10),
+                    painter: EyebrowPainter(
+                      style: config.eyebrowStyle,
+                      color: _hairColor,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Mouth (jaw transform)
+              Positioned(
+                left: headSize * 0.35,
+                top: headSize * (_faceTop + _faceHeightFraction * 0.68),
+                child: Transform.translate(
+                  offset: Offset(0, jawDrop),
+                  child: CustomPaint(
+                    size: Size(headSize * 0.30, headSize * 0.12),
+                    isComplex: true,
+                    willChange: widget.controller != null,
+                    painter: MouthPainter(
+                      style: config.mouthStyle,
+                      lipColor: _lipColor,
+                      expression: widget.controller?.expression ??
+                          AvatarExpression.neutral,
+                      mouthOpenAmount:
+                          widget.controller?.mouthOpenAmount ?? 0.0,
+                      repaint: widget.controller != null
+                          ? _repaintNotifier
+                          : null,
+                    ),
+                  ),
+                ),
+              ),
+
+              // Face paint
+              if (config.facePaint > 0)
+                Positioned(
+                  left: headSize * 0.15,
+                  top: headSize * _faceTop,
+                  child: CustomPaint(
+                    size: Size(headSize * 0.70, headSize * _faceHeightFraction),
+                    isComplex: true,
+                    painter: FacePaintPainter(
+                      style: config.facePaint,
+                      skinColor: _skinColor,
+                    ),
+                  ),
+                ),
+
+              // Glasses
+              if (config.glassesStyle > 0)
+                Positioned(
+                  left: headSize * 0.26,
+                  top: headSize * (_faceTop + _faceHeightFraction * 0.28),
+                  child: CustomPaint(
+                    size: Size(headSize * 0.48, headSize * 0.16),
+                    isComplex: true,
+                    painter: GlassesPainter(
+                      style: config.glassesStyle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+
+      // 7. Accessories — aligned with hair size/position
+      if (config.accessory > 1)
+        Positioned(
+          left: hairLeft,
+          top: hairTop,
+          width: hairSize,
+          height: hairSize,
+          child: CustomPaint(
+            isComplex: true,
+            willChange: widget.animateEffects,
+            painter: accessoryPainter(
+              config.accessory,
+              swayValue: _idleSwayValue,
+              twinklePhase: _twinkleValue,
+            ),
+          ),
+        ),
+    ];
   }
 }
 

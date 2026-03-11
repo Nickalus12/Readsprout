@@ -55,6 +55,49 @@ Color skinColorForIndex(int index) {
   return skinToneOptions[index.clamp(0, skinToneOptions.length - 1)].color;
 }
 
+/// Anchor points for the continuous skin tone gradient.
+const List<_SkinAnchor> _skinAnchors = [
+  _SkinAnchor(0.0, Color(0xFFFFE8D0)),
+  _SkinAnchor(0.2, Color(0xFFF5D0A9)),
+  _SkinAnchor(0.4, Color(0xFFD4A574)),
+  _SkinAnchor(0.6, Color(0xFFB07D50)),
+  _SkinAnchor(0.8, Color(0xFF8B5E3C)),
+  _SkinAnchor(1.0, Color(0xFF5C3A21)),
+];
+
+class _SkinAnchor {
+  final double position;
+  final Color color;
+  const _SkinAnchor(this.position, this.color);
+}
+
+/// Convert a continuous slider value (0.0-1.0) to a skin color.
+/// Interpolates through realistic skin tone anchor points using HSL blending.
+Color skinColorFromSlider(double value) {
+  final v = value.clamp(0.0, 1.0);
+  // Find the two anchors that bracket this value.
+  for (int i = 0; i < _skinAnchors.length - 1; i++) {
+    final a = _skinAnchors[i];
+    final b = _skinAnchors[i + 1];
+    if (v >= a.position && v <= b.position) {
+      final t = (v - a.position) / (b.position - a.position);
+      // Interpolate in HSL for perceptually smoother transitions.
+      final hslA = HSLColor.fromColor(a.color);
+      final hslB = HSLColor.fromColor(b.color);
+      return HSLColor.lerp(hslA, hslB, t)!.toColor();
+    }
+  }
+  return _skinAnchors.last.color;
+}
+
+/// The full skin tone gradient as a list of colors for painting slider tracks.
+List<Color> get skinToneGradientColors =>
+    _skinAnchors.map((a) => a.color).toList();
+
+/// The stops matching each anchor point.
+List<double> get skinToneGradientStops =>
+    _skinAnchors.map((a) => a.position).toList();
+
 // ── Hair Styles ───────────────────────────────────────────────────────
 
 class HairStyleOption {

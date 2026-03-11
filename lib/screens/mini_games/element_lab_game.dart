@@ -14,8 +14,17 @@ import '../../utils/haptics.dart';
 // Element Lab — A kid-friendly physics sandbox (inspired by Powder Game)
 // ---------------------------------------------------------------------------
 
-/// Cost in star coins to enter the game.
+/// Cost in star coins for initial 3-minute session.
 const int kElementLabCost = 5;
+
+/// Cost in star coins for a 2-minute extension.
+const int kExtensionCost = 3;
+
+/// Initial session duration.
+const Duration kSessionDuration = Duration(minutes: 3);
+
+/// Extension duration.
+const Duration kExtensionDuration = Duration(minutes: 2);
 
 /// Element types stored in the grid as byte values.
 class El {
@@ -32,8 +41,11 @@ class El {
   static const int mud = 10;
   static const int steam = 11;
   static const int ant = 12;
+  static const int oil = 13;
+  static const int acid = 14;
+  static const int glass = 15;
   static const int eraser = 99; // UI-only, never stored in grid
-  static const int count = 13; // number of real element types
+  static const int count = 16; // number of real element types
 }
 
 /// Per-element base colors (index = element type).
@@ -51,13 +63,36 @@ const List<Color> _baseColors = [
   Color(0xFF8B6914), // mud — brown
   Color(0xFFDDDDDD), // steam — white
   Color(0xFF222222), // ant — dark
+  Color(0xFF4A3728), // oil — dark brown
+  Color(0xFF33FF33), // acid — neon green
+  Color(0xFFDDEEFF), // glass — transparent white
 ];
 
 /// Element display names for the palette.
 const List<String> _elementNames = [
   '', 'Sand', 'Water', 'Fire', 'Ice', 'Zap',
   'Plant', 'Stone', 'TNT', 'Rainbow', 'Mud', 'Steam', 'Ant',
+  'Oil', 'Acid', 'Glass',
 ];
+
+/// Element descriptions for long-press info.
+const Map<int, String> _elementDescriptions = {
+  El.sand: 'Falls down and piles up.\nMixes with water to make mud.\nSinks through water.',
+  El.water: 'Flows and fills containers.\nFreezes near ice.\nPuts out fire (makes steam).',
+  El.fire: 'Rises up and burns out.\nSpreads to plants and oil.\nMelts ice into water.',
+  El.ice: 'Solid and cold.\nFreezes nearby water.\nMelts from fire.',
+  El.lightning: 'Zaps down fast!\nExplodes TNT.\nElectrifies water.',
+  El.plant: 'Grows upward when watered.\nBurns when touched by fire.',
+  El.stone: 'Solid and immovable.\nNothing can destroy it.\nAcid dissolves it slowly.',
+  El.tnt: 'Falls like sand.\nExplodes when hit by fire or lightning!\nMore TNT = bigger boom!',
+  El.rainbow: 'Floats upward with sparkles.\nChanges colors!',
+  El.mud: 'Like slow sand.\nMade from sand + water.',
+  El.steam: 'Rises up fast.\nCondenses back to water at the top.',
+  El.ant: 'Walks along surfaces.\nDrowns in water.\nRuns from fire.\nDissolved by acid.',
+  El.oil: 'Floats on water.\nVery flammable!\nBurns longer than plant.',
+  El.acid: 'Dissolves stone slowly.\nKills ants.\nMixes with water.\nDangerous!',
+  El.glass: 'Made when lightning hits sand.\nSolid like stone but see-through.',
+};
 
 class ElementLabGame extends StatefulWidget {
   final ProgressService progressService;
@@ -102,6 +137,9 @@ class _ElementLabGameState extends State<ElementLabGame>
   int _selectedElement = El.sand;
   int _brushSize = 1; // 1, 3, or 5
   bool _isDrawing = false;
+  bool _isPaused = false;
+  bool _showElementInfo = false;
+  int _infoElement = El.sand;
 
   // -- Canvas layout ---------------------------------------------------------
   double _canvasTop = 0;
@@ -119,17 +157,29 @@ class _ElementLabGameState extends State<ElementLabGame>
   // -- Lightning flash -------------------------------------------------------
   int _lightningFlashFrames = 0;
 
+  // -- Session timer ---------------------------------------------------------
+  late int _remainingSeconds;
+  Timer? _sessionTimer;
+  bool _sessionExpired = false;
+  bool _showTimeWarning = false;
+  String _timeWarningText = '';
+
+  // -- Undo history ----------------------------------------------------------
+  final List<_UndoSnapshot> _undoHistory = [];
+  static const int _maxUndoHistory = 10;
+  bool _isCapturingStroke = false;
+
   @override
   void initState() {
     super.initState();
+    _remainingSeconds = kSessionDuration.inSeconds;
     _ticker = createTicker(_onTick);
+    _startSessionTimer();
   }
 
   bool _gridInitialized = false;
 
   void _initGrid(double canvasW, double canvasH) {
-    // Determine cell size so grid fits nicely
-    // Target ~160 wide on phones; scale up proportionally
     _cellSize = (canvasW / 160).clamp(1.0, 4.0);
     _gridW = (canvasW / _cellSize).floor();
     _gridH = (canvasH / _cellSize).floor();
@@ -155,8 +205,38 @@ class _ElementLabGameState extends State<ElementLabGame>
     }
   }
 
+  void _startSessionTimer() {
+    _sessionTimer?.cancel();
+    _sessionTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (_isPaused || _sessionExpired) return;
+      setState(() {
+        _remainingSeconds--;
+        // Time warnings
+        if (_remainingSeconds == 60) {
+          _showTimeWarning = true;
+          _timeWarningText = '1 Minute Left!';
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) setState(() => _showTimeWarning = false);
+          });
+        } else if (_remainingSeconds == 30) {
+          _showTimeWarning = true;
+          _timeWarningText = '30 Seconds Left!';
+          Future.delayed(const Duration(seconds: 2), () {
+            if (mounted) setState(() => _showTimeWarning = false);
+          });
+        }
+
+        if (_remainingSeconds <= 0) {
+          _remainingSeconds = 0;
+          _sessionExpired = true;
+        }
+      });
+    });
+  }
+
   @override
   void dispose() {
+    _sessionTimer?.cancel();
     _ticker.dispose();
     _frameImage?.dispose();
     super.dispose();
@@ -165,7 +245,7 @@ class _ElementLabGameState extends State<ElementLabGame>
   // ── Tick callback ────────────────────────────────────────────────────────
 
   void _onTick(Duration elapsed) {
-    if (!_gridInitialized) return;
+    if (!_gridInitialized || _isPaused || _sessionExpired) return;
 
     // Throttle to ~30 fps
     final dt = elapsed - _lastTick;
@@ -229,7 +309,11 @@ class _ElementLabGameState extends State<ElementLabGame>
             _simSteam(x, y, idx);
           case El.ant:
             _simAnt(x, y, idx);
-          // stone does nothing (immovable)
+          case El.oil:
+            _simOil(x, y, idx);
+          case El.acid:
+            _simAcid(x, y, idx);
+          // stone and glass do nothing (immovable)
         }
       }
     }
@@ -238,10 +322,17 @@ class _ElementLabGameState extends State<ElementLabGame>
   // ── Element behaviors ───────────────────────────────────────────────────
 
   void _simSand(int x, int y, int idx) {
-    // Check for water below or adjacent → become mud
+    // Lightning hitting sand -> glass
+    if (_checkAdjacent(x, y, El.lightning)) {
+      _grid[idx] = El.glass;
+      _life[idx] = 0;
+      _flags[idx] = 1;
+      return;
+    }
+
+    // Check for water below or adjacent -> become mud
     if (_checkAdjacent(x, y, El.water)) {
       _grid[idx] = El.mud;
-      // Remove one adjacent water
       _removeOneAdjacent(x, y, El.water);
       _flags[idx] = 1;
       return;
@@ -251,11 +342,22 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   void _simWater(int x, int y, int idx) {
-    // Check for adjacent ice → freeze
+    // Check for adjacent ice -> freeze
     if (_checkAdjacent(x, y, El.ice)) {
       _grid[idx] = El.ice;
       _flags[idx] = 1;
       return;
+    }
+
+    // Water pressure: deeper water pushes sideways harder
+    int depth = 0;
+    for (int cy = y - 1; cy >= max(0, y - 8); cy--) {
+      final cellAbove = _grid[cy * _gridW + x];
+      if (cellAbove == El.water || cellAbove == El.oil) {
+        depth++;
+      } else {
+        break;
+      }
     }
 
     // Fall down first
@@ -278,14 +380,19 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Flow sideways (water behavior)
-    if (_inBounds(x1, y) && _grid[y * _gridW + x1] == El.empty) {
-      _swap(idx, y * _gridW + x1);
-      return;
-    }
-    if (_inBounds(x2, y) && _grid[y * _gridW + x2] == El.empty) {
-      _swap(idx, y * _gridW + x2);
-      return;
+    // Flow sideways — pressure increases flow distance
+    final flowDist = 1 + (depth ~/ 2).clamp(0, 4);
+    for (int d = 1; d <= flowDist; d++) {
+      final sx1 = dl ? x - d : x + d;
+      final sx2 = dl ? x + d : x - d;
+      if (_inBounds(sx1, y) && _grid[y * _gridW + sx1] == El.empty) {
+        _swap(idx, y * _gridW + sx1);
+        return;
+      }
+      if (_inBounds(sx2, y) && _grid[y * _gridW + sx2] == El.empty) {
+        _swap(idx, y * _gridW + sx2);
+        return;
+      }
     }
   }
 
@@ -308,7 +415,6 @@ class _ElementLabGameState extends State<ElementLabGame>
         final ni = ny * _gridW + nx;
         final neighbor = _grid[ni];
         if (neighbor == El.water) {
-          // Fire + Water → Steam
           _grid[ni] = El.steam;
           _life[ni] = 0;
           _grid[idx] = El.empty;
@@ -316,21 +422,25 @@ class _ElementLabGameState extends State<ElementLabGame>
           _flags[ni] = 1;
           return;
         }
-        if (neighbor == El.plant && _rng.nextInt(4) == 0) {
-          // Fire + Plant → Fire spreads
+        if (neighbor == El.plant && _rng.nextInt(2) == 0) {
+          // Fire spreads to plant more aggressively
+          _grid[ni] = El.fire;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+        }
+        if (neighbor == El.oil) {
+          // Oil is very flammable — always ignites
           _grid[ni] = El.fire;
           _life[ni] = 0;
           _flags[ni] = 1;
         }
         if (neighbor == El.ice) {
-          // Fire + Ice → Water
           _grid[ni] = El.water;
-          _life[ni] = 0;
+          _life[ni] = 150; // melting visual
           _flags[ni] = 1;
         }
         if (neighbor == El.tnt) {
-          // Fire + TNT → Explosion!
-          _pendingExplosions.add(_Explosion(nx, ny, 6 + _rng.nextInt(3)));
+          _pendingExplosions.add(_Explosion(nx, ny, _calculateTNTRadius(nx, ny)));
           _grid[idx] = El.empty;
           _life[idx] = 0;
           return;
@@ -344,8 +454,7 @@ class _ElementLabGameState extends State<ElementLabGame>
       _swap(idx, upIdx);
       return;
     }
-    // Random horizontal drift
-    final drift = _rng.nextInt(3) - 1; // -1, 0, or 1
+    final drift = _rng.nextInt(3) - 1;
     final driftX = x + drift;
     if (_inBounds(driftX, y - 1) &&
         _grid[(y - 1) * _gridW + driftX] == El.empty) {
@@ -354,11 +463,9 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   void _simIce(int x, int y, int idx) {
-    // Ice is mostly static; reactions handled by fire/water neighbors
-    // But check: adjacent fire melts it
     if (_checkAdjacent(x, y, El.fire)) {
       _grid[idx] = El.water;
-      _life[idx] = 0;
+      _life[idx] = 150; // melting visual flag
       _flags[idx] = 1;
     }
   }
@@ -373,7 +480,6 @@ class _ElementLabGameState extends State<ElementLabGame>
 
     _lightningFlashFrames = 3;
 
-    // Check interactions at current cell neighbors
     for (int dy = -1; dy <= 1; dy++) {
       for (int dx = -1; dx <= 1; dx++) {
         if (dx == 0 && dy == 0) continue;
@@ -383,22 +489,26 @@ class _ElementLabGameState extends State<ElementLabGame>
         final ni = ny * _gridW + nx;
         final neighbor = _grid[ni];
         if (neighbor == El.tnt) {
-          _pendingExplosions.add(_Explosion(nx, ny, 7 + _rng.nextInt(3)));
+          _pendingExplosions.add(_Explosion(nx, ny, _calculateTNTRadius(nx, ny)));
         }
         if (neighbor == El.ice) {
           _grid[ni] = El.water;
-          _life[ni] = 0;
+          _life[ni] = 150;
           _flags[ni] = 1;
         }
         if (neighbor == El.water) {
-          // Electrify water — turn it yellow briefly by setting life
-          _life[ni] = 200; // special "electrified" flag
+          _life[ni] = 200; // electrified
+          _flags[ni] = 1;
+        }
+        if (neighbor == El.sand) {
+          _grid[ni] = El.glass;
+          _life[ni] = 0;
           _flags[ni] = 1;
         }
       }
     }
 
-    // Move downward rapidly — pick a landing spot
+    // Move downward rapidly
     final dist = 2 + _rng.nextInt(3);
     final ndx = _rng.nextInt(3) - 1;
     final targetY = y + dist;
@@ -416,25 +526,20 @@ class _ElementLabGameState extends State<ElementLabGame>
       _grid[idx] = El.empty;
       _life[idx] = 0;
     }
-    // Lightning that can't move just dies next frame
   }
 
   void _simPlant(int x, int y, int idx) {
-    // Grow upward if touching water (slow: 1 in 20 frames)
     if (_rng.nextInt(20) != 0) return;
 
     if (_checkAdjacent(x, y, El.water)) {
-      // Grow upward
       if (y > 0) {
         final above = (y - 1) * _gridW + x;
         if (_grid[above] == El.empty) {
           _grid[above] = El.plant;
           _flags[above] = 1;
-          // Consume one water
           _removeOneAdjacent(x, y, El.water);
         }
       }
-      // Also try growing to the side occasionally
       if (_rng.nextInt(3) == 0) {
         final side = _rng.nextBool() ? x - 1 : x + 1;
         if (_inBounds(side, y - 1)) {
@@ -449,39 +554,58 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   void _simTNT(int x, int y, int idx) {
-    // TNT just sits there until fire or lightning hits it
-    // Falls like sand
     _fallGranular(x, y, idx, El.tnt);
   }
 
+  /// Calculate TNT explosion radius based on cluster size (chain reactions).
+  int _calculateTNTRadius(int cx, int cy) {
+    int count = 0;
+    final visited = <int>{};
+    final queue = <int>[cy * _gridW + cx];
+    while (queue.isNotEmpty && count < 50) {
+      final curIdx = queue.removeLast();
+      if (visited.contains(curIdx)) continue;
+      visited.add(curIdx);
+      if (_grid[curIdx] != El.tnt) continue;
+      count++;
+      final qx = curIdx % _gridW;
+      final qy = curIdx ~/ _gridW;
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          if (dx == 0 && dy == 0) continue;
+          final nx = qx + dx;
+          final ny = qy + dy;
+          if (_inBounds(nx, ny)) queue.add(ny * _gridW + nx);
+        }
+      }
+    }
+    // Base radius 6, +2 per additional TNT block
+    return (6 + (count - 1) * 2).clamp(6, 30);
+  }
+
   void _simRainbow(int x, int y, int idx) {
-    // Float upward slowly
     if (_rng.nextInt(3) == 0 && y > 0) {
       final above = (y - 1) * _gridW + x;
       if (_grid[above] == El.empty) {
         _swap(idx, above);
         return;
       }
-      // Drift sideways
       final side = _rng.nextBool() ? x - 1 : x + 1;
       if (_inBounds(side, y - 1) &&
           _grid[(y - 1) * _gridW + side] == El.empty) {
         _swap(idx, (y - 1) * _gridW + side);
       }
     }
-    // Increment life for sparkle timing
     _life[idx] = (_life[idx] + 1) % 255;
   }
 
   void _simMud(int x, int y, int idx) {
-    // Like sand but slower — only moves every other frame
     if (_frameCount.isOdd) return;
     _fallGranular(x, y, idx, El.mud);
   }
 
   void _simSteam(int x, int y, int idx) {
     _life[idx]++;
-    // Steam condenses back to water at the top or after lifetime
     if (y <= 2 || _life[idx] > 80 + _rng.nextInt(40)) {
       _grid[idx] = _rng.nextInt(3) == 0 ? El.water : El.empty;
       _life[idx] = 0;
@@ -489,7 +613,6 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Rise fast with drift
     if (y > 0) {
       final drift = _rng.nextInt(3) - 1;
       final nx = x + drift;
@@ -498,14 +621,12 @@ class _ElementLabGameState extends State<ElementLabGame>
         _swap(idx, ny * _gridW + nx);
         return;
       }
-      // Try straight up
       final above = (y - 1) * _gridW + x;
       if (_grid[above] == El.empty) {
         _swap(idx, above);
         return;
       }
     }
-    // Drift sideways if stuck
     final side = _rng.nextBool() ? x - 1 : x + 1;
     if (_inBounds(side, y) && _grid[y * _gridW + side] == El.empty) {
       _swap(idx, y * _gridW + side);
@@ -513,20 +634,23 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   void _simAnt(int x, int y, int idx) {
-    // Only move every 2 frames (slower than particles)
     if (_frameCount % 2 != 0) return;
+
+    // Acid kills ants
+    if (_checkAdjacent(x, y, El.acid)) {
+      _grid[idx] = El.empty;
+      _life[idx] = 0;
+      return;
+    }
 
     // Check for dangers
     if (_checkAdjacent(x, y, El.water)) {
-      // Drown!
       _grid[idx] = El.empty;
       _life[idx] = 0;
       return;
     }
     if (_checkAdjacent(x, y, El.fire)) {
-      // Run away from fire — move in opposite direction
       _life[idx] = 0;
-      // Try to move away
       for (int dy = -1; dy <= 1; dy++) {
         for (int dx = -1; dx <= 1; dx++) {
           final nx = x + dx;
@@ -542,8 +666,6 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Walk along surfaces (needs ground below or to the side)
-    // Direction stored in velX: -1 or 1
     if (_velX[idx] == 0) _velX[idx] = _rng.nextBool() ? 1 : -1;
 
     // Apply gravity if no ground
@@ -552,7 +674,17 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Walk horizontally
+    // Trail-following: check if other ants are nearby and tend toward them
+    bool foundFriend = false;
+    for (int scanD = 1; scanD <= 5; scanD++) {
+      final scanX = x + _velX[idx] * scanD;
+      if (_inBounds(scanX, y) && _grid[y * _gridW + scanX] == El.ant) {
+        foundFriend = true;
+        break;
+      }
+    }
+
+    // Walk along surfaces
     final nx = x + _velX[idx];
     if (_inBounds(nx, y) && _grid[y * _gridW + nx] == El.empty) {
       _swap(idx, y * _gridW + nx);
@@ -565,14 +697,164 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Reverse direction
-    _velX[idx] = -_velX[idx];
+    // Try climbing straight up (wall climb)
+    if (y > 0 && _grid[(y - 1) * _gridW + x] == El.empty) {
+      if (!_inBounds(nx, y) || _grid[y * _gridW + nx] != El.empty) {
+        _swap(idx, (y - 1) * _gridW + x);
+        return;
+      }
+    }
+
+    // Reverse direction (but if following a friend trail, less random)
+    if (!foundFriend) {
+      _velX[idx] = -_velX[idx];
+      if (_rng.nextInt(5) == 0) _velX[idx] = _rng.nextBool() ? 1 : -1;
+    }
+  }
+
+  void _simOil(int x, int y, int idx) {
+    // Oil burns when near fire
+    if (_checkAdjacent(x, y, El.fire)) {
+      _grid[idx] = El.fire;
+      _life[idx] = 0;
+      _flags[idx] = 1;
+      return;
+    }
+
+    // Fall through empty
+    final below = (y + 1) * _gridW + x;
+    if (y + 1 < _gridH && _grid[below] == El.empty) {
+      _swap(idx, below);
+      return;
+    }
+
+    // Float on water: if sitting on water, swap (oil rises through water)
+    if (y + 1 < _gridH && _grid[below] == El.water) {
+      _grid[below] = El.oil;
+      _life[below] = _life[idx];
+      _grid[idx] = El.water;
+      _life[idx] = 0;
+      _flags[below] = 1;
+      _flags[idx] = 1;
+      return;
+    }
+
+    // Diagonal fall
+    final dl = _rng.nextBool();
+    final x1 = dl ? x - 1 : x + 1;
+    final x2 = dl ? x + 1 : x - 1;
+    if (_inBounds(x1, y + 1) && _grid[(y + 1) * _gridW + x1] == El.empty) {
+      _swap(idx, (y + 1) * _gridW + x1);
+      return;
+    }
+    if (_inBounds(x2, y + 1) && _grid[(y + 1) * _gridW + x2] == El.empty) {
+      _swap(idx, (y + 1) * _gridW + x2);
+      return;
+    }
+
+    // Flow sideways like water but slower
+    if (_frameCount.isEven) {
+      if (_inBounds(x1, y) && _grid[y * _gridW + x1] == El.empty) {
+        _swap(idx, y * _gridW + x1);
+        return;
+      }
+      if (_inBounds(x2, y) && _grid[y * _gridW + x2] == El.empty) {
+        _swap(idx, y * _gridW + x2);
+      }
+    }
+  }
+
+  void _simAcid(int x, int y, int idx) {
+    _life[idx]++;
+
+    // Acid dissolves over time
+    if (_life[idx] > 120 + _rng.nextInt(60)) {
+      _grid[idx] = El.empty;
+      _life[idx] = 0;
+      return;
+    }
+
+    // Check for reactions with neighbors
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        if (dx == 0 && dy == 0) continue;
+        final nx = x + dx;
+        final ny = y + dy;
+        if (!_inBounds(nx, ny)) continue;
+        final ni = ny * _gridW + nx;
+        final neighbor = _grid[ni];
+
+        // Dissolve stone slowly
+        if (neighbor == El.stone && _rng.nextInt(15) == 0) {
+          _grid[ni] = El.empty;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+          _grid[idx] = El.empty;
+          _life[idx] = 0;
+          return;
+        }
+        // Dissolve glass
+        if (neighbor == El.glass && _rng.nextInt(10) == 0) {
+          _grid[ni] = El.empty;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+          _grid[idx] = El.empty;
+          _life[idx] = 0;
+          return;
+        }
+        // Kill ants
+        if (neighbor == El.ant) {
+          _grid[ni] = El.empty;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+        }
+        // Mix with water — dilutes
+        if (neighbor == El.water && _rng.nextInt(8) == 0) {
+          _grid[idx] = El.water;
+          _life[idx] = 0;
+          _flags[idx] = 1;
+          return;
+        }
+        // Dissolve plant
+        if (neighbor == El.plant && _rng.nextInt(3) == 0) {
+          _grid[ni] = El.empty;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+        }
+      }
+    }
+
+    // Flow like water
+    final below = (y + 1) * _gridW + x;
+    if (y + 1 < _gridH && _grid[below] == El.empty) {
+      _swap(idx, below);
+      return;
+    }
+
+    final dl = _rng.nextBool();
+    final x1 = dl ? x - 1 : x + 1;
+    final x2 = dl ? x + 1 : x - 1;
+    if (_inBounds(x1, y + 1) && _grid[(y + 1) * _gridW + x1] == El.empty) {
+      _swap(idx, (y + 1) * _gridW + x1);
+      return;
+    }
+    if (_inBounds(x2, y + 1) && _grid[(y + 1) * _gridW + x2] == El.empty) {
+      _swap(idx, (y + 1) * _gridW + x2);
+      return;
+    }
+
+    if (_inBounds(x1, y) && _grid[y * _gridW + x1] == El.empty) {
+      _swap(idx, y * _gridW + x1);
+      return;
+    }
+    if (_inBounds(x2, y) && _grid[y * _gridW + x2] == El.empty) {
+      _swap(idx, y * _gridW + x2);
+    }
   }
 
   // ── Helpers ─────────────────────────────────────────────────────────────
 
   void _fallGranular(int x, int y, int idx, int elType) {
-    // Down
     if (y + 1 < _gridH) {
       final below = (y + 1) * _gridW + x;
       final belowEl = _grid[below];
@@ -590,7 +872,6 @@ class _ElementLabGameState extends State<ElementLabGame>
       }
     }
 
-    // Diagonal down
     final goLeft = _rng.nextBool();
     final x1 = goLeft ? x - 1 : x + 1;
     final x2 = goLeft ? x + 1 : x - 1;
@@ -674,8 +955,7 @@ class _ElementLabGameState extends State<ElementLabGame>
           final ny = exp.y + dy;
           if (!_inBounds(nx, ny)) continue;
           final ni = ny * _gridW + nx;
-          // Don't destroy stone
-          if (_grid[ni] != El.stone) {
+          if (_grid[ni] != El.stone && _grid[ni] != El.glass) {
             _grid[ni] = El.empty;
             _life[ni] = 0;
           }
@@ -705,33 +985,63 @@ class _ElementLabGameState extends State<ElementLabGame>
     final total = _gridW * _gridH;
     for (int i = 0; i < total; i++) {
       final el = _grid[i];
-      final pi = i * 4;
+      final pi4 = i * 4;
       if (el == El.empty) {
-        // Dark background
-        _pixels[pi] = 10;
-        _pixels[pi + 1] = 10;
-        _pixels[pi + 2] = 26;
-        _pixels[pi + 3] = 255;
+        // Check for fire glow from neighbors
+        final x = i % _gridW;
+        final y = i ~/ _gridW;
+        int glowIntensity = 0;
+        for (int dy = -2; dy <= 2; dy++) {
+          for (int dx = -2; dx <= 2; dx++) {
+            final nx = x + dx;
+            final ny = y + dy;
+            if (_inBounds(nx, ny)) {
+              final ni = ny * _gridW + nx;
+              if (_grid[ni] == El.fire) {
+                final dist = dx.abs() + dy.abs();
+                glowIntensity += (3 - dist).clamp(0, 3) * 8;
+              }
+            }
+          }
+        }
+        if (glowIntensity > 0) {
+          glowIntensity = glowIntensity.clamp(0, 60);
+          _pixels[pi4] = 10 + glowIntensity;
+          _pixels[pi4 + 1] = 10 + (glowIntensity ~/ 3);
+          _pixels[pi4 + 2] = 26;
+          _pixels[pi4 + 3] = 255;
+        } else {
+          _pixels[pi4] = 10;
+          _pixels[pi4 + 1] = 10;
+          _pixels[pi4 + 2] = 26;
+          _pixels[pi4 + 3] = 255;
+        }
         continue;
       }
 
-      Color c = _getElementColor(el, i);
+      final c = _getElementColor(el, i);
 
-      _pixels[pi] = (c.r * 255.0).round().clamp(0, 255);
-      _pixels[pi + 1] = (c.g * 255.0).round().clamp(0, 255);
-      _pixels[pi + 2] = (c.b * 255.0).round().clamp(0, 255);
-      _pixels[pi + 3] = (c.a * 255.0).round().clamp(0, 255);
+      _pixels[pi4] = (c.r * 255.0).round().clamp(0, 255);
+      _pixels[pi4 + 1] = (c.g * 255.0).round().clamp(0, 255);
+      _pixels[pi4 + 2] = (c.b * 255.0).round().clamp(0, 255);
+      _pixels[pi4 + 3] = (c.a * 255.0).round().clamp(0, 255);
     }
   }
 
   Color _getElementColor(int el, int idx) {
+    // Slight random hue variation per particle using idx as seed
+    final variation = ((idx * 7 + idx ~/ _gridW * 3) % 11) - 5; // -5 to +5
+
     switch (el) {
       case El.fire:
-        // Animated fire: orange → red → yellow
         final phase = (_life[idx] + _frameCount) % 20;
-        if (phase < 7) return const Color(0xFFFF6600);
-        if (phase < 14) return const Color(0xFFFF2200);
-        return const Color(0xFFFFAA00);
+        if (phase < 7) {
+          return Color.fromARGB(255, (255 + variation).clamp(200, 255), (102 + variation).clamp(60, 140), 0);
+        }
+        if (phase < 14) {
+          return Color.fromARGB(255, (255 + variation).clamp(200, 255), (34 + variation).clamp(0, 80), 0);
+        }
+        return Color.fromARGB(255, 255, (170 + variation).clamp(130, 210), 0);
 
       case El.lightning:
         return _frameCount.isEven
@@ -744,50 +1054,83 @@ class _ElementLabGameState extends State<ElementLabGame>
 
       case El.steam:
         final alpha = (180 - _life[idx] * 2).clamp(60, 180);
-        return Color.fromARGB(alpha, 220, 220, 240);
+        return Color.fromARGB(alpha, 220 + variation, 220 + variation, 240);
 
       case El.water:
-        // Electrified water shows yellow flash
+        // Electrified water
         if (_life[idx] >= 200) {
           _life[idx]--;
           if (_life[idx] < 200) _life[idx] = 0;
           return const Color(0xFFFFFF66);
         }
-        // Slight variation for visual interest
-        final variation = (_rng.nextInt(3) == 0) ? 15 : 0;
-        return Color.fromARGB(255, 30, 100 + variation, 255);
+        // Melting transition from ice
+        if (_life[idx] >= 140 && _life[idx] < 200) {
+          _life[idx]--;
+          final blend = (_life[idx] - 140) / 10.0;
+          return Color.fromARGB(
+            255,
+            (30 + blend * 140).round().clamp(0, 255),
+            (100 + blend * 120).round().clamp(0, 255),
+            255,
+          );
+        }
+        // Water shimmer — top edge is lighter
+        final wx = idx % _gridW;
+        final wy = idx ~/ _gridW;
+        final isTop = wy > 0 && _grid[(wy - 1) * _gridW + wx] != El.water &&
+            _grid[(wy - 1) * _gridW + wx] != El.oil;
+        if (isTop) {
+          return Color.fromARGB(255, (80 + variation).clamp(50, 110), 180, 255);
+        }
+        return Color.fromARGB(255, (30 + variation).clamp(10, 60), (100 + variation).clamp(80, 130), 255);
 
       case El.sand:
-        final v = (idx % 7) * 3;
+        final v = ((idx % 7) * 3 + variation).clamp(0, 30);
         return Color.fromARGB(255, 222 - v, 184 - v, 135 - v);
 
       case El.tnt:
-        // Red with black lines pattern
-        final x = idx % _gridW;
-        final y = idx ~/ _gridW;
-        if ((x + y) % 4 == 0) return const Color(0xFF440000);
-        return const Color(0xFFCC2222);
+        final tx = idx % _gridW;
+        final ty = idx ~/ _gridW;
+        if ((tx + ty) % 4 == 0) return const Color(0xFF440000);
+        return Color.fromARGB(255, (204 + variation).clamp(180, 230), (34 + variation).clamp(10, 60), (34 + variation).clamp(10, 60));
 
       case El.ant:
-        // Tiny dark bodies with occasional lighter segments
         return (_life[idx] % 3 == 0)
             ? const Color(0xFF333333)
             : const Color(0xFF111111);
 
       case El.plant:
-        final shade = (idx % 5) * 8;
+        final shade = ((idx % 5) * 8 + variation).clamp(0, 50);
         return Color.fromARGB(255, 20 + shade, 160 + shade, 20 + shade);
 
       case El.ice:
-        return const Color(0xFFAADDFF);
+        return Color.fromARGB(255, (170 + variation).clamp(150, 200), (221 + variation).clamp(200, 240), 255);
 
       case El.stone:
-        final v = (idx % 3) * 10;
+        final v = ((idx % 3) * 10 + variation).clamp(0, 40);
         return Color.fromARGB(255, 120 + v, 120 + v, 120 + v);
 
       case El.mud:
-        final v = (idx % 5) * 5;
-        return Color.fromARGB(255, 139 - v, 105 - v, 20);
+        final v = ((idx % 5) * 5 + variation).clamp(0, 30);
+        return Color.fromARGB(255, (139 - v).clamp(100, 150), (105 - v).clamp(70, 120), 20);
+
+      case El.oil:
+        final ox = idx % _gridW;
+        final oy = idx ~/ _gridW;
+        final isTop = oy > 0 && _grid[(oy - 1) * _gridW + ox] != El.oil;
+        if (isTop) {
+          final shimmer = (_frameCount + ox) % 8 < 2 ? 20 : 0;
+          return Color.fromARGB(255, 74 + shimmer, 55 + shimmer, 40 + shimmer);
+        }
+        return Color.fromARGB(255, (50 + variation).clamp(30, 70), (37 + variation).clamp(20, 55), (28 + variation).clamp(10, 45));
+
+      case El.acid:
+        final bubble = (_frameCount + idx) % 12 < 3 ? 40 : 0;
+        return Color.fromARGB(255, (30 + variation + bubble).clamp(0, 100), (255 + variation).clamp(200, 255), (30 + variation).clamp(0, 80));
+
+      case El.glass:
+        final sparkle = (_frameCount + idx * 3) % 20 < 2 ? 30 : 0;
+        return Color.fromARGB(200, (210 + variation + sparkle).clamp(180, 255), (225 + variation + sparkle).clamp(200, 255), 255);
 
       default:
         return _baseColors[el.clamp(0, _baseColors.length - 1)];
@@ -810,12 +1153,36 @@ class _ElementLabGameState extends State<ElementLabGame>
 
   // ── Drawing input ───────────────────────────────────────────────────────
 
+  void _captureUndoSnapshot() {
+    if (!_isCapturingStroke) {
+      _isCapturingStroke = true;
+      _undoHistory.add(_UndoSnapshot(
+        grid: Uint8List.fromList(_grid),
+        life: Uint8List.fromList(_life),
+      ));
+      if (_undoHistory.length > _maxUndoHistory) {
+        _undoHistory.removeAt(0);
+      }
+    }
+  }
+
+  void _undo() {
+    if (_undoHistory.isEmpty) return;
+    final snapshot = _undoHistory.removeLast();
+    _grid.setAll(0, snapshot.grid);
+    _life.setAll(0, snapshot.life);
+    Haptics.tap();
+  }
+
   void _handlePanStart(DragStartDetails details) {
+    if (_sessionExpired) return;
+    _captureUndoSnapshot();
     _isDrawing = true;
     _placeElement(details.localPosition);
   }
 
   void _handlePanUpdate(DragUpdateDetails details) {
+    if (_sessionExpired) return;
     if (_isDrawing) {
       _placeElement(details.localPosition);
     }
@@ -823,20 +1190,26 @@ class _ElementLabGameState extends State<ElementLabGame>
 
   void _handlePanEnd(DragEndDetails details) {
     _isDrawing = false;
+    _isCapturingStroke = false;
   }
 
   void _handleTapDown(TapDownDetails details) {
+    if (_sessionExpired) return;
+    _captureUndoSnapshot();
     _placeElement(details.localPosition);
+    _isCapturingStroke = false;
     Haptics.tap();
   }
 
   void _handleLongPressStart(LongPressStartDetails details) {
+    if (_sessionExpired) return;
+    _captureUndoSnapshot();
     _isDrawing = true;
-    // Place a bigger burst
     _placeElement(details.localPosition, burst: true);
   }
 
   void _handleLongPressMoveUpdate(LongPressMoveUpdateDetails details) {
+    if (_sessionExpired) return;
     if (_isDrawing) {
       _placeElement(details.localPosition, burst: true);
     }
@@ -844,10 +1217,10 @@ class _ElementLabGameState extends State<ElementLabGame>
 
   void _handleLongPressEnd(LongPressEndDetails details) {
     _isDrawing = false;
+    _isCapturingStroke = false;
   }
 
   void _placeElement(Offset pos, {bool burst = false}) {
-    // Convert screen position to grid coordinates
     final gx = ((pos.dx - _canvasLeft) / _cellSize).floor();
     final gy = ((pos.dy - _canvasTop) / _cellSize).floor();
 
@@ -860,7 +1233,6 @@ class _ElementLabGameState extends State<ElementLabGame>
         final ny = gy + dy;
         if (!_inBounds(nx, ny)) continue;
 
-        // For circular brush, skip corners of larger sizes
         if (radius > 1 && dx * dx + dy * dy > halfR * halfR + 1) continue;
 
         final ni = ny * _gridW + nx;
@@ -884,12 +1256,41 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   void _clearGrid() {
+    _captureUndoSnapshot();
+    _isCapturingStroke = false;
     _grid.fillRange(0, _grid.length, El.empty);
     _life.fillRange(0, _life.length, 0);
     _flags.fillRange(0, _flags.length, 0);
     _velX.fillRange(0, _velX.length, 0);
     _velY.fillRange(0, _velY.length, 0);
     Haptics.tap();
+  }
+
+  void _togglePause() {
+    setState(() => _isPaused = !_isPaused);
+    Haptics.tap();
+  }
+
+  void _addMoreTime() {
+    final balance = widget.progressService.starCoins;
+    if (balance < kExtensionCost) return;
+    widget.progressService.spendStarCoins(kExtensionCost);
+    setState(() {
+      _remainingSeconds += kExtensionDuration.inSeconds;
+      _sessionExpired = false;
+    });
+  }
+
+  String _formatTime(int totalSeconds) {
+    final m = totalSeconds ~/ 60;
+    final s = totalSeconds % 60;
+    return '${m.toString().padLeft(1, '0')}:${s.toString().padLeft(2, '0')}';
+  }
+
+  Color _timerColor() {
+    if (_remainingSeconds > 60) return AppColors.emerald;
+    if (_remainingSeconds > 30) return const Color(0xFFFFBB33);
+    return AppColors.error;
   }
 
   // ── Build ───────────────────────────────────────────────────────────────
@@ -899,29 +1300,40 @@ class _ElementLabGameState extends State<ElementLabGame>
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: Column(
+        child: Stack(
           children: [
-            _buildTopBar(),
-            Expanded(
-              child: LayoutBuilder(
-                builder: (context, constraints) {
-                  if (!_gridInitialized) {
-                    // First build — initialize grid to fit available space
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      _initGrid(constraints.maxWidth, constraints.maxHeight);
-                    });
-                    return const Center(
-                      child: CircularProgressIndicator(
-                        color: AppColors.electricBlue,
-                      ),
-                    );
-                  }
-                  return _buildCanvas(constraints);
-                },
-              ),
+            Column(
+              children: [
+                _buildTopBar(),
+                Expanded(
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      if (!_gridInitialized) {
+                        WidgetsBinding.instance.addPostFrameCallback((_) {
+                          _initGrid(constraints.maxWidth, constraints.maxHeight);
+                        });
+                        return const Center(
+                          child: CircularProgressIndicator(
+                            color: AppColors.electricBlue,
+                          ),
+                        );
+                      }
+                      return _buildCanvas(constraints);
+                    },
+                  ),
+                ),
+                _buildPalette(),
+                _buildBottomBar(),
+              ],
             ),
-            _buildPalette(),
-            _buildBrushSizeBar(),
+            // Time warning overlay
+            if (_showTimeWarning) _buildTimeWarningOverlay(),
+            // Session expired overlay
+            if (_sessionExpired) _buildSessionExpiredOverlay(),
+            // Element info overlay
+            if (_showElementInfo) _buildElementInfoOverlay(),
+            // Pause overlay
+            if (_isPaused && !_sessionExpired) _buildPauseOverlay(),
           ],
         ),
       ),
@@ -929,6 +1341,9 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   Widget _buildTopBar() {
+    final timerColor = _timerColor();
+    final isPulsing = _remainingSeconds <= 30 && !_sessionExpired;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
@@ -949,6 +1364,45 @@ class _ElementLabGameState extends State<ElementLabGame>
             ),
           ),
           const Spacer(),
+          // Session timer
+          TweenAnimationBuilder<double>(
+            tween: Tween(begin: 1.0, end: isPulsing ? 1.15 : 1.0),
+            duration: const Duration(milliseconds: 600),
+            builder: (context, scale, child) {
+              return Transform.scale(
+                scale: isPulsing
+                    ? 1.0 + 0.15 * sin(_frameCount * 0.15)
+                    : 1.0,
+                child: child,
+              );
+            },
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: timerColor.withValues(alpha: 0.15),
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(
+                  color: timerColor.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.timer_rounded, color: timerColor, size: 16),
+                  const SizedBox(width: 4),
+                  Text(
+                    _formatTime(_remainingSeconds),
+                    style: AppFonts.fredoka(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                      color: timerColor,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
           // Star coin balance
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -975,14 +1429,6 @@ class _ElementLabGameState extends State<ElementLabGame>
                 ),
               ],
             ),
-          ),
-          const SizedBox(width: 4),
-          IconButton(
-            onPressed: _clearGrid,
-            icon: const Icon(Icons.delete_outline_rounded),
-            color: AppColors.error.withValues(alpha: 0.8),
-            iconSize: 22,
-            tooltip: 'Clear all',
           ),
         ],
       ),
@@ -1034,7 +1480,7 @@ class _ElementLabGameState extends State<ElementLabGame>
         itemCount: El.count + 1, // +1 for eraser
         itemBuilder: (context, index) {
           if (index == 0) return _buildEraserChip();
-          return _buildElementChip(index); // index 1..12 maps to El types 1..12
+          return _buildElementChip(index); // index 1..15 maps to El types 1..15
         },
       ),
     );
@@ -1048,6 +1494,13 @@ class _ElementLabGameState extends State<ElementLabGame>
     return GestureDetector(
       onTap: () {
         setState(() => _selectedElement = elType);
+        Haptics.tap();
+      },
+      onLongPress: () {
+        setState(() {
+          _showElementInfo = true;
+          _infoElement = elType;
+        });
         Haptics.tap();
       },
       child: AnimatedContainer(
@@ -1162,14 +1615,14 @@ class _ElementLabGameState extends State<ElementLabGame>
     );
   }
 
-  Widget _buildBrushSizeBar() {
+  Widget _buildBottomBar() {
     return Container(
-      height: 40,
+      height: 44,
       color: AppColors.surface,
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.symmetric(horizontal: 12),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Brush size controls
           Text(
             'Brush:',
             style: AppFonts.fredoka(
@@ -1180,7 +1633,7 @@ class _ElementLabGameState extends State<ElementLabGame>
           const SizedBox(width: 8),
           for (final size in const [1, 3, 5])
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 4),
+              padding: const EdgeInsets.symmetric(horizontal: 3),
               child: GestureDetector(
                 onTap: () {
                   setState(() => _brushSize = size);
@@ -1188,8 +1641,8 @@ class _ElementLabGameState extends State<ElementLabGame>
                 },
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 150),
-                  width: 28,
-                  height: 28,
+                  width: 26,
+                  height: 26,
                   decoration: BoxDecoration(
                     color: _brushSize == size
                         ? AppColors.electricBlue.withValues(alpha: 0.2)
@@ -1217,7 +1670,358 @@ class _ElementLabGameState extends State<ElementLabGame>
                 ),
               ),
             ),
+          const Spacer(),
+          // Undo button
+          IconButton(
+            onPressed: _undoHistory.isNotEmpty ? _undo : null,
+            icon: const Icon(Icons.undo_rounded),
+            color: _undoHistory.isNotEmpty
+                ? AppColors.electricBlue
+                : AppColors.secondaryText.withValues(alpha: 0.3),
+            iconSize: 20,
+            tooltip: 'Undo',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          ),
+          // Pause/Play button
+          IconButton(
+            onPressed: _togglePause,
+            icon: Icon(_isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded),
+            color: AppColors.electricBlue,
+            iconSize: 20,
+            tooltip: _isPaused ? 'Resume' : 'Pause',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          ),
+          // Clear button
+          IconButton(
+            onPressed: _clearGrid,
+            icon: const Icon(Icons.delete_outline_rounded),
+            color: AppColors.error.withValues(alpha: 0.8),
+            iconSize: 20,
+            tooltip: 'Clear all',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+          ),
         ],
+      ),
+    );
+  }
+
+  // ── Overlay widgets ────────────────────────────────────────────────────
+
+  Widget _buildTimeWarningOverlay() {
+    return Positioned.fill(
+      child: IgnorePointer(
+        child: Center(
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            decoration: BoxDecoration(
+              color: AppColors.background.withValues(alpha: 0.85),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(
+                color: _timerColor().withValues(alpha: 0.6),
+                width: 2,
+              ),
+            ),
+            child: Text(
+              _timeWarningText,
+              style: AppFonts.fredoka(
+                fontSize: 28,
+                fontWeight: FontWeight.w700,
+                color: _timerColor(),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildSessionExpiredOverlay() {
+    final canAfford = widget.progressService.starCoins >= kExtensionCost;
+
+    return Positioned.fill(
+      child: Container(
+        color: AppColors.background.withValues(alpha: 0.9),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 32),
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppColors.electricBlue.withValues(alpha: 0.3),
+                width: 2,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.electricBlue.withValues(alpha: 0.1),
+                  blurRadius: 20,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.timer_off_rounded,
+                  color: AppColors.starGold,
+                  size: 48,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  "Time's Up!",
+                  style: AppFonts.fredoka(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.primaryText,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Your Element Lab session has ended.',
+                  textAlign: TextAlign.center,
+                  style: AppFonts.fredoka(
+                    fontSize: 14,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Add More Time button
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: canAfford ? _addMoreTime : null,
+                    icon: const Icon(Icons.add_rounded, size: 20),
+                    label: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          'Add 2 Minutes  ',
+                          style: AppFonts.fredoka(
+                            fontSize: 15,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                        const Icon(Icons.star_rounded,
+                            color: AppColors.starGold, size: 16),
+                        Text(
+                          ' $kExtensionCost',
+                          style: AppFonts.fredoka(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.starGold,
+                          ),
+                        ),
+                      ],
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: canAfford
+                          ? AppColors.electricBlue
+                          : AppColors.surfaceVariant,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                  ),
+                ),
+                if (!canAfford) ...[
+                  const SizedBox(height: 8),
+                  Text(
+                    'Complete words in Adventure Mode\nto earn more Star Coins!',
+                    textAlign: TextAlign.center,
+                    style: AppFonts.fredoka(
+                      fontSize: 12,
+                      color: AppColors.starGold.withValues(alpha: 0.8),
+                    ),
+                  ),
+                ],
+                const SizedBox(height: 12),
+                // Exit button
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.primaryText,
+                      side: BorderSide(
+                        color: AppColors.border.withValues(alpha: 0.5),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    child: Text(
+                      'Exit',
+                      style: AppFonts.fredoka(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildElementInfoOverlay() {
+    final elType = _infoElement;
+    final color = _baseColors[elType.clamp(0, _baseColors.length - 1)];
+    final name = _elementNames[elType.clamp(0, _elementNames.length - 1)];
+    final desc = _elementDescriptions[elType] ?? 'A mysterious element.';
+
+    return Positioned.fill(
+      child: GestureDetector(
+        onTap: () => setState(() => _showElementInfo = false),
+        child: Container(
+          color: AppColors.background.withValues(alpha: 0.7),
+          child: Center(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 48),
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: color.withValues(alpha: 0.5),
+                  width: 2,
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: color.withValues(alpha: 0.2),
+                    blurRadius: 16,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: color,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.3),
+                        width: 2,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    name,
+                    style: AppFonts.fredoka(
+                      fontSize: 22,
+                      fontWeight: FontWeight.w700,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    desc,
+                    textAlign: TextAlign.center,
+                    style: AppFonts.fredoka(
+                      fontSize: 13,
+                      color: AppColors.secondaryText,
+                      height: 1.4,
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  Text(
+                    'Tap anywhere to close',
+                    style: AppFonts.fredoka(
+                      fontSize: 11,
+                      color: AppColors.secondaryText.withValues(alpha: 0.5),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildPauseOverlay() {
+    return Positioned.fill(
+      child: Container(
+        color: AppColors.background.withValues(alpha: 0.85),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.pause_circle_filled_rounded,
+                color: AppColors.electricBlue,
+                size: 64,
+              ),
+              const SizedBox(height: 16),
+              Text(
+                'Paused',
+                style: AppFonts.fredoka(
+                  fontSize: 32,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.primaryText,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '${_formatTime(_remainingSeconds)} remaining',
+                style: AppFonts.fredoka(
+                  fontSize: 16,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              const SizedBox(height: 24),
+              ElevatedButton.icon(
+                onPressed: _togglePause,
+                icon: const Icon(Icons.play_arrow_rounded),
+                label: Text(
+                  'Resume',
+                  style: AppFonts.fredoka(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.electricBlue,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 32,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  'Exit Lab',
+                  style: AppFonts.fredoka(
+                    fontSize: 14,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -1246,7 +2050,6 @@ class _GridPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     if (image == null) return;
 
-    // Draw the pixel grid scaled to fit the canvas area
     final src = Rect.fromLTWH(
       0,
       0,
@@ -1255,14 +2058,12 @@ class _GridPainter extends CustomPainter {
     );
     final dst = Rect.fromLTWH(canvasLeft, canvasTop, canvasPixelW, canvasPixelH);
 
-    // Use nearest-neighbor for crisp pixels
     final paint = Paint()
       ..filterQuality = FilterQuality.none
       ..isAntiAlias = false;
 
     canvas.drawImageRect(image!, src, dst, paint);
 
-    // Lightning flash overlay
     if (lightningFlash) {
       canvas.drawRect(
         dst,
@@ -1274,16 +2075,22 @@ class _GridPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_GridPainter oldDelegate) => true; // repaints every frame
+  bool shouldRepaint(_GridPainter oldDelegate) => true;
 }
 
-// ── Explosion data ────────────────────────────────────────────────────────
+// ── Data classes ──────────────────────────────────────────────────────────
 
 class _Explosion {
   final int x;
   final int y;
   final int radius;
   const _Explosion(this.x, this.y, this.radius);
+}
+
+class _UndoSnapshot {
+  final Uint8List grid;
+  final Uint8List life;
+  const _UndoSnapshot({required this.grid, required this.life});
 }
 
 // ── Beaker icon painter for the hub ──────────────────────────────────────
