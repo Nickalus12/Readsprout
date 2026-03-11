@@ -949,6 +949,54 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
           const _SectionTitle(title: 'Settings', icon: Icons.settings_rounded),
           const SizedBox(height: 14),
 
+          // Free play mode toggle
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: AppColors.background.withValues(alpha: 0.5),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                const Icon(Icons.all_inclusive_rounded,
+                    color: AppColors.emerald, size: 20),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Free Play Mode',
+                        style: AppFonts.fredoka(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.primaryText,
+                        ),
+                      ),
+                      Text(
+                        'Skip star coin costs and time limits for mini games',
+                        style: AppFonts.nunito(
+                          fontSize: 11,
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Switch(
+                  value: widget.progressService.freePlayMode,
+                  onChanged: (v) {
+                    setState(() {
+                      widget.progressService.freePlayMode = v;
+                    });
+                  },
+                  activeTrackColor: AppColors.emerald,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 10),
+
           // Reset progress
           _SettingsButton(
             icon: Icons.restart_alt_rounded,

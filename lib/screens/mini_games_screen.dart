@@ -403,11 +403,11 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
       label: label,
       painter: painter,
       glowColor: glow,
-      coinCost: cost,
+      coinCost: widget.progressService.freePlayMode ? null : cost,
       coinBalance: widget.progressService.starCoins,
       onTap: () async {
         final balance = widget.progressService.starCoins;
-        if (balance < cost) {
+        if (!widget.progressService.freePlayMode && balance < cost) {
           if (!mounted) return;
           showDialog(
             context: context,
@@ -449,13 +449,17 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
           );
           return;
         }
-        // Spend the coins
-        widget.progressService.spendStarCoins(cost);
+        // Spend the coins (skip in free play mode)
+        final freePlay = widget.progressService.freePlayMode;
+        if (!freePlay) {
+          widget.progressService.spendStarCoins(cost);
+        }
         if (!mounted) return;
         final game = ElementLabGame(
           progressService: widget.progressService,
           audioService: widget.audioService,
           playerName: widget.playerName,
+          freePlay: freePlay,
         );
         await Navigator.push(context, _smoothRoute(game));
         if (!mounted) return;

@@ -35,7 +35,7 @@ class El {
   static const int fire = 3;
   static const int ice = 4;
   static const int lightning = 5;
-  static const int plant = 6;
+  static const int seed = 6; // was "plant" — now falls like sand, sprouts into plant
   static const int stone = 7;
   static const int tnt = 8;
   static const int rainbow = 9;
@@ -45,35 +45,54 @@ class El {
   static const int oil = 13;
   static const int acid = 14;
   static const int glass = 15;
+  static const int dirt = 16;
+  static const int plant = 17; // sprouted plant — static, grows upward
+  static const int lava = 18;
+  static const int snow = 19;
+  static const int wood = 20;
+  static const int metal = 21;
+  static const int smoke = 22;
+  static const int bubble = 23;
+  static const int ash = 24;
   static const int eraser = 99; // UI-only, never stored in grid
-  static const int count = 16; // number of real element types
+  static const int count = 25; // number of real element types
 }
 
 /// Per-element base colors (index = element type).
 const List<Color> _baseColors = [
-  Color(0x00000000), // empty (transparent)
-  Color(0xFFDEB887), // sand — tan
-  Color(0xFF3399FF), // water — blue
-  Color(0xFFFF6600), // fire — orange
-  Color(0xFFAADDFF), // ice — light blue
-  Color(0xFFFFFF66), // lightning — yellow
-  Color(0xFF33CC33), // plant — green
-  Color(0xFF888888), // stone — gray
-  Color(0xFFCC2222), // TNT — red
-  Color(0xFFFF00FF), // rainbow — magenta (cycles)
-  Color(0xFF8B6914), // mud — brown
-  Color(0xFFDDDDDD), // steam — white
-  Color(0xFF222222), // ant — dark
-  Color(0xFF4A3728), // oil — dark brown
-  Color(0xFF33FF33), // acid — neon green
-  Color(0xFFDDEEFF), // glass — transparent white
+  Color(0x00000000), // 0  empty (transparent)
+  Color(0xFFDEB887), // 1  sand — tan
+  Color(0xFF3399FF), // 2  water — blue
+  Color(0xFFFF6600), // 3  fire — orange
+  Color(0xFFAADDFF), // 4  ice — light blue
+  Color(0xFFFFFF66), // 5  lightning — yellow
+  Color(0xFF8B7355), // 6  seed — woody brown
+  Color(0xFF888888), // 7  stone — gray
+  Color(0xFFCC2222), // 8  TNT — red
+  Color(0xFFFF00FF), // 9  rainbow — magenta (cycles)
+  Color(0xFF6B4226), // 10 mud — dark brown
+  Color(0xFFDDDDDD), // 11 steam — white
+  Color(0xFF222222), // 12 ant — dark
+  Color(0xFF4A3728), // 13 oil — dark brown
+  Color(0xFF33FF33), // 14 acid — neon green
+  Color(0xFFDDEEFF), // 15 glass — transparent white
+  Color(0xFF8B6914), // 16 dirt — earthy brown
+  Color(0xFF33CC33), // 17 plant — green
+  Color(0xFFFF4500), // 18 lava — orange-red
+  Color(0xFFF0F0FF), // 19 snow — white
+  Color(0xFFA0522D), // 20 wood — warm brown
+  Color(0xFFA8A8B0), // 21 metal — silver-gray
+  Color(0xFF808080), // 22 smoke — gray
+  Color(0xFFADD8E6), // 23 bubble — light blue
+  Color(0xFFB0B0B0), // 24 ash — light grey
 ];
 
 /// Element display names for the palette.
 const List<String> _elementNames = [
   '', 'Sand', 'Water', 'Fire', 'Ice', 'Zap',
-  'Plant', 'Stone', 'TNT', 'Rainbow', 'Mud', 'Steam', 'Ant',
-  'Oil', 'Acid', 'Glass',
+  'Seed', 'Stone', 'TNT', 'Rainbow', 'Mud', 'Steam', 'Ant',
+  'Oil', 'Acid', 'Glass', 'Dirt', 'Plant', 'Lava', 'Snow',
+  'Wood', 'Metal', 'Smoke', 'Bubble', 'Ash',
 ];
 
 /// Element descriptions for long-press info.
@@ -83,28 +102,39 @@ const Map<int, String> _elementDescriptions = {
   El.fire: 'Rises up and burns out.\nSpreads to plants and oil.\nMelts ice into water.',
   El.ice: 'Solid and cold.\nFreezes nearby water.\nMelts from fire.',
   El.lightning: 'Zaps down fast!\nExplodes TNT.\nElectrifies water.',
-  El.plant: 'Grows upward when watered.\nBurns when touched by fire.',
+  El.seed: 'Pick a seed type and plant in moist dirt!\n5 types: Grass, Flower, Tree, Mushroom, Vine.\nNeeds moist soil to grow!',
   El.stone: 'Solid and immovable.\nNothing can destroy it.\nAcid dissolves it slowly.',
   El.tnt: 'Falls like sand.\nExplodes when hit by fire or lightning!\nMore TNT = bigger boom!',
   El.rainbow: 'Floats upward with sparkles.\nChanges colors!',
-  El.mud: 'Like slow sand.\nMade from sand + water.',
+  El.mud: 'Thick and slow.\nMade from dirt + lots of water.',
   El.steam: 'Rises up fast.\nCondenses back to water at the top.',
   El.ant: 'Walks along surfaces.\nDrowns in water.\nRuns from fire.\nDissolved by acid.',
   El.oil: 'Floats on water.\nVery flammable!\nBurns longer than plant.',
   El.acid: 'Dissolves stone slowly.\nKills ants.\nMixes with water.\nDangerous!',
   El.glass: 'Made when lightning hits sand.\nSolid like stone but see-through.',
+  El.dirt: 'Falls and piles up.\nAbsorbs water.\nToo much water turns it to mud!',
+  El.plant: 'Grows upward from seeds.\nBurns when touched by fire.\nDissolved by acid.',
+  El.lava: 'Hot liquid rock!\nTurns water to stone and steam.\nCools into stone over time.',
+  El.snow: 'Falls softly and piles up.\nMelts near fire or lava.\nFreezes nearby water!',
+  El.wood: 'Solid and sturdy.\nBurns when touched by fire.\nAcid dissolves it slowly.',
+  El.metal: 'Super strong metal!\nConducts lightning to all connected metal.\nImmune to fire and acid.',
+  El.smoke: 'Rises and fades away.\nMade when things burn.\nDrifts in the wind.',
+  El.bubble: 'Rises through water.\nPops into droplets at the surface!\nAcid in water makes bubbles.',
+  El.ash: 'Very light — drifts in the wind.\nFloats on water, then sinks.\nFertilizes dirt!',
 };
 
 class ElementLabGame extends StatefulWidget {
   final ProgressService progressService;
   final AudioService audioService;
   final String playerName;
+  final bool freePlay;
 
   const ElementLabGame({
     super.key,
     required this.progressService,
     required this.audioService,
     required this.playerName,
+    this.freePlay = false,
   });
 
   @override
@@ -126,7 +156,7 @@ class _ElementLabGameState extends State<ElementLabGame>
 
   // -- Rendering buffer (RGBA pixels) ----------------------------------------
   late Uint8List _pixels;
-  ui.Image? _frameImage;
+  final ValueNotifier<ui.Image?> _frameImageNotifier = ValueNotifier(null);
 
   // -- Animation / ticker ---------------------------------------------------
   late Ticker _ticker;
@@ -137,10 +167,32 @@ class _ElementLabGameState extends State<ElementLabGame>
   // -- UI state --------------------------------------------------------------
   int _selectedElement = El.sand;
   int _brushSize = 1; // 1, 3, or 5
+  int _brushMode = 0; // 0=circle, 1=line, 2=spray
+  int _lineStartX = -1;
+  int _lineStartY = -1;
+  int _lineEndX = -1;
+  int _lineEndY = -1;
   bool _isDrawing = false;
   bool _isPaused = false;
   bool _showElementInfo = false;
   int _infoElement = El.sand;
+  int _selectedTab = 0; // palette tab index
+
+  // Element palette tab definitions
+  static const List<List<int>> _tabElements = [
+    [El.sand, El.dirt, El.stone, El.ice, El.glass, El.snow, El.wood, El.metal, El.ash], // Solids
+    [El.water, El.oil, El.acid, El.mud, El.lava, El.bubble],  // Liquids
+    [El.fire, El.lightning, El.tnt, El.steam, El.smoke],       // Energy
+    [El.seed, El.ant],                                            // Life
+    [El.rainbow, El.eraser],                                    // Tools
+  ];
+  static const List<IconData> _tabIcons = [
+    Icons.landscape_rounded,
+    Icons.water_drop_rounded,
+    Icons.bolt_rounded,
+    Icons.eco_rounded,
+    Icons.auto_fix_high_rounded,
+  ];
 
   // -- Canvas layout ---------------------------------------------------------
   double _canvasTop = 0;
@@ -148,6 +200,19 @@ class _ElementLabGameState extends State<ElementLabGame>
   double _cellSize = 1.0;
   double _canvasPixelW = 0;
   double _canvasPixelH = 0;
+
+  // -- Physics manipulation --------------------------------------------------
+  int _gravityDir = 1; // 1 = down, -1 = up
+  int _windForce = 0; // -3..+3
+  int _shakeCooldown = 0; // frames remaining
+  Offset _shakeOffset = Offset.zero;
+
+  // -- Day/Night system -------------------------------------------------------
+  bool _isNight = false;
+  double _dayNightT = 0.0; // 0.0 = day, 1.0 = night (smooth transition)
+  // Star positions (generated once, twinkle via frame counter)
+  late List<int> _starPositions; // grid indices for star cells
+  bool _starsGenerated = false;
 
   // -- Rainbow color cycling -------------------------------------------------
   int _rainbowHue = 0;
@@ -178,12 +243,15 @@ class _ElementLabGameState extends State<ElementLabGame>
   static const Set<String> _speakableWords = {
     'sand', 'water', 'fire', 'ice', 'plant', 'stone',
     'mud', 'steam', 'ant', 'oil', 'acid', 'glass', 'rainbow',
+    'seed', 'dirt', 'lava', 'snow', 'wood', 'metal', 'smoke', 'bubble', 'ash',
   };
 
   @override
   void initState() {
     super.initState();
-    _remainingSeconds = kSessionDuration.inSeconds;
+    _remainingSeconds = widget.freePlay
+        ? const Duration(minutes: 999).inSeconds
+        : kSessionDuration.inSeconds;
     _ticker = createTicker(_onTick);
     _startSessionTimer();
     _loadMutePreference();
@@ -205,6 +273,24 @@ class _ElementLabGameState extends State<ElementLabGame>
     Haptics.tap();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_muteKey, _isMuted);
+  }
+
+  void _toggleDayNight() {
+    setState(() => _isNight = !_isNight);
+    Haptics.tap();
+  }
+
+  void _generateStars() {
+    if (_starsGenerated) return;
+    _starsGenerated = true;
+    // Place ~30 stars in the top 10% of the grid
+    final topRows = (_gridH * 0.10).floor().clamp(3, 30);
+    _starPositions = [];
+    for (int i = 0; i < 30; i++) {
+      final sx = _rng.nextInt(_gridW);
+      final sy = _rng.nextInt(topRows);
+      _starPositions.add(sy * _gridW + sx);
+    }
   }
 
   /// Speak an element name aloud. Uses playWord() for known words,
@@ -254,6 +340,7 @@ class _ElementLabGameState extends State<ElementLabGame>
     _velY = Int8List(totalCells);
     _pixels = Uint8List(totalCells * 4); // RGBA
 
+    _generateStars();
     _gridInitialized = true;
     if (!_ticker.isActive) {
       _ticker.start();
@@ -304,7 +391,8 @@ class _ElementLabGameState extends State<ElementLabGame>
   void dispose() {
     _sessionTimer?.cancel();
     _ticker.dispose();
-    _frameImage?.dispose();
+    _frameImageNotifier.value?.dispose();
+    _frameImageNotifier.dispose();
     super.dispose();
   }
 
@@ -319,9 +407,108 @@ class _ElementLabGameState extends State<ElementLabGame>
     _lastTick = elapsed;
     _frameCount++;
 
+    if (_shakeCooldown > 0) _shakeCooldown--;
+
+    // Smooth day/night transition (60 frames = 2 seconds at 30fps)
+    final targetT = _isNight ? 1.0 : 0.0;
+    if ((_dayNightT - targetT).abs() > 0.001) {
+      _dayNightT += (_isNight ? 1.0 : -1.0) / 60.0;
+      _dayNightT = _dayNightT.clamp(0.0, 1.0);
+    }
+
+    _applyWind();
     _simulate();
     _renderPixels();
     _buildImage();
+  }
+
+  // ── Wind & shake ─────────────────────────────────────────────────────
+
+  /// Lightweight elements affected fully by wind.
+  static const Set<int> _lightWindElements = {
+    El.sand, El.snow, El.smoke, El.fire, El.steam, El.bubble, El.seed, El.ash,
+  };
+  /// Heavy liquids affected partially by wind.
+  static const Set<int> _heavyWindElements = {
+    El.water, El.oil, El.acid,
+  };
+  /// Static elements unaffected by wind or shake.
+  static const Set<int> _staticElements = {
+    El.stone, El.metal, El.wood, El.glass, El.ice,
+  };
+
+  void _applyWind() {
+    if (_windForce == 0) return;
+    final absWind = _windForce.abs();
+    final dir = _windForce > 0 ? 1 : -1;
+
+    // Scan all cells
+    for (int y = 0; y < _gridH; y++) {
+      // Scan against wind direction to avoid double-pushing
+      final startX = dir > 0 ? _gridW - 1 : 0;
+      final endX = dir > 0 ? -1 : _gridW;
+      final step = dir > 0 ? -1 : 1;
+      for (int x = startX; x != endX; x += step) {
+        final idx = y * _gridW + x;
+        final el = _grid[idx];
+        if (el == El.empty) continue;
+
+        double chance;
+        if (el == El.ash) {
+          chance = absWind / 4.0; // ash is ultra-lightweight, blows very easily
+        } else if (_lightWindElements.contains(el)) {
+          chance = absWind / 10.0;
+        } else if (_heavyWindElements.contains(el)) {
+          chance = absWind / 30.0;
+        } else {
+          continue; // static or unaffected
+        }
+
+        if (_rng.nextDouble() < chance) {
+          final nx = x + dir;
+          if (_inBounds(nx, y) && _grid[y * _gridW + nx] == El.empty) {
+            _swap(idx, y * _gridW + nx);
+          }
+        }
+      }
+    }
+  }
+
+  void _doShake() {
+    if (_shakeCooldown > 0) return;
+    _shakeCooldown = 60; // 2 second cooldown at 30fps
+    Haptics.tap();
+
+    // Random displacement
+    for (int y = _gridH - 1; y >= 0; y--) {
+      for (int x = 0; x < _gridW; x++) {
+        final idx = y * _gridW + x;
+        final el = _grid[idx];
+        if (el == El.empty || _staticElements.contains(el)) continue;
+        if (_rng.nextInt(100) < 30) {
+          final dx = _rng.nextInt(3) - 1;
+          final dy = _rng.nextInt(3) - 1;
+          final nx = x + dx;
+          final ny = y + dy;
+          if (_inBounds(nx, ny) && _grid[ny * _gridW + nx] == El.empty) {
+            _swap(idx, ny * _gridW + nx);
+          }
+        }
+      }
+    }
+
+    // Brief screen shake animation
+    _shakeOffset = Offset(
+      (_rng.nextDouble() - 0.5) * 6,
+      (_rng.nextDouble() - 0.5) * 6,
+    );
+    Future.delayed(const Duration(milliseconds: 100), () {
+      if (mounted) setState(() => _shakeOffset = Offset(-_shakeOffset.dx, -_shakeOffset.dy));
+    });
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (mounted) setState(() => _shakeOffset = Offset.zero);
+    });
+    setState(() {});
   }
 
   // ── Physics simulation (single pass) ────────────────────────────────────
@@ -339,9 +526,12 @@ class _ElementLabGameState extends State<ElementLabGame>
     // Decrease lightning flash
     if (_lightningFlashFrames > 0) _lightningFlashFrames--;
 
-    // Bottom-up scan for gravity-affected elements, left-right alternating
+    // Scan from gravity-bottom to top, left-right alternating
     final leftToRight = _frameCount.isEven;
-    for (int y = _gridH - 2; y >= 0; y--) {
+    final yStart = _gravityDir == 1 ? _gridH - 2 : 1;
+    final yEnd = _gravityDir == 1 ? -1 : _gridH;
+    final yStep = _gravityDir == 1 ? -1 : 1;
+    for (int y = yStart; y != yEnd; y += yStep) {
       final startX = leftToRight ? 0 : _gridW - 1;
       final endX = leftToRight ? _gridW : -1;
       final dx = leftToRight ? 1 : -1;
@@ -363,8 +553,8 @@ class _ElementLabGameState extends State<ElementLabGame>
             _simIce(x, y, idx);
           case El.lightning:
             _simLightning(x, y, idx);
-          case El.plant:
-            _simPlant(x, y, idx);
+          case El.seed:
+            _simSeed(x, y, idx);
           case El.tnt:
             _simTNT(x, y, idx);
           case El.rainbow:
@@ -379,6 +569,24 @@ class _ElementLabGameState extends State<ElementLabGame>
             _simOil(x, y, idx);
           case El.acid:
             _simAcid(x, y, idx);
+          case El.dirt:
+            _simDirt(x, y, idx);
+          case El.plant:
+            _simPlant(x, y, idx);
+          case El.lava:
+            _simLava(x, y, idx);
+          case El.snow:
+            _simSnow(x, y, idx);
+          case El.wood:
+            _simWood(x, y, idx);
+          case El.metal:
+            _simMetal(x, y, idx);
+          case El.smoke:
+            _simSmoke(x, y, idx);
+          case El.bubble:
+            _simBubble(x, y, idx);
+          case El.ash:
+            _simAsh(x, y, idx);
           // stone and glass do nothing (immovable)
         }
       }
@@ -408,16 +616,95 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   void _simWater(int x, int y, int idx) {
-    // Check for adjacent ice -> freeze
-    if (_checkAdjacent(x, y, El.ice)) {
+    final g = _gravityDir;
+    final by = y + g;
+    final uy = y - g;
+
+    // ── Neighbor reactions ──────────────────────────────────────────────
+
+    // Check for adjacent ice → freeze (1 in 60 chance, slower than before)
+    if (_rng.nextInt(60) == 0 && _checkAdjacent(x, y, El.ice)) {
       _grid[idx] = El.ice;
       _flags[idx] = 1;
       return;
     }
 
-    // Water pressure: deeper water pushes sideways harder
+    // Evaporation: water near heat source (fire/lava within 2-cell radius)
+    // At night: half evaporation rate
+    final evapChance = _isNight ? 30 : 15;
+    if (_rng.nextInt(evapChance) == 0) {
+      for (int dy = -2; dy <= 2; dy++) {
+        for (int dx = -2; dx <= 2; dx++) {
+          if (dx == 0 && dy == 0) continue;
+          final nx = x + dx;
+          final ny = y + dy;
+          if (!_inBounds(nx, ny)) continue;
+          final neighbor = _grid[ny * _gridW + nx];
+          if (neighbor == El.fire || neighbor == El.lava) {
+            _grid[idx] = El.steam;
+            _life[idx] = 0;
+            _flags[idx] = 1;
+            return;
+          }
+        }
+      }
+    }
+
+    // Water + Oil: if water is directly above oil, swap them (oil floats)
+    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.oil) {
+      final bi = by * _gridW + x;
+      _grid[idx] = El.oil;
+      _life[idx] = 0;
+      _grid[bi] = El.water;
+      _life[bi] = 0;
+      _flags[idx] = 1;
+      _flags[bi] = 1;
+      return;
+    }
+
+    // Water defuses TNT (TNT becomes sand over ~30 frames)
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        if (dx == 0 && dy == 0) continue;
+        final nx = x + dx;
+        final ny = y + dy;
+        if (!_inBounds(nx, ny)) continue;
+        final ni = ny * _gridW + nx;
+        final neighbor = _grid[ni];
+        // Defuse TNT
+        if (neighbor == El.tnt && _rng.nextInt(10) == 0) {
+          _grid[ni] = El.sand;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+        }
+        // Water absorbs smoke
+        if (neighbor == El.smoke && _rng.nextInt(10) == 0) {
+          _grid[ni] = El.empty;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+        }
+        // Water + Rainbow → prismatic refraction (spawn extra rainbow)
+        if (neighbor == El.rainbow && _rng.nextInt(40) == 0) {
+          // Find an empty cell nearby and spawn rainbow
+          final rx = x + _rng.nextInt(3) - 1;
+          final ry = uy;
+          if (_inBounds(rx, ry) && _grid[ry * _gridW + rx] == El.empty) {
+            _grid[ry * _gridW + rx] = El.rainbow;
+            _life[ry * _gridW + rx] = 0;
+            _flags[ry * _gridW + rx] = 1;
+          }
+        }
+        // Water nourishes plant (handled by making plant grow faster — set flag)
+        if (neighbor == El.plant && _rng.nextInt(20) == 0) {
+          // Boost plant growth by decrementing its life timer
+          if (_life[ni] > 2) _life[ni] -= 2;
+        }
+      }
+    }
+
+    // ── Water pressure and depth ────────────────────────────────────────
     int depth = 0;
-    for (int cy = y - 1; cy >= max(0, y - 8); cy--) {
+    for (int cy = y - g; _inBounds(x, cy) && depth < 8; cy -= g) {
       final cellAbove = _grid[cy * _gridW + x];
       if (cellAbove == El.water || cellAbove == El.oil) {
         depth++;
@@ -426,48 +713,87 @@ class _ElementLabGameState extends State<ElementLabGame>
       }
     }
 
-    // Fall down first
-    final below = (y + 1) * _gridW + x;
-    if (y + 1 < _gridH && _grid[below] == El.empty) {
-      _swap(idx, below);
+    // ── Movement with momentum ──────────────────────────────────────────
+
+    // Fall in gravity direction
+    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
+      // Track fall distance for splash (use velY)
+      _velY[idx] = (_velY[idx] + 1).clamp(0, 10).toInt();
+      _swap(idx, by * _gridW + x);
       return;
     }
 
-    // Try diagonal down
-    final dl = _rng.nextBool();
-    final x1 = dl ? x - 1 : x + 1;
-    final x2 = dl ? x + 1 : x - 1;
-    if (_inBounds(x1, y + 1) && _grid[(y + 1) * _gridW + x1] == El.empty) {
-      _swap(idx, (y + 1) * _gridW + x1);
+    // Splash: if falling fast onto a solid, scatter sideways
+    if (_velY[idx] >= 3 && _inBounds(x, by) && _grid[by * _gridW + x] != El.empty) {
+      for (int i = 0; i < (_velY[idx] ~/ 2).clamp(1, 3); i++) {
+        final sx = x + (_rng.nextBool() ? 1 : -1) * (1 + _rng.nextInt(2));
+        final sy = y - g * _rng.nextInt(2);
+        if (_inBounds(sx, sy) && _grid[sy * _gridW + sx] == El.empty) {
+          _grid[sy * _gridW + sx] = El.water;
+          _life[sy * _gridW + sx] = 0;
+          _flags[sy * _gridW + sx] = 1;
+          _grid[idx] = El.empty;
+          _life[idx] = 0;
+          _velY[idx] = 0;
+          return;
+        }
+      }
+    }
+    _velY[idx] = 0; // reset fall velocity when not falling
+
+    // Use momentum: prefer previous flow direction
+    final momentum = _velX[idx]; // -1 or 1 from previous flow
+    final dl = momentum != 0 ? (momentum > 0) : _rng.nextBool();
+    final x1 = dl ? x + 1 : x - 1;
+    final x2 = dl ? x - 1 : x + 1;
+
+    // Try diagonal in gravity direction
+    if (_inBounds(x1, by) && _grid[by * _gridW + x1] == El.empty) {
+      _velX[idx] = dl ? 1 : -1;
+      _swap(idx, by * _gridW + x1);
       return;
     }
-    if (_inBounds(x2, y + 1) && _grid[(y + 1) * _gridW + x2] == El.empty) {
-      _swap(idx, (y + 1) * _gridW + x2);
+    if (_inBounds(x2, by) && _grid[by * _gridW + x2] == El.empty) {
+      _velX[idx] = dl ? -1 : 1;
+      _swap(idx, by * _gridW + x2);
       return;
     }
 
     // Flow sideways — pressure increases flow distance
     final flowDist = 1 + (depth ~/ 2).clamp(0, 4);
     for (int d = 1; d <= flowDist; d++) {
-      final sx1 = dl ? x - d : x + d;
-      final sx2 = dl ? x + d : x - d;
+      final sx1 = dl ? x + d : x - d;
+      final sx2 = dl ? x - d : x + d;
       if (_inBounds(sx1, y) && _grid[y * _gridW + sx1] == El.empty) {
+        _velX[idx] = dl ? 1 : -1;
         _swap(idx, y * _gridW + sx1);
         return;
       }
       if (_inBounds(sx2, y) && _grid[y * _gridW + sx2] == El.empty) {
+        _velX[idx] = dl ? -1 : 1;
         _swap(idx, y * _gridW + sx2);
         return;
       }
     }
+
+    // Stuck — decay momentum
+    if (_rng.nextInt(4) == 0) _velX[idx] = 0;
   }
 
   void _simFire(int x, int y, int idx) {
     _life[idx]++;
-    // Fire dies after 40-80 frames
+    // Fire dies after 40-80 frames → becomes ash (sometimes smoke rises)
     if (_life[idx] > 40 + _rng.nextInt(40)) {
-      _grid[idx] = El.empty;
+      _grid[idx] = El.ash;
       _life[idx] = 0;
+      _flags[idx] = 1;
+      // Spawn smoke above ~50% of the time
+      final uy = y - _gravityDir;
+      if (_rng.nextBool() && _inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
+        _grid[uy * _gridW + x] = El.smoke;
+        _life[uy * _gridW + x] = 0;
+        _flags[uy * _gridW + x] = 1;
+      }
       return;
     }
 
@@ -488,8 +814,13 @@ class _ElementLabGameState extends State<ElementLabGame>
           _flags[ni] = 1;
           return;
         }
-        if (neighbor == El.plant && _rng.nextInt(2) == 0) {
-          // Fire spreads to plant more aggressively
+        if ((neighbor == El.plant || neighbor == El.seed) && _rng.nextInt(2) == 0) {
+          // Fire spreads to plant/seed aggressively
+          _grid[ni] = El.fire;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+        }
+        if (neighbor == El.wood && _rng.nextInt(4) == 0) {
           _grid[ni] = El.fire;
           _life[ni] = 0;
           _flags[ni] = 1;
@@ -500,6 +831,7 @@ class _ElementLabGameState extends State<ElementLabGame>
           _life[ni] = 0;
           _flags[ni] = 1;
         }
+        // Ash is already burned — fire does nothing to it
         if (neighbor == El.ice) {
           _grid[ni] = El.water;
           _life[ni] = 150; // melting visual
@@ -514,25 +846,46 @@ class _ElementLabGameState extends State<ElementLabGame>
       }
     }
 
-    // Rise upward with random drift
-    final upIdx = (y - 1) * _gridW + x;
-    if (y > 0 && _grid[upIdx] == El.empty) {
-      _swap(idx, upIdx);
+    // Rise opposite to gravity with random drift
+    final uy = y - _gravityDir;
+    if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
+      _swap(idx, uy * _gridW + x);
       return;
     }
     final drift = _rng.nextInt(3) - 1;
     final driftX = x + drift;
-    if (_inBounds(driftX, y - 1) &&
-        _grid[(y - 1) * _gridW + driftX] == El.empty) {
-      _swap(idx, (y - 1) * _gridW + driftX);
+    if (_inBounds(driftX, uy) &&
+        _grid[uy * _gridW + driftX] == El.empty) {
+      _swap(idx, uy * _gridW + driftX);
     }
   }
 
   void _simIce(int x, int y, int idx) {
-    if (_checkAdjacent(x, y, El.fire)) {
+    if (_checkAdjacent(x, y, El.fire) || _checkAdjacent(x, y, El.lava)) {
       _grid[idx] = El.water;
       _life[idx] = 150; // melting visual flag
       _flags[idx] = 1;
+      return;
+    }
+    // Temperature balance: ice surrounded by 3+ water cells melts (slower at night)
+    final ambientMeltChance = _isNight ? 60 : 20;
+    if (_rng.nextInt(ambientMeltChance) == 0) {
+      int waterCount = 0;
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          if (dx == 0 && dy == 0) continue;
+          final nx = x + dx;
+          final ny = y + dy;
+          if (_inBounds(nx, ny) && _grid[ny * _gridW + nx] == El.water) {
+            waterCount++;
+          }
+        }
+      }
+      if (waterCount >= 3) {
+        _grid[idx] = El.water;
+        _life[idx] = 150;
+        _flags[idx] = 1;
+      }
     }
   }
 
@@ -563,21 +916,23 @@ class _ElementLabGameState extends State<ElementLabGame>
           _flags[ni] = 1;
         }
         if (neighbor == El.water) {
-          _life[ni] = 200; // electrified
-          _flags[ni] = 1;
+          _electrifyWater(nx, ny);
         }
         if (neighbor == El.sand) {
           _grid[ni] = El.glass;
           _life[ni] = 0;
           _flags[ni] = 1;
         }
+        if (neighbor == El.metal) {
+          _conductMetal(nx, ny);
+        }
       }
     }
 
-    // Move downward rapidly
+    // Move in gravity direction rapidly
     final dist = 2 + _rng.nextInt(3);
     final ndx = _rng.nextInt(3) - 1;
-    final targetY = y + dist;
+    final targetY = y + _gravityDir * dist;
     final targetX = x + ndx;
     if (!_inBounds(targetX, targetY)) {
       _grid[idx] = El.empty;
@@ -594,27 +949,1063 @@ class _ElementLabGameState extends State<ElementLabGame>
     }
   }
 
-  void _simPlant(int x, int y, int idx) {
-    if (_rng.nextInt(20) != 0) return;
+  // ── Plant data encoding ─────────────────────────────────────────────
+  static const int kPlantGrass = 1, kPlantFlower = 2, kPlantTree = 3;
+  static const int kPlantMushroom = 4, kPlantVine = 5;
+  static const int kStSprout = 0, kStGrowing = 1, kStMature = 2;
+  static const int kStWilting = 3, kStDead = 4;
+  int _plantType(int idx) => _velX[idx] & 0x0F;
+  int _plantStage(int idx) => (_velX[idx] >> 4) & 0x0F;
+  void _setPlantData(int idx, int t, int s) => _velX[idx] = ((s & 0xF) << 4) | (t & 0xF);
+  static const _plantMaxH = [0, 3, 6, 15, 3, 12];
+  static const _plantMinMoist = [0, 1, 2, 3, 4, 2];
+  static const _plantGrowRate = [0, 25, 35, 60, 40, 30];
+  int _selectedSeedType = 1; // kPlantGrass
 
-    if (_checkAdjacent(x, y, El.water)) {
-      if (y > 0) {
-        final above = (y - 1) * _gridW + x;
-        if (_grid[above] == El.empty) {
-          _grid[above] = El.plant;
-          _flags[above] = 1;
-          _removeOneAdjacent(x, y, El.water);
+  void _simSeed(int x, int y, int idx) {
+    final sType = _velX[idx].clamp(1, 5);
+    _life[idx]++;
+    if (_checkAdjacent(x, y, El.fire) || _checkAdjacent(x, y, El.lava)) {
+      _grid[idx] = El.ash; _life[idx] = 0; _velX[idx] = 0; _flags[idx] = 1; return;
+    }
+    if (_checkAdjacent(x, y, El.acid)) {
+      _grid[idx] = El.empty; _life[idx] = 0; _velX[idx] = 0; return;
+    }
+    final by = y + _gravityDir;
+    bool onDirt = _inBounds(x, by) && _grid[by * _gridW + x] == El.dirt;
+    if (onDirt) {
+      final soilM = _life[by * _gridW + x];
+      if (soilM >= _plantMinMoist[sType]) {
+        if (_life[idx] > 30) {
+          _grid[idx] = El.plant; _life[idx] = 50;
+          _setPlantData(idx, sType, kStSprout); _velY[idx] = 1; _flags[idx] = 1; return;
         }
+        return;
+      } else if (_life[idx] > 60) {
+        _grid[idx] = El.empty; _life[idx] = 0; _velX[idx] = 0; return;
       }
-      if (_rng.nextInt(3) == 0) {
-        final side = _rng.nextBool() ? x - 1 : x + 1;
-        if (_inBounds(side, y - 1)) {
-          final sideIdx = (y - 1) * _gridW + side;
-          if (_grid[sideIdx] == El.empty) {
-            _grid[sideIdx] = El.plant;
-            _flags[sideIdx] = 1;
+    } else {
+      bool onSolid = _inBounds(x, by) && _grid[by * _gridW + x] != El.empty;
+      if (onSolid) { if (_life[idx] > 60) { _grid[idx] = El.empty; _life[idx] = 0; _velX[idx] = 0; return; } return; }
+    }
+    _fallGranular(x, y, idx, El.seed);
+  }
+
+  void _simDirt(int x, int y, int idx) {
+    // _life[idx] = soil moisture level (0-5)
+
+    // --- Soil moisture: gain from adjacent water (every ~10 frames) ---
+    if (_frameCount % 10 == 0 && _life[idx] < 5 && _checkAdjacent(x, y, El.water)) {
+      _life[idx]++;
+    }
+
+    // --- Moisture propagation from wetter dirt neighbors (every ~20 frames) ---
+    if (_frameCount % 20 == 0 && _life[idx] < 4) {
+      for (int dy2 = -1; dy2 <= 1; dy2++) {
+        for (int dx2 = -1; dx2 <= 1; dx2++) {
+          if (dx2 == 0 && dy2 == 0) continue;
+          final nx = x + dx2;
+          final ny = y + dy2;
+          if (!_inBounds(nx, ny)) continue;
+          final ni = ny * _gridW + nx;
+          if (_grid[ni] == El.dirt && _life[ni] > _life[idx] + 1) {
+            _life[idx]++;
+            break;
           }
         }
+      }
+    }
+
+    // --- Lose moisture when not near water (every ~30 frames) ---
+    if (_frameCount % 30 == 0 && _life[idx] > 0 && !_checkAdjacent(x, y, El.water)) {
+      bool nearWetDirt = false;
+      for (int dy2 = -1; dy2 <= 1; dy2++) {
+        for (int dx2 = -1; dx2 <= 1; dx2++) {
+          if (dx2 == 0 && dy2 == 0) continue;
+          final nx = x + dx2;
+          final ny = y + dy2;
+          if (_inBounds(nx, ny) && _grid[ny * _gridW + nx] == El.dirt &&
+              _life[ny * _gridW + nx] > _life[idx]) {
+            nearWetDirt = true;
+            break;
+          }
+        }
+        if (nearWetDirt) break;
+      }
+      if (!nearWetDirt) _life[idx]--;
+    }
+
+    // --- Saturated + lots of water → mud ---
+    if (_life[idx] >= 5) {
+      int wc = 0;
+      for (int dy2 = -1; dy2 <= 1; dy2++) {
+        for (int dx2 = -1; dx2 <= 1; dx2++) {
+          if (dx2 == 0 && dy2 == 0) continue;
+          if (_inBounds(x + dx2, y + dy2) &&
+              _grid[(y + dy2) * _gridW + (x + dx2)] == El.water) {
+            wc++;
+          }
+        }
+      }
+      if (wc >= 3) {
+        _grid[idx] = El.mud;
+        _life[idx] = 0;
+        _flags[idx] = 1;
+        return;
+      }
+    }
+
+    // --- Ash fertilizer: ash on dirt consumed, moisture +1 ---
+    if (_rng.nextInt(10) == 0) {
+      for (int dy2 = -1; dy2 <= 1; dy2++) {
+        for (int dx2 = -1; dx2 <= 1; dx2++) {
+          if (dx2 == 0 && dy2 == 0) continue;
+          final nx = x + dx2;
+          final ny = y + dy2;
+          if (_inBounds(nx, ny) && _grid[ny * _gridW + nx] == El.ash) {
+            final ni = ny * _gridW + nx;
+            _grid[ni] = El.empty;
+            _life[ni] = 0;
+            _flags[ni] = 1;
+            _life[idx] = (_life[idx] + 1).clamp(0, 5);
+            break;
+          }
+        }
+      }
+    }
+
+    // --- Fall with water displacement (Task #1) ---
+    _fallGranularDisplace(x, y, idx, El.dirt);
+  }
+
+  /// Check if a water cell is trapped (surrounded, 0-1 water neighbors, no empty).
+  bool _isTrappedWater(int wx, int wy) {
+    int waterN = 0, emptyN = 0;
+    for (int dy2 = -1; dy2 <= 1; dy2++) {
+      for (int dx2 = -1; dx2 <= 1; dx2++) {
+        if (dx2 == 0 && dy2 == 0) continue;
+        final nx = wx + dx2;
+        final ny = wy + dy2;
+        if (!_inBounds(nx, ny)) continue;
+        final n = _grid[ny * _gridW + nx];
+        if (n == El.water) waterN++;
+        if (n == El.empty) emptyN++;
+      }
+    }
+    return emptyN == 0 && waterN <= 1;
+  }
+
+  /// Push a water cell to the nearest empty cell above or beside.
+  void _displaceWater(int wx, int wy) {
+    final wi = wy * _gridW + wx;
+    for (int r = 1; r <= 10; r++) {
+      final uy = wy - _gravityDir * r;
+      if (_inBounds(wx, uy) && _grid[uy * _gridW + wx] == El.empty) {
+        _grid[uy * _gridW + wx] = El.water;
+        _life[uy * _gridW + wx] = 0;
+        _flags[uy * _gridW + wx] = 1;
+        _grid[wi] = El.empty;
+        _life[wi] = 0;
+        _flags[wi] = 1;
+        return;
+      }
+      for (final dx in [r, -r]) {
+        final nx = wx + dx;
+        if (_inBounds(nx, wy) && _grid[wy * _gridW + nx] == El.empty) {
+          _grid[wy * _gridW + nx] = El.water;
+          _life[wy * _gridW + nx] = 0;
+          _flags[wy * _gridW + nx] = 1;
+          _grid[wi] = El.empty;
+          _life[wi] = 0;
+          _flags[wi] = 1;
+          return;
+        }
+        final uy2 = wy - _gravityDir * r;
+        if (_inBounds(nx, uy2) && _grid[uy2 * _gridW + nx] == El.empty) {
+          _grid[uy2 * _gridW + nx] = El.water;
+          _life[uy2 * _gridW + nx] = 0;
+          _flags[uy2 * _gridW + nx] = 1;
+          _grid[wi] = El.empty;
+          _life[wi] = 0;
+          _flags[wi] = 1;
+          return;
+        }
+      }
+    }
+  }
+
+  /// Granular fall with water displacement (dirt pushes water up, not absorbs).
+  void _fallGranularDisplace(int x, int y, int idx, int elType) {
+    final by = y + _gravityDir;
+    if (_inBounds(x, by)) {
+      final below = by * _gridW + x;
+      final belowEl = _grid[below];
+      if (belowEl == El.empty) {
+        _swap(idx, below);
+        return;
+      }
+      if (belowEl == El.water) {
+        if (_isTrappedWater(x, by)) {
+          _grid[below] = elType;
+          _life[below] = (_life[idx] + 1).clamp(0, 5);
+          _velY[below] = _velY[idx];
+          _grid[idx] = El.empty;
+          _life[idx] = 0;
+          _velY[idx] = 0;
+          _flags[idx] = 1;
+          _flags[below] = 1;
+        } else {
+          _displaceWater(x, by);
+          if (_grid[below] == El.empty) {
+            _grid[below] = elType;
+            _life[below] = _life[idx];
+            _velY[below] = _velY[idx];
+            _grid[idx] = El.empty;
+            _life[idx] = 0;
+            _velY[idx] = 0;
+            _flags[idx] = 1;
+            _flags[below] = 1;
+          } else {
+            _grid[idx] = El.water;
+            _grid[below] = elType;
+            _life[below] = _life[idx];
+            _life[idx] = 0;
+            _flags[idx] = 1;
+            _flags[below] = 1;
+          }
+        }
+        return;
+      }
+    }
+    final goLeft = _rng.nextBool();
+    final x1 = goLeft ? x - 1 : x + 1;
+    final x2 = goLeft ? x + 1 : x - 1;
+    if (_inBounds(x, by)) {
+      if (_inBounds(x1, by) && _grid[by * _gridW + x1] == El.empty) {
+        _swap(idx, by * _gridW + x1);
+        return;
+      }
+      if (_inBounds(x2, by) && _grid[by * _gridW + x2] == El.empty) {
+        _swap(idx, by * _gridW + x2);
+        return;
+      }
+    }
+  }
+
+  void _simPlant(int x, int y, int idx) {
+    final pType = _plantType(idx);
+    final pStage = _plantStage(idx);
+    final hydration = _life[idx]; // 0-100
+
+    // ── Instant death: fire, lava, lightning → ash ──
+    if (_checkAdjacent(x, y, El.fire) || _checkAdjacent(x, y, El.lava)) {
+      _grid[idx] = El.fire; _life[idx] = 0; _velX[idx] = 0; _velY[idx] = 0;
+      _flags[idx] = 1; return;
+    }
+    // Acid dissolves over ~20 frames
+    if (_checkAdjacent(x, y, El.acid) && _rng.nextInt(3) == 0) {
+      _grid[idx] = El.empty; _life[idx] = 0; _velX[idx] = 0; _velY[idx] = 0;
+      _flags[idx] = 1; return;
+    }
+
+    // ── Dead plant decomposes to dirt after ~120 frames ──
+    if (pStage == kStDead) {
+      _velY[idx] = (_velY[idx] + 1).clamp(0, 127).toInt();
+      if (_velY[idx] > 120) {
+        _grid[idx] = El.dirt; _life[idx] = 0; _velX[idx] = 0; _velY[idx] = 0;
+        _flags[idx] = 1;
+      }
+      return;
+    }
+
+    // ── Hydration: check soil moisture below/around ──
+    if (_frameCount % 5 == 0) {
+      bool hasMoisture = false;
+      for (int dy2 = -1; dy2 <= 1; dy2++) {
+        for (int dx2 = -1; dx2 <= 1; dx2++) {
+          final nx = x + dx2; final ny = y + dy2;
+          if (!_inBounds(nx, ny)) continue;
+          final ni = ny * _gridW + nx;
+          if (_grid[ni] == El.dirt && _life[ni] >= _plantMinMoist[pType.clamp(1, 5)]) {
+            hasMoisture = true; break;
+          }
+          if (_grid[ni] == El.water) { hasMoisture = true; break; }
+        }
+        if (hasMoisture) break;
+      }
+      if (hasMoisture) {
+        _life[idx] = (hydration + 2).clamp(0, 100);
+      } else {
+        _life[idx] = (hydration - 1).clamp(0, 100);
+      }
+    }
+
+    // ── Wilting / recovery ──
+    if (_life[idx] < 30 && pStage < kStWilting) {
+      _setPlantData(idx, pType, kStWilting);
+    } else if (_life[idx] >= 30 && pStage == kStWilting) {
+      _setPlantData(idx, pType, _velY[idx] >= _plantMaxH[pType.clamp(1, 5)] ? kStMature : kStGrowing);
+    }
+    // Death from dehydration
+    if (_life[idx] <= 0 && pStage == kStWilting) {
+      _setPlantData(idx, pType, kStDead);
+      _velY[idx] = 0; // reuse as decompose timer
+      return;
+    }
+
+    // ── Growth (only if sprout/growing, not wilting/dead) ──
+    if (pStage > kStMature) return; // wilting or dead — no growth
+
+    final maxH = _plantMaxH[pType.clamp(1, 5)];
+    final curSize = _velY[idx].clamp(0, 127).toInt();
+    if (curSize >= maxH) {
+      if (pStage != kStMature) _setPlantData(idx, pType, kStMature);
+      return;
+    }
+
+    // Ash nearby = fertilizer bonus (1.5x growth)
+    bool fertilized = _checkAdjacent(x, y, El.ash);
+    int growRate = _plantGrowRate[pType.clamp(1, 5)];
+    if (_isNight && pType != kPlantMushroom) growRate = (growRate * 5); // 20% rate
+    if (fertilized) growRate = (growRate * 2) ~/ 3; // 1.5x faster
+
+    if (_frameCount % growRate != 0) return;
+
+    // Advance from sprout to growing after first growth
+    if (pStage == kStSprout) _setPlantData(idx, pType, kStGrowing);
+
+    // ── Growth patterns per plant type (Task #6) ──
+    switch (pType) {
+      case kPlantGrass:
+        _growGrass(x, y, idx, curSize);
+      case kPlantFlower:
+        _growFlower(x, y, idx, curSize);
+      case kPlantTree:
+        _growTree(x, y, idx, curSize);
+      case kPlantMushroom:
+        _growMushroom(x, y, idx, curSize);
+      case kPlantVine:
+        _growVine(x, y, idx, curSize);
+    }
+  }
+
+  // ── Plant growth patterns (Task #6) ──────────────────────────────────
+
+  void _growGrass(int x, int y, int idx, int curSize) {
+    // Grass: 2-3 tall, spreads sideways
+    if (curSize < 3) {
+      final uy = y - _gravityDir;
+      if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
+        final ni = uy * _gridW + x;
+        _grid[ni] = El.plant; _life[ni] = _life[idx];
+        _setPlantData(ni, kPlantGrass, kStGrowing); _velY[ni] = (curSize + 1);
+        _flags[ni] = 1;
+        _velY[idx] = (curSize + 1);
+      }
+    }
+    // Spread sideways on dirt surface
+    if (_rng.nextInt(40) == 0) {
+      final side = _rng.nextBool() ? x - 1 : x + 1;
+      final by = y + _gravityDir;
+      if (_inBounds(side, y) && _grid[y * _gridW + side] == El.empty &&
+          _inBounds(side, by) && _grid[by * _gridW + side] == El.dirt) {
+        final ni = y * _gridW + side;
+        _grid[ni] = El.plant; _life[ni] = _life[idx];
+        _setPlantData(ni, kPlantGrass, kStSprout); _velY[ni] = 1;
+        _flags[ni] = 1;
+      }
+    }
+  }
+
+  void _growFlower(int x, int y, int idx, int curSize) {
+    // Flower: grows up 4-6 cells, bloom at top
+    if (curSize < 6) {
+      final uy = y - _gravityDir;
+      if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
+        final ni = uy * _gridW + x;
+        _grid[ni] = El.plant; _life[ni] = _life[idx];
+        // Top 1-2 cells are bloom (stage = mature marks bloom)
+        final newSize = curSize + 1;
+        _setPlantData(ni, kPlantFlower, newSize >= 4 ? kStMature : kStGrowing);
+        _velY[ni] = newSize;
+        _flags[ni] = 1;
+        _velY[idx] = newSize;
+      }
+    }
+  }
+
+  void _growTree(int x, int y, int idx, int curSize) {
+    // Tree: 8-15 tall, trunk then canopy
+    if (curSize < 15) {
+      final uy = y - _gravityDir;
+      if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
+        final ni = uy * _gridW + x;
+        _grid[ni] = El.plant; _life[ni] = _life[idx];
+        final newSize = curSize + 1;
+        // Canopy starts at ~60% height
+        final isTrunk = newSize < (15 * 0.6).round();
+        _setPlantData(ni, kPlantTree, isTrunk ? kStGrowing : kStMature);
+        _velY[ni] = newSize;
+        _flags[ni] = 1;
+        _velY[idx] = newSize;
+      }
+      // Canopy: spread sideways at top
+      if (curSize >= 8 && _rng.nextInt(3) == 0) {
+        final side = _rng.nextBool() ? x - 1 : x + 1;
+        final uy2 = y - _gravityDir;
+        if (_inBounds(side, uy2) && _grid[uy2 * _gridW + side] == El.empty) {
+          final ni = uy2 * _gridW + side;
+          _grid[ni] = El.plant; _life[ni] = _life[idx];
+          _setPlantData(ni, kPlantTree, kStMature); _velY[ni] = curSize;
+          _flags[ni] = 1;
+        }
+      }
+    }
+  }
+
+  void _growMushroom(int x, int y, int idx, int curSize) {
+    // Mushroom: 2-3 tall, cap at top, spreads in wet soil
+    if (curSize < 3) {
+      final uy = y - _gravityDir;
+      if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
+        final ni = uy * _gridW + x;
+        _grid[ni] = El.plant; _life[ni] = _life[idx];
+        final newSize = curSize + 1;
+        _setPlantData(ni, kPlantMushroom, newSize >= 2 ? kStMature : kStGrowing);
+        _velY[ni] = newSize;
+        _flags[ni] = 1;
+        _velY[idx] = newSize;
+      }
+    }
+    // Spread to nearby wet soil
+    if (_rng.nextInt(80) == 0) {
+      for (int r = 1; r <= 3; r++) {
+        final sx = x + (_rng.nextBool() ? r : -r);
+        final by = y + _gravityDir;
+        if (_inBounds(sx, y) && _grid[y * _gridW + sx] == El.empty &&
+            _inBounds(sx, by) && _grid[by * _gridW + sx] == El.dirt &&
+            _life[by * _gridW + sx] >= 4) {
+          final ni = y * _gridW + sx;
+          _grid[ni] = El.plant; _life[ni] = _life[idx];
+          _setPlantData(ni, kPlantMushroom, kStSprout); _velY[ni] = 1;
+          _flags[ni] = 1;
+          break;
+        }
+      }
+    }
+  }
+
+  void _growVine(int x, int y, int idx, int curSize) {
+    // Vine: climbs surfaces (dirt, stone, wood, metal)
+    if (curSize < 12) {
+      // Find adjacent solid surface to climb along
+      final directions = <List<int>>[];
+      // Prioritize upward, then sideways
+      for (final d in [[-1, -_gravityDir], [1, -_gravityDir], [-1, 0], [1, 0], [0, -_gravityDir]]) {
+        final nx = x + d[0]; final ny = y + d[1];
+        if (!_inBounds(nx, ny)) continue;
+        if (_grid[ny * _gridW + nx] != El.empty) continue;
+        // Check if adjacent to a solid surface
+        bool nearSolid = false;
+        for (int dy2 = -1; dy2 <= 1; dy2++) {
+          for (int dx2 = -1; dx2 <= 1; dx2++) {
+            final sx = nx + dx2; final sy = ny + dy2;
+            if (!_inBounds(sx, sy)) continue;
+            final se = _grid[sy * _gridW + sx];
+            if (se == El.dirt || se == El.stone || se == El.wood || se == El.metal) {
+              nearSolid = true; break;
+            }
+          }
+          if (nearSolid) break;
+        }
+        if (nearSolid) directions.add(d);
+      }
+      if (directions.isNotEmpty) {
+        final d = directions[_rng.nextInt(directions.length)];
+        final nx = x + d[0]; final ny = y + d[1];
+        final ni = ny * _gridW + nx;
+        _grid[ni] = El.plant; _life[ni] = _life[idx];
+        _setPlantData(ni, kPlantVine, kStGrowing);
+        _velY[ni] = (curSize + 1); _flags[ni] = 1;
+        _velY[idx] = (curSize + 1);
+      }
+    }
+  }
+
+  void _simLava(int x, int y, int idx) {
+    _life[idx]++;
+
+    // Slowly cools into stone over time
+    if (_life[idx] > 200 + _rng.nextInt(50)) {
+      _grid[idx] = El.stone;
+      _life[idx] = 0;
+      _flags[idx] = 1;
+      return;
+    }
+
+    // Check neighbor reactions
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        if (dx == 0 && dy == 0) continue;
+        final nx = x + dx;
+        final ny = y + dy;
+        if (!_inBounds(nx, ny)) continue;
+        final ni = ny * _gridW + nx;
+        final neighbor = _grid[ni];
+        // Lava + Water → Stone + Steam (explosive evaporation)
+        if (neighbor == El.water) {
+          _grid[idx] = El.stone;
+          _life[idx] = 0;
+          _flags[idx] = 1;
+          _grid[ni] = El.steam;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+          // Spawn 2-3 extra steam cells nearby (explosive evaporation)
+          final extraSteam = 2 + _rng.nextInt(2);
+          for (int s = 0; s < extraSteam; s++) {
+            final sx = x + _rng.nextInt(5) - 2;
+            final sy = y - _gravityDir * (1 + _rng.nextInt(2));
+            if (_inBounds(sx, sy) && _grid[sy * _gridW + sx] == El.empty) {
+              _grid[sy * _gridW + sx] = El.steam;
+              _life[sy * _gridW + sx] = 0;
+              _flags[sy * _gridW + sx] = 1;
+            }
+          }
+          return;
+        }
+        // Lava + Ice → Stone + Water
+        if (neighbor == El.ice) {
+          _grid[idx] = El.stone;
+          _life[idx] = 0;
+          _flags[idx] = 1;
+          _grid[ni] = El.water;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+          return;
+        }
+        // Ignite flammables
+        if ((neighbor == El.plant || neighbor == El.seed ||
+             neighbor == El.oil || neighbor == El.wood) &&
+            _rng.nextInt(2) == 0) {
+          _grid[ni] = El.fire;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+        }
+        // Melt snow
+        if (neighbor == El.snow) {
+          _grid[ni] = El.water;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+        }
+      }
+    }
+
+    // Viscous flow — only every 2nd frame
+    if (_frameCount.isOdd) return;
+
+    final by = y + _gravityDir;
+    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
+      _swap(idx, by * _gridW + x);
+      return;
+    }
+
+    final dl = _rng.nextBool();
+    final x1 = dl ? x - 1 : x + 1;
+    final x2 = dl ? x + 1 : x - 1;
+    if (_inBounds(x1, by) && _grid[by * _gridW + x1] == El.empty) {
+      _swap(idx, by * _gridW + x1);
+      return;
+    }
+    if (_inBounds(x2, by) && _grid[by * _gridW + x2] == El.empty) {
+      _swap(idx, by * _gridW + x2);
+      return;
+    }
+
+    // Slow sideways flow
+    if (_inBounds(x1, y) && _grid[y * _gridW + x1] == El.empty) {
+      _swap(idx, y * _gridW + x1);
+      return;
+    }
+    if (_inBounds(x2, y) && _grid[y * _gridW + x2] == El.empty) {
+      _swap(idx, y * _gridW + x2);
+    }
+  }
+
+  void _simSnow(int x, int y, int idx) {
+    // Melt near fire or lava (slower at night — 50% chance to resist)
+    if (_checkAdjacent(x, y, El.fire) || _checkAdjacent(x, y, El.lava)) {
+      if (!_isNight || _rng.nextBool()) {
+        _grid[idx] = El.water;
+        _life[idx] = 0;
+        _flags[idx] = 1;
+        return;
+      }
+    }
+
+    // Freeze adjacent water into ice (rarely)
+    if (_rng.nextInt(30) == 0) {
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          if (dx == 0 && dy == 0) continue;
+          final nx = x + dx;
+          final ny = y + dy;
+          if (_inBounds(nx, ny) && _grid[ny * _gridW + nx] == El.water) {
+            _grid[ny * _gridW + nx] = El.ice;
+            _life[ny * _gridW + nx] = 0;
+            _flags[ny * _gridW + nx] = 1;
+            break;
+          }
+        }
+      }
+    }
+
+    // Compression: 3+ snow "above" (opposite to gravity) → become ice
+    final ug = -_gravityDir;
+    int snowAbove = 0;
+    for (int d = 1; d <= 4; d++) {
+      final cy = y + ug * d;
+      if (!_inBounds(x, cy)) break;
+      if (_grid[cy * _gridW + x] == El.snow) {
+        snowAbove++;
+      } else {
+        break;
+      }
+    }
+    if (snowAbove >= 3) {
+      _grid[idx] = El.ice;
+      _life[idx] = 0;
+      _flags[idx] = 1;
+      return;
+    }
+
+    // Fall slowly (every 2nd frame), spread wider than sand
+    if (_frameCount.isOdd) return;
+
+    final by = y + _gravityDir;
+    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
+      _swap(idx, by * _gridW + x);
+      return;
+    }
+
+    // Spread wider — try 2 cells to each side
+    final dl = _rng.nextBool();
+    for (int d = 1; d <= 2; d++) {
+      final sx1 = dl ? x - d : x + d;
+      final sx2 = dl ? x + d : x - d;
+      if (_inBounds(sx1, by) && _grid[by * _gridW + sx1] == El.empty) {
+        _swap(idx, by * _gridW + sx1);
+        return;
+      }
+      if (_inBounds(sx2, by) && _grid[by * _gridW + sx2] == El.empty) {
+        _swap(idx, by * _gridW + sx2);
+        return;
+      }
+    }
+  }
+
+  void _simWood(int x, int y, int idx) {
+    // Wood is static — no gravity (unless waterlogged).
+    // _life[idx]: 0 = dry, 1..40 = burning, velY used as waterlog counter (0..3)
+    // _velY[idx]: waterlog level (0=dry, 1-3=absorbing, 3=waterlogged)
+
+    // If life > 0, wood is burning (set by fire contact)
+    if (_life[idx] > 0) {
+      _life[idx]++;
+      // Spread fire to adjacent wood (15% chance)
+      if (_rng.nextInt(100) < 15) {
+        for (int dy = -1; dy <= 1; dy++) {
+          for (int dx = -1; dx <= 1; dx++) {
+            if (dx == 0 && dy == 0) continue;
+            final nx = x + dx;
+            final ny = y + dy;
+            if (!_inBounds(nx, ny)) continue;
+            final ni = ny * _gridW + nx;
+            if (_grid[ni] == El.wood && _life[ni] == 0) {
+              _life[ni] = 1; // ignite neighbor
+              break;
+            }
+          }
+        }
+      }
+      // Burn out after ~40 frames → ash (smoke rises from burning)
+      if (_life[idx] > 40 + _rng.nextInt(20)) {
+        _grid[idx] = El.ash;
+        _life[idx] = 0;
+        _velY[idx] = 0;
+        _flags[idx] = 1;
+        // Spawn smoke above
+        final uy = y - _gravityDir;
+        if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
+          _grid[uy * _gridW + x] = El.smoke;
+          _life[uy * _gridW + x] = 0;
+          _flags[uy * _gridW + x] = 1;
+        }
+      }
+      return;
+    }
+
+    // Waterlogging: absorb adjacent water slowly
+    if (_checkAdjacent(x, y, El.water) && _velY[idx] < 3) {
+      if (_rng.nextInt(30) == 0) {
+        _velY[idx] = (_velY[idx] + 1).clamp(0, 3).toInt();
+        // Remove one adjacent water cell
+        _removeOneAdjacent(x, y, El.water);
+      }
+    }
+
+    // Waterlogged wood sinks through water
+    if (_velY[idx] >= 3) {
+      final by = y + _gravityDir;
+      if (_inBounds(x, by)) {
+        final bi = by * _gridW + x;
+        if (_grid[bi] == El.water) {
+          _grid[idx] = El.water;
+          _life[idx] = 0;
+          _grid[bi] = El.wood;
+          _life[bi] = 0;
+          _velY[bi] = 3; // keep waterlogged
+          _flags[idx] = 1;
+          _flags[bi] = 1;
+          return;
+        }
+      }
+    }
+
+    // Check if adjacent fire should ignite this wood
+    // Waterlogged wood is harder to ignite (1 in 5 chance vs always)
+    if (_checkAdjacent(x, y, El.fire) || _checkAdjacent(x, y, El.lava)) {
+      if (_velY[idx] < 3 || _rng.nextInt(5) == 0) {
+        _life[idx] = 1; // start burning
+        _velY[idx] = 0; // dry out when burning
+      }
+    }
+  }
+
+  void _simMetal(int x, int y, int idx) {
+    // Skip if electrified (visual only, decays in _getElementColor)
+    if (_life[idx] >= 200) return;
+
+    // Rust: metal touching water slowly corrodes
+    if (_checkAdjacent(x, y, El.water)) {
+      _life[idx]++; // rust counter
+      // After ~120 frames of water contact → crumble to dirt
+      if (_life[idx] > 120) {
+        _grid[idx] = El.dirt;
+        _life[idx] = 0;
+        _flags[idx] = 1;
+        return;
+      }
+    }
+
+    // Condensation: empty cell adjacent to metal+water → water (rare)
+    if (_rng.nextInt(100) == 0) {
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          if (dx == 0 && dy == 0) continue;
+          final nx = x + dx;
+          final ny = y + dy;
+          if (!_inBounds(nx, ny)) continue;
+          final ni = ny * _gridW + nx;
+          if (_grid[ni] == El.empty && _checkAdjacent(nx, ny, El.water)) {
+            _grid[ni] = El.water;
+            _life[ni] = 0;
+            _flags[ni] = 1;
+            return;
+          }
+        }
+      }
+    }
+  }
+
+  /// Flood-fill connected water body and electrify all cells.
+  /// Destroys ants and plants in the electrified water.
+  void _electrifyWater(int startX, int startY) {
+    final visited = <int>{};
+    final queue = <int>[startY * _gridW + startX];
+    int count = 0;
+    while (queue.isNotEmpty && count < 50) {
+      final curIdx = queue.removeLast();
+      if (visited.contains(curIdx)) continue;
+      visited.add(curIdx);
+      if (_grid[curIdx] != El.water) continue;
+      _life[curIdx] = 200; // electrified visual
+      _flags[curIdx] = 1;
+      count++;
+      final cx = curIdx % _gridW;
+      final cy = curIdx ~/ _gridW;
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          if (dx == 0 && dy == 0) continue;
+          final nx = cx + dx;
+          final ny = cy + dy;
+          if (!_inBounds(nx, ny)) continue;
+          final ni = ny * _gridW + nx;
+          if (_grid[ni] == El.water && !visited.contains(ni)) {
+            queue.add(ni);
+          } else if (_grid[ni] == El.ant || _grid[ni] == El.plant || _grid[ni] == El.seed) {
+            // Destroy life in electrified water
+            _grid[ni] = El.empty;
+            _life[ni] = 0;
+            _flags[ni] = 1;
+          }
+        }
+      }
+    }
+    _lightningFlashFrames = 5;
+  }
+
+  /// Flood-fill connected metal and electrify neighbors.
+  void _conductMetal(int startX, int startY) {
+    final visited = <int>{};
+    final queue = <int>[startY * _gridW + startX];
+    int sparks = 0;
+    while (queue.isNotEmpty && sparks < 30) {
+      final curIdx = queue.removeLast();
+      if (visited.contains(curIdx)) continue;
+      visited.add(curIdx);
+      if (_grid[curIdx] != El.metal) continue;
+      _life[curIdx] = 200; // electrified visual
+      final cx = curIdx % _gridW;
+      final cy = curIdx ~/ _gridW;
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          if (dx == 0 && dy == 0) continue;
+          final nx = cx + dx;
+          final ny = cy + dy;
+          if (!_inBounds(nx, ny)) continue;
+          final ni = ny * _gridW + nx;
+          if (_grid[ni] == El.metal && !visited.contains(ni)) {
+            queue.add(ni);
+          } else if (_grid[ni] == El.water) {
+            _life[ni] = 200; // electrify water
+            _flags[ni] = 1;
+            sparks++;
+          } else if (_grid[ni] == El.tnt) {
+            _pendingExplosions.add(_Explosion(nx, ny, _calculateTNTRadius(nx, ny)));
+            sparks++;
+          } else if (_rng.nextInt(100) < 30) {
+            // Spark reactions (30% chance)
+            if (_grid[ni] == El.sand) {
+              _grid[ni] = El.glass;
+              _life[ni] = 0;
+              _flags[ni] = 1;
+              sparks++;
+            } else if (_grid[ni] == El.ice) {
+              _grid[ni] = El.water;
+              _life[ni] = 150;
+              _flags[ni] = 1;
+              sparks++;
+            } else if (_grid[ni] == El.plant || _grid[ni] == El.seed ||
+                       _grid[ni] == El.oil || _grid[ni] == El.wood) {
+              _grid[ni] = El.fire;
+              _life[ni] = 0;
+              _flags[ni] = 1;
+              sparks++;
+            }
+          }
+        }
+      }
+    }
+    _lightningFlashFrames = 3;
+  }
+
+  void _simSmoke(int x, int y, int idx) {
+    _life[idx]++;
+    if (_life[idx] > 60) {
+      _grid[idx] = El.empty;
+      _life[idx] = 0;
+      return;
+    }
+
+    // Rise opposite to gravity with random drift
+    final uy = y - _gravityDir;
+    if (_inBounds(x, uy)) {
+      final drift = _rng.nextInt(3) - 1;
+      final nx = x + drift;
+      if (_inBounds(nx, uy) && _grid[uy * _gridW + nx] == El.empty) {
+        _swap(idx, uy * _gridW + nx);
+        return;
+      }
+      if (_grid[uy * _gridW + x] == El.empty) {
+        _swap(idx, uy * _gridW + x);
+        return;
+      }
+    }
+    // Drift sideways
+    final side = _rng.nextBool() ? x - 1 : x + 1;
+    if (_inBounds(side, y) && _grid[y * _gridW + side] == El.empty) {
+      _swap(idx, y * _gridW + side);
+    }
+  }
+
+  void _simBubble(int x, int y, int idx) {
+    _life[idx]++;
+
+    // Check if in water
+    final inWater = _checkAdjacent(x, y, El.water);
+    final uy = y - _gravityDir; // "up" = opposite gravity
+
+    if (inWater) {
+      // Rise through water every 3 frames
+      if (_life[idx] % 3 == 0 && _inBounds(x, uy)) {
+        final ai = uy * _gridW + x;
+        if (_grid[ai] == El.water) {
+          _grid[ai] = El.bubble;
+          _life[ai] = _life[idx];
+          _grid[idx] = El.water;
+          _life[idx] = 0;
+          _flags[ai] = 1;
+          _flags[idx] = 1;
+          return;
+        }
+        // Reached surface — pop!
+        if (_grid[ai] == El.empty) {
+          _grid[idx] = El.empty;
+          _life[idx] = 0;
+          for (int i = 0; i < 2 + _rng.nextInt(2); i++) {
+            final dx = _rng.nextInt(5) - 2;
+            final dy = -_gravityDir * (_rng.nextInt(3) + 1);
+            final nx = x + dx;
+            final ny = y + dy;
+            if (_inBounds(nx, ny) && _grid[ny * _gridW + nx] == El.empty) {
+              _grid[ny * _gridW + nx] = El.water;
+              _life[ny * _gridW + nx] = 0;
+              _flags[ny * _gridW + nx] = 1;
+            }
+          }
+          return;
+        }
+      }
+    } else {
+      if (_life[idx] > 30) {
+        _grid[idx] = El.empty;
+        _life[idx] = 0;
+      }
+    }
+  }
+
+  void _simAsh(int x, int y, int idx) {
+    _life[idx]++;
+    final g = _gravityDir;
+    final by = y + g;
+
+    // ── Interaction: ash on dirt = fertilizer ──────────────────────────
+    if (_checkAdjacent(x, y, El.dirt)) {
+      // Find the adjacent dirt cell and increase its moisture
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          if (dx == 0 && dy == 0) continue;
+          final nx = x + dx;
+          final ny = y + dy;
+          if (!_inBounds(nx, ny)) continue;
+          final ni = ny * _gridW + nx;
+          if (_grid[ni] == El.dirt) {
+            _life[ni] = (_life[ni] + 1).clamp(0, 4); // increase moisture
+            _grid[idx] = El.empty; // ash consumed
+            _life[idx] = 0;
+            _flags[idx] = 1;
+            return;
+          }
+        }
+      }
+    }
+
+    // ── Interaction: ash in water ──────────────────────────────────────
+    final inWater = _checkAdjacent(x, y, El.water);
+    if (inWater) {
+      // _velX[idx] tracks water contact frames for ash
+      _velX[idx] = (_velX[idx] + 1).clamp(0, 127).toInt();
+
+      // Count surrounding water cells to estimate water body size
+      int waterCount = 0;
+      for (int dy2 = -3; dy2 <= 3; dy2++) {
+        for (int dx2 = -3; dx2 <= 3; dx2++) {
+          final nx = x + dx2;
+          final ny = y + dy2;
+          if (_inBounds(nx, ny) && _grid[ny * _gridW + nx] == El.water) {
+            waterCount++;
+          }
+        }
+      }
+
+      final isLargeBody = waterCount > 20;
+
+      if (isLargeBody) {
+        // Large water body: dissipate after ~15 frames
+        if (_velX[idx] > 15) {
+          _grid[idx] = El.empty;
+          _life[idx] = 0;
+          _velX[idx] = 0;
+          return;
+        }
+      } else {
+        // Small water body: float on surface ~30 frames, then sink slowly
+        if (_velX[idx] < 30) {
+          // Float — don't fall through water
+          // Drift sideways
+          if (_rng.nextInt(3) == 0) {
+            final side = _rng.nextBool() ? x - 1 : x + 1;
+            if (_inBounds(side, y) && _grid[y * _gridW + side] == El.empty) {
+              _swap(idx, y * _gridW + side);
+            }
+          }
+          return;
+        }
+        // After floating, sink slowly (1 cell per 3 frames)
+        if (_life[idx] % 3 == 0 && _inBounds(x, by)) {
+          final bi = by * _gridW + x;
+          if (_grid[bi] == El.water) {
+            _grid[idx] = El.water;
+            _grid[bi] = El.ash;
+            _life[bi] = _life[idx];
+            _velX[bi] = _velX[idx];
+            _life[idx] = 0;
+            _velX[idx] = 0;
+            _flags[idx] = 1;
+            _flags[bi] = 1;
+            return;
+          }
+        }
+      }
+      return;
+    } else {
+      _velX[idx] = 0; // reset water contact timer when not in water
+    }
+
+    // ── Movement: very slow fall (1 cell per ~3 frames) ───────────────
+    if (_life[idx] % 3 != 0) return;
+
+    if (_inBounds(x, by)) {
+      final below = by * _gridW + x;
+      if (_grid[below] == El.empty) {
+        _swap(idx, below);
+        return;
+      }
+      // Float on water surface
+      if (_grid[below] == El.water) {
+        // Stay on top — don't fall through (handled above when in water)
+        return;
+      }
+    }
+
+    // Diagonal drift (wider than sand due to lightness)
+    final dl = _rng.nextBool();
+    final x1 = dl ? x - 1 : x + 1;
+    final x2 = dl ? x + 1 : x - 1;
+    if (_inBounds(x1, by) && _grid[by * _gridW + x1] == El.empty) {
+      _swap(idx, by * _gridW + x1);
+      return;
+    }
+    if (_inBounds(x2, by) && _grid[by * _gridW + x2] == El.empty) {
+      _swap(idx, by * _gridW + x2);
+      return;
+    }
+
+    // Extra sideways drift (ash is very floaty)
+    if (_rng.nextInt(3) == 0) {
+      final sx = _rng.nextBool() ? x - 1 : x + 1;
+      if (_inBounds(sx, y) && _grid[y * _gridW + sx] == El.empty) {
+        _swap(idx, y * _gridW + sx);
       }
     }
   }
@@ -650,16 +2041,17 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   void _simRainbow(int x, int y, int idx) {
-    if (_rng.nextInt(3) == 0 && y > 0) {
-      final above = (y - 1) * _gridW + x;
-      if (_grid[above] == El.empty) {
-        _swap(idx, above);
+    final uy = y - _gravityDir;
+    if (_rng.nextInt(3) == 0 && _inBounds(x, uy)) {
+      if (_grid[uy * _gridW + x] == El.empty) {
+        _swap(idx, uy * _gridW + x);
+        _life[idx] = (_life[idx] + 1) % 255;
         return;
       }
       final side = _rng.nextBool() ? x - 1 : x + 1;
-      if (_inBounds(side, y - 1) &&
-          _grid[(y - 1) * _gridW + side] == El.empty) {
-        _swap(idx, (y - 1) * _gridW + side);
+      if (_inBounds(side, uy) &&
+          _grid[uy * _gridW + side] == El.empty) {
+        _swap(idx, uy * _gridW + side);
       }
     }
     _life[idx] = (_life[idx] + 1) % 255;
@@ -672,24 +2064,37 @@ class _ElementLabGameState extends State<ElementLabGame>
 
   void _simSteam(int x, int y, int idx) {
     _life[idx]++;
-    if (y <= 2 || _life[idx] > 80 + _rng.nextInt(40)) {
-      _grid[idx] = _rng.nextInt(3) == 0 ? El.water : El.empty;
+    final uy = y - _gravityDir;
+    final atEdge = _gravityDir == 1 ? y <= 2 : y >= _gridH - 3;
+    // Steam condenses faster at night (half lifetime)
+    final steamLife = _isNight ? 40 + _rng.nextInt(20) : 80 + _rng.nextInt(40);
+    if (atEdge || _life[idx] > steamLife) {
+      // At night, steam is more likely to condense back to water
+      final waterChance = _isNight ? 2 : 3;
+      _grid[idx] = _rng.nextInt(waterChance) == 0 ? El.water : El.empty;
       _life[idx] = 0;
       _flags[idx] = 1;
       return;
     }
 
-    if (y > 0) {
+    // Condensation: steam touching water → back to water (night: 2x faster)
+    final condenseChance = _isNight ? 15 : 30;
+    if (_rng.nextInt(condenseChance) == 0 && _checkAdjacent(x, y, El.water)) {
+      _grid[idx] = El.water;
+      _life[idx] = 0;
+      _flags[idx] = 1;
+      return;
+    }
+
+    if (_inBounds(x, uy)) {
       final drift = _rng.nextInt(3) - 1;
       final nx = x + drift;
-      final ny = y - 1;
-      if (_inBounds(nx, ny) && _grid[ny * _gridW + nx] == El.empty) {
-        _swap(idx, ny * _gridW + nx);
+      if (_inBounds(nx, uy) && _grid[uy * _gridW + nx] == El.empty) {
+        _swap(idx, uy * _gridW + nx);
         return;
       }
-      final above = (y - 1) * _gridW + x;
-      if (_grid[above] == El.empty) {
-        _swap(idx, above);
+      if (_grid[uy * _gridW + x] == El.empty) {
+        _swap(idx, uy * _gridW + x);
         return;
       }
     }
@@ -709,11 +2114,37 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Check for dangers
+    // Drowning in water: ants struggle and slowly sink
     if (_checkAdjacent(x, y, El.water)) {
-      _grid[idx] = El.empty;
-      _life[idx] = 0;
-      return;
+      // Try to swim upward (opposite gravity)
+      final uy = y - _gravityDir;
+      if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.water && _rng.nextInt(3) == 0) {
+        _swap(idx, uy * _gridW + x);
+        return;
+      }
+      // Sink 1 cell every ~15 frames
+      _velY[idx] = (_velY[idx] + 1).toInt();
+      if (_velY[idx] >= 15) {
+        _velY[idx] = 0;
+        final by2 = y + _gravityDir;
+        if (_inBounds(x, by2) && _grid[by2 * _gridW + x] == El.water) {
+          _swap(idx, by2 * _gridW + x);
+          return;
+        }
+      }
+      // Drown after ~90 frames submerged
+      _life[idx]++;
+      if (_life[idx] > 90) {
+        _grid[idx] = El.empty;
+        _life[idx] = 0;
+        _velY[idx] = 0;
+        return;
+      }
+      return; // skip normal ant movement while in water
+    } else {
+      // Reset drowning counter when not touching water
+      if (_life[idx] > 0) _life[idx] = 0;
+      _velY[idx] = 0;
     }
     if (_checkAdjacent(x, y, El.fire)) {
       _life[idx] = 0;
@@ -735,8 +2166,10 @@ class _ElementLabGameState extends State<ElementLabGame>
     if (_velX[idx] == 0) _velX[idx] = _rng.nextBool() ? 1 : -1;
 
     // Apply gravity if no ground
-    if (y + 1 < _gridH && _grid[(y + 1) * _gridW + x] == El.empty) {
-      _swap(idx, (y + 1) * _gridW + x);
+    final by = y + _gravityDir;
+    final uy = y - _gravityDir;
+    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
+      _swap(idx, by * _gridW + x);
       return;
     }
 
@@ -757,16 +2190,16 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Try climbing 1 cell
-    if (_inBounds(nx, y - 1) && _grid[(y - 1) * _gridW + nx] == El.empty) {
-      _swap(idx, (y - 1) * _gridW + nx);
+    // Try climbing 1 cell (opposite to gravity)
+    if (_inBounds(nx, uy) && _grid[uy * _gridW + nx] == El.empty) {
+      _swap(idx, uy * _gridW + nx);
       return;
     }
 
     // Try climbing straight up (wall climb)
-    if (y > 0 && _grid[(y - 1) * _gridW + x] == El.empty) {
+    if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
       if (!_inBounds(nx, y) || _grid[y * _gridW + nx] != El.empty) {
-        _swap(idx, (y - 1) * _gridW + x);
+        _swap(idx, uy * _gridW + x);
         return;
       }
     }
@@ -788,19 +2221,20 @@ class _ElementLabGameState extends State<ElementLabGame>
     }
 
     // Fall through empty
-    final below = (y + 1) * _gridW + x;
-    if (y + 1 < _gridH && _grid[below] == El.empty) {
-      _swap(idx, below);
+    final by = y + _gravityDir;
+    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
+      _swap(idx, by * _gridW + x);
       return;
     }
 
-    // Float on water: if sitting on water, swap (oil rises through water)
-    if (y + 1 < _gridH && _grid[below] == El.water) {
-      _grid[below] = El.oil;
-      _life[below] = _life[idx];
+    // Float on water: swap oil and water (oil rises through water)
+    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.water) {
+      final bi = by * _gridW + x;
+      _grid[bi] = El.oil;
+      _life[bi] = _life[idx];
       _grid[idx] = El.water;
       _life[idx] = 0;
-      _flags[below] = 1;
+      _flags[bi] = 1;
       _flags[idx] = 1;
       return;
     }
@@ -809,12 +2243,12 @@ class _ElementLabGameState extends State<ElementLabGame>
     final dl = _rng.nextBool();
     final x1 = dl ? x - 1 : x + 1;
     final x2 = dl ? x + 1 : x - 1;
-    if (_inBounds(x1, y + 1) && _grid[(y + 1) * _gridW + x1] == El.empty) {
-      _swap(idx, (y + 1) * _gridW + x1);
+    if (_inBounds(x1, by) && _grid[by * _gridW + x1] == El.empty) {
+      _swap(idx, by * _gridW + x1);
       return;
     }
-    if (_inBounds(x2, y + 1) && _grid[(y + 1) * _gridW + x2] == El.empty) {
-      _swap(idx, (y + 1) * _gridW + x2);
+    if (_inBounds(x2, by) && _grid[by * _gridW + x2] == El.empty) {
+      _swap(idx, by * _gridW + x2);
       return;
     }
 
@@ -881,9 +2315,24 @@ class _ElementLabGameState extends State<ElementLabGame>
           _flags[idx] = 1;
           return;
         }
-        // Dissolve plant
-        if (neighbor == El.plant && _rng.nextInt(3) == 0) {
+        // Dissolve plant/seed
+        if ((neighbor == El.plant || neighbor == El.seed) && _rng.nextInt(3) == 0) {
           _grid[ni] = El.empty;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+        }
+        // Dissolve wood slowly
+        if (neighbor == El.wood && _rng.nextInt(12) == 0) {
+          _grid[ni] = El.empty;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+          _grid[idx] = El.empty;
+          _life[idx] = 0;
+          return;
+        }
+        // Acid in water generates bubbles
+        if (neighbor == El.water && _rng.nextInt(20) == 0) {
+          _grid[ni] = El.bubble;
           _life[ni] = 0;
           _flags[ni] = 1;
         }
@@ -891,21 +2340,21 @@ class _ElementLabGameState extends State<ElementLabGame>
     }
 
     // Flow like water
-    final below = (y + 1) * _gridW + x;
-    if (y + 1 < _gridH && _grid[below] == El.empty) {
-      _swap(idx, below);
+    final by = y + _gravityDir;
+    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
+      _swap(idx, by * _gridW + x);
       return;
     }
 
     final dl = _rng.nextBool();
     final x1 = dl ? x - 1 : x + 1;
     final x2 = dl ? x + 1 : x - 1;
-    if (_inBounds(x1, y + 1) && _grid[(y + 1) * _gridW + x1] == El.empty) {
-      _swap(idx, (y + 1) * _gridW + x1);
+    if (_inBounds(x1, by) && _grid[by * _gridW + x1] == El.empty) {
+      _swap(idx, by * _gridW + x1);
       return;
     }
-    if (_inBounds(x2, y + 1) && _grid[(y + 1) * _gridW + x2] == El.empty) {
-      _swap(idx, (y + 1) * _gridW + x2);
+    if (_inBounds(x2, by) && _grid[by * _gridW + x2] == El.empty) {
+      _swap(idx, by * _gridW + x2);
       return;
     }
 
@@ -921,17 +2370,18 @@ class _ElementLabGameState extends State<ElementLabGame>
   // ── Helpers ─────────────────────────────────────────────────────────────
 
   void _fallGranular(int x, int y, int idx, int elType) {
-    if (y + 1 < _gridH) {
-      final below = (y + 1) * _gridW + x;
+    final by = y + _gravityDir;
+    if (_inBounds(x, by)) {
+      final below = by * _gridW + x;
       final belowEl = _grid[below];
       if (belowEl == El.empty) {
         _swap(idx, below);
         return;
       }
       // Sink through water
-      if (elType == El.sand && belowEl == El.water) {
+      if ((elType == El.sand || elType == El.dirt || elType == El.seed) && belowEl == El.water) {
         _grid[idx] = El.water;
-        _grid[below] = El.sand;
+        _grid[below] = elType;
         _flags[idx] = 1;
         _flags[below] = 1;
         return;
@@ -941,15 +2391,15 @@ class _ElementLabGameState extends State<ElementLabGame>
     final goLeft = _rng.nextBool();
     final x1 = goLeft ? x - 1 : x + 1;
     final x2 = goLeft ? x + 1 : x - 1;
-    if (y + 1 < _gridH) {
-      if (_inBounds(x1, y + 1) &&
-          _grid[(y + 1) * _gridW + x1] == El.empty) {
-        _swap(idx, (y + 1) * _gridW + x1);
+    if (_inBounds(x, by)) {
+      if (_inBounds(x1, by) &&
+          _grid[by * _gridW + x1] == El.empty) {
+        _swap(idx, by * _gridW + x1);
         return;
       }
-      if (_inBounds(x2, y + 1) &&
-          _grid[(y + 1) * _gridW + x2] == El.empty) {
-        _swap(idx, (y + 1) * _gridW + x2);
+      if (_inBounds(x2, by) &&
+          _grid[by * _gridW + x2] == El.empty) {
+        _swap(idx, by * _gridW + x2);
         return;
       }
     }
@@ -1021,7 +2471,7 @@ class _ElementLabGameState extends State<ElementLabGame>
           final ny = exp.y + dy;
           if (!_inBounds(nx, ny)) continue;
           final ni = ny * _gridW + nx;
-          if (_grid[ni] != El.stone && _grid[ni] != El.glass) {
+          if (_grid[ni] != El.stone && _grid[ni] != El.glass && _grid[ni] != El.metal) {
             _grid[ni] = El.empty;
             _life[ni] = 0;
           }
@@ -1049,37 +2499,70 @@ class _ElementLabGameState extends State<ElementLabGame>
 
   void _renderPixels() {
     final total = _gridW * _gridH;
+    final t = _dayNightT; // 0.0 = day, 1.0 = night
+
+    // Day background: RGB(10, 10, 26). Night: deep navy RGB(4, 4, 16).
+    final bgR = (10 - t * 6).round().clamp(0, 255);
+    final bgG = (10 - t * 6).round().clamp(0, 255);
+    final bgB = (26 - t * 10).round().clamp(0, 255);
+
+    // Night glow multiplier for fire/lava halos
+    final glowMul = 1.0 + t * 1.5; // 1.0 at day, 2.5 at night
+
+    // Star set for quick lookup
+    final starSet = t > 0.05 ? Set<int>.from(_starPositions) : <int>{};
+
     for (int i = 0; i < total; i++) {
       final el = _grid[i];
       final pi4 = i * 4;
       if (el == El.empty) {
-        // Check for fire glow from neighbors
+        // Check for fire/lava glow from neighbors
         final x = i % _gridW;
         final y = i ~/ _gridW;
-        int glowIntensity = 0;
+        int glowR = 0, glowG = 0;
         for (int dy = -2; dy <= 2; dy++) {
           for (int dx = -2; dx <= 2; dx++) {
             final nx = x + dx;
             final ny = y + dy;
             if (_inBounds(nx, ny)) {
               final ni = ny * _gridW + nx;
-              if (_grid[ni] == El.fire) {
+              final nel = _grid[ni];
+              if (nel == El.fire || nel == El.lava) {
                 final dist = dx.abs() + dy.abs();
-                glowIntensity += (3 - dist).clamp(0, 3) * 8;
+                final intensity = ((3 - dist).clamp(0, 3) * 8 * glowMul).round();
+                glowR += intensity;
+                if (nel == El.fire) glowG += (intensity * 0.3).round();
               }
             }
           }
         }
-        if (glowIntensity > 0) {
-          glowIntensity = glowIntensity.clamp(0, 60);
-          _pixels[pi4] = 10 + glowIntensity;
-          _pixels[pi4 + 1] = 10 + (glowIntensity ~/ 3);
-          _pixels[pi4 + 2] = 26;
+        if (glowR > 0) {
+          glowR = glowR.clamp(0, 120);
+          glowG = glowG.clamp(0, 40);
+          _pixels[pi4] = (bgR + glowR).clamp(0, 255);
+          _pixels[pi4 + 1] = (bgG + glowG).clamp(0, 255);
+          _pixels[pi4 + 2] = bgB;
           _pixels[pi4 + 3] = 255;
+        } else if (starSet.contains(i)) {
+          // Twinkling stars at night
+          final twinkle = ((_frameCount + i * 17) % 40);
+          if (twinkle < 6) {
+            final brightness = twinkle < 3 ? 200 : 140;
+            final starBright = (brightness * t).round();
+            _pixels[pi4] = (bgR + starBright).clamp(0, 255);
+            _pixels[pi4 + 1] = (bgG + starBright).clamp(0, 255);
+            _pixels[pi4 + 2] = (bgB + starBright).clamp(0, 255);
+            _pixels[pi4 + 3] = 255;
+          } else {
+            _pixels[pi4] = bgR;
+            _pixels[pi4 + 1] = bgG;
+            _pixels[pi4 + 2] = bgB;
+            _pixels[pi4 + 3] = 255;
+          }
         } else {
-          _pixels[pi4] = 10;
-          _pixels[pi4 + 1] = 10;
-          _pixels[pi4 + 2] = 26;
+          _pixels[pi4] = bgR;
+          _pixels[pi4 + 1] = bgG;
+          _pixels[pi4 + 2] = bgB;
           _pixels[pi4 + 3] = 255;
         }
         continue;
@@ -1087,10 +2570,54 @@ class _ElementLabGameState extends State<ElementLabGame>
 
       final c = _getElementColor(el, i);
 
-      _pixels[pi4] = (c.r * 255.0).round().clamp(0, 255);
-      _pixels[pi4 + 1] = (c.g * 255.0).round().clamp(0, 255);
-      _pixels[pi4 + 2] = (c.b * 255.0).round().clamp(0, 255);
-      _pixels[pi4 + 3] = (c.a * 255.0).round().clamp(0, 255);
+      int r = (c.r * 255.0).round().clamp(0, 255);
+      int g = (c.g * 255.0).round().clamp(0, 255);
+      int b = (c.b * 255.0).round().clamp(0, 255);
+      final int a = (c.a * 255.0).round().clamp(0, 255);
+
+      // Night lighting adjustments
+      if (t > 0.01) {
+        if (el == El.fire || el == El.lava) {
+          // Fire/lava glow brighter at night
+          final boost = (t * 30).round();
+          r = (r + boost).clamp(0, 255);
+          g = (g + (boost * 0.2).round()).clamp(0, 255);
+        } else if (el == El.lightning) {
+          // Lightning stays bright — no change
+        } else if (el == El.water) {
+          // Moonlight shimmer on water surface at night
+          final wx = i % _gridW;
+          final wy = i ~/ _gridW;
+          final isTop = wy > 0 && _grid[(wy - 1) * _gridW + wx] != El.water;
+          if (isTop && ((_frameCount + wx * 3) % 12 < 3)) {
+            final shimmer = (t * 50).round();
+            r = (r + shimmer).clamp(0, 255);
+            g = (g + shimmer).clamp(0, 255);
+            b = (b + shimmer).clamp(0, 255);
+          } else {
+            final dim = t * 0.15;
+            r = (r * (1.0 - dim)).round().clamp(0, 255);
+            g = (g * (1.0 - dim)).round().clamp(0, 255);
+          }
+        } else if (el == El.smoke) {
+          // Smoke more visible at night
+          final boost = (t * 20).round();
+          r = (r + boost).clamp(0, 255);
+          g = (g + boost).clamp(0, 255);
+          b = (b + boost).clamp(0, 255);
+        } else {
+          // General dimming for other elements
+          final dim = t * 0.2;
+          r = (r * (1.0 - dim)).round().clamp(0, 255);
+          g = (g * (1.0 - dim)).round().clamp(0, 255);
+          b = (b * (1.0 - dim)).round().clamp(0, 255);
+        }
+      }
+
+      _pixels[pi4] = r;
+      _pixels[pi4 + 1] = g;
+      _pixels[pi4 + 2] = b;
+      _pixels[pi4 + 3] = a;
     }
   }
 
@@ -1165,9 +2692,66 @@ class _ElementLabGameState extends State<ElementLabGame>
             ? const Color(0xFF333333)
             : const Color(0xFF111111);
 
+      case El.seed:
+        final v = ((idx % 5) * 4 + variation).clamp(0, 25);
+        return Color.fromARGB(255, (139 - v).clamp(100, 150), (115 - v).clamp(80, 130), (85 - v).clamp(50, 100));
+
+      case El.dirt:
+        // Moisture gradient: 0=dry sandy brown, 5=dark rich brown/muddy
+        final moisture = _life[idx].clamp(0, 5);
+        final mFrac = moisture / 5.0;
+        final v = ((idx % 5) * 5 + variation).clamp(0, 30);
+        // Dry: (139,105,20) → Moist: (80,55,15) (darker, richer)
+        final dr = (139 - mFrac * 59 - v).round().clamp(60, 150);
+        final dg = (105 - mFrac * 50 - v).round().clamp(40, 120);
+        final db = (20 + v - mFrac * 5).round().clamp(10, 50);
+        return Color.fromARGB(255, dr, dg, db);
+
       case El.plant:
+        final pType = _plantType(idx);
+        final pStage = _plantStage(idx);
+        // Dead plant: dark brown
+        if (pStage == kStDead) {
+          return Color.fromARGB(255, (80 + variation).clamp(60, 100), (50 + variation).clamp(30, 70), 20);
+        }
+        // Wilting: faded yellowish green
+        if (pStage == kStWilting) {
+          return Color.fromARGB(255, (120 + variation).clamp(100, 150), (130 + variation).clamp(110, 160), (40 + variation).clamp(20, 60));
+        }
         final shade = ((idx % 5) * 8 + variation).clamp(0, 50);
-        return Color.fromARGB(255, 20 + shade, 160 + shade, 20 + shade);
+        switch (pType) {
+          case kPlantGrass:
+            return Color.fromARGB(255, 30 + shade, 170 + shade ~/ 2, 30 + shade);
+          case kPlantFlower:
+            // Stem green, bloom uses position hash for color variety
+            if (pStage == kStMature) {
+              final hue = ((idx * 37) % 5);
+              const bloomColors = [Color(0xFFFF4488), Color(0xFFFFDD44), Color(0xFFFF88CC), Color(0xFF9944FF), Color(0xFF4488FF)];
+              return bloomColors[hue];
+            }
+            return Color.fromARGB(255, 20 + shade, 160 + shade, 20 + shade);
+          case kPlantTree:
+            // Trunk (growing) = brown, canopy (mature) = dark green
+            if (pStage == kStGrowing) {
+              return Color.fromARGB(255, (100 + variation).clamp(80, 120), (60 + variation).clamp(40, 80), (25 + variation).clamp(10, 40));
+            }
+            return Color.fromARGB(255, 15 + shade ~/ 2, 120 + shade, 15 + shade ~/ 2);
+          case kPlantMushroom:
+            // Cap (mature) = red/brown with white, stem = beige
+            if (pStage == kStMature) {
+              final spot = (idx * 13) % 7 == 0;
+              if (spot) return const Color(0xFFF0F0E0); // white spots
+              return Color.fromARGB(255, (180 + variation).clamp(160, 210), (50 + variation).clamp(30, 70), (30 + variation).clamp(10, 50));
+            }
+            return Color.fromARGB(255, (220 + variation).clamp(200, 240), (210 + variation).clamp(190, 230), (180 + variation).clamp(160, 200));
+          case kPlantVine:
+            // Green with leaf nodes every few cells
+            final isLeaf = _velY[idx] % 4 == 0;
+            if (isLeaf) return Color.fromARGB(255, 10 + shade, 180 + shade ~/ 2, 10 + shade);
+            return Color.fromARGB(255, 30 + shade, 140 + shade, 30 + shade);
+          default:
+            return Color.fromARGB(255, 20 + shade, 160 + shade, 20 + shade);
+        }
 
       case El.ice:
         return Color.fromARGB(255, (170 + variation).clamp(150, 200), (221 + variation).clamp(200, 240), 255);
@@ -1198,13 +2782,71 @@ class _ElementLabGameState extends State<ElementLabGame>
         final sparkle = (_frameCount + idx * 3) % 20 < 2 ? 30 : 0;
         return Color.fromARGB(200, (210 + variation + sparkle).clamp(180, 255), (225 + variation + sparkle).clamp(200, 255), 255);
 
+      case El.lava:
+        final flicker = (_frameCount + idx) % 6;
+        final bright = flicker < 3 ? 30 : 0;
+        return Color.fromARGB(255, (255 + variation).clamp(220, 255), (69 + bright + variation).clamp(40, 120), 0);
+
+      case El.snow:
+        final sparkle = (_frameCount + idx * 5) % 15 < 2 ? 15 : 0;
+        return Color.fromARGB(255, (240 + sparkle).clamp(230, 255), (240 + sparkle).clamp(230, 255), 255);
+
+      case El.wood:
+        // Burning wood — shifts to red/orange
+        if (_life[idx] > 0) {
+          final burnPhase = (_life[idx] + _frameCount) % 6;
+          final bright = burnPhase < 3 ? 40 : 0;
+          return Color.fromARGB(255, (200 + bright).clamp(180, 255), (80 + bright - _life[idx]).clamp(20, 120), 10);
+        }
+        // Grain pattern: alternate lighter/darker based on position
+        final wx = idx % _gridW;
+        final wy = idx ~/ _gridW;
+        final grain = (wx + wy * 3) % 5 < 2 ? 15 : 0;
+        // Waterlogged wood is darker (velY tracks waterlog level 0..3)
+        final waterlog = _velY[idx].clamp(0, 3) * 20;
+        return Color.fromARGB(255, (160 - grain - waterlog + variation).clamp(60, 180), (82 - grain - waterlog + variation).clamp(30, 110), (45 - grain - waterlog + variation).clamp(10, 70));
+
+      case El.metal:
+        // Electrified glow when _life >= 200
+        if (_life[idx] >= 200) {
+          _life[idx]--;
+          if (_life[idx] < 200) _life[idx] = 0;
+          return const Color(0xFFFFFF88);
+        }
+        // Rust: darken and shift to orange-brown based on life counter (0..120)
+        final rustLevel = _life[idx].clamp(0, 120);
+        if (rustLevel > 0) {
+          final rustFrac = rustLevel / 120.0;
+          // Shift from silver (168,168,176) toward rust-brown (139,90,43)
+          final r = (168 - rustFrac * 29 + variation).round().clamp(100, 200);
+          final g = (168 - rustFrac * 78 + variation).round().clamp(60, 200);
+          final b = (176 - rustFrac * 133 + variation).round().clamp(30, 210);
+          return Color.fromARGB(255, r, g, b);
+        }
+        final sheen = (_frameCount + idx * 2) % 12 < 2 ? 20 : 0;
+        return Color.fromARGB(255, (168 + sheen + variation).clamp(140, 200), (168 + sheen + variation).clamp(140, 200), (176 + sheen + variation).clamp(150, 210));
+
+      case El.smoke:
+        final fade = (60 - _life[idx]).clamp(0, 60);
+        final alpha = (fade * 3 + 60).clamp(60, 200);
+        return Color.fromARGB(alpha, (128 + variation).clamp(100, 160), (128 + variation).clamp(100, 160), (128 + variation).clamp(100, 160));
+
+      case El.bubble:
+        final bright = (_frameCount + idx) % 8 < 3 ? 30 : 0;
+        return Color.fromARGB(180, (173 + bright + variation).clamp(150, 220), (216 + bright + variation).clamp(190, 255), (230 + bright).clamp(210, 255));
+
+      case El.ash:
+        final v = ((idx % 7) * 3 + variation).clamp(0, 20);
+        // Semi-transparent feel — slightly varied grey
+        return Color.fromARGB(220, (176 - v).clamp(150, 200), (176 - v).clamp(150, 200), (180 - v).clamp(155, 205));
+
       default:
         return _baseColors[el.clamp(0, _baseColors.length - 1)];
     }
   }
 
   Future<void> _buildImage() async {
-    _frameImage?.dispose();
+    _frameImageNotifier.value?.dispose();
     final completer = Completer<ui.Image>();
     ui.decodeImageFromPixels(
       _pixels,
@@ -1213,8 +2855,10 @@ class _ElementLabGameState extends State<ElementLabGame>
       ui.PixelFormat.rgba8888,
       (image) => completer.complete(image),
     );
-    _frameImage = await completer.future;
-    if (mounted) setState(() {});
+    final newImage = await completer.future;
+    if (mounted) {
+      _frameImageNotifier.value = newImage;
+    }
   }
 
   // ── Drawing input ───────────────────────────────────────────────────────
@@ -1244,23 +2888,41 @@ class _ElementLabGameState extends State<ElementLabGame>
     if (_sessionExpired) return;
     _captureUndoSnapshot();
     _isDrawing = true;
-    _placeElement(details.localPosition);
+    if (_brushMode == 1) {
+      _lineStartX = ((details.localPosition.dx - _canvasLeft) / _cellSize).floor();
+      _lineStartY = ((details.localPosition.dy - _canvasTop) / _cellSize).floor();
+      _lineEndX = _lineStartX;
+      _lineEndY = _lineStartY;
+    } else {
+      _placeElement(details.localPosition);
+    }
   }
 
   void _handlePanUpdate(DragUpdateDetails details) {
     if (_sessionExpired) return;
     if (_isDrawing) {
-      _placeElement(details.localPosition);
+      if (_brushMode == 1) {
+        _lineEndX = ((details.localPosition.dx - _canvasLeft) / _cellSize).floor();
+        _lineEndY = ((details.localPosition.dy - _canvasTop) / _cellSize).floor();
+      } else {
+        _placeElement(details.localPosition);
+      }
     }
   }
 
   void _handlePanEnd(DragEndDetails details) {
+    if (_brushMode == 1 && _lineStartX >= 0) {
+      _drawLine(_lineStartX, _lineStartY, _lineEndX, _lineEndY);
+    }
     _isDrawing = false;
     _isCapturingStroke = false;
+    _lineStartX = -1;
+    _lineStartY = -1;
   }
 
   void _handleTapDown(TapDownDetails details) {
     if (_sessionExpired) return;
+    if (_showSeedPopup) setState(() => _showSeedPopup = false);
     _captureUndoSnapshot();
     _placeElement(details.localPosition);
     _isCapturingStroke = false;
@@ -1301,6 +2963,9 @@ class _ElementLabGameState extends State<ElementLabGame>
 
         if (radius > 1 && dx * dx + dy * dy > halfR * halfR + 1) continue;
 
+        // Spray mode: 40% chance per cell
+        if (_brushMode == 2 && _rng.nextInt(100) >= 40) continue;
+
         final ni = ny * _gridW + nx;
 
         if (_selectedElement == El.eraser) {
@@ -1315,7 +2980,59 @@ class _ElementLabGameState extends State<ElementLabGame>
 
         _grid[ni] = _selectedElement;
         _life[ni] = 0;
-        _velX[ni] = 0;
+        _velX[ni] = _selectedElement == El.seed ? _selectedSeedType : 0;
+        _velY[ni] = 0;
+      }
+    }
+  }
+
+  /// Bresenham line drawing from (x0,y0) to (x1,y1).
+  void _drawLine(int x0, int y0, int x1, int y1) {
+    int dx = (x1 - x0).abs();
+    int dy = -(y1 - y0).abs();
+    int sx = x0 < x1 ? 1 : -1;
+    int sy = y0 < y1 ? 1 : -1;
+    int err = dx + dy;
+
+    int cx = x0;
+    int cy = y0;
+
+    while (true) {
+      _placeAt(cx, cy);
+      if (cx == x1 && cy == y1) break;
+      final e2 = 2 * err;
+      if (e2 >= dy) {
+        err += dy;
+        cx += sx;
+      }
+      if (e2 <= dx) {
+        err += dx;
+        cy += sy;
+      }
+    }
+  }
+
+  /// Place element at a single grid cell (for line drawing).
+  void _placeAt(int gx, int gy) {
+    final halfR = _brushSize ~/ 2;
+    for (int dy = -halfR; dy <= halfR; dy++) {
+      for (int dx = -halfR; dx <= halfR; dx++) {
+        final nx = gx + dx;
+        final ny = gy + dy;
+        if (!_inBounds(nx, ny)) continue;
+        if (_brushSize > 1 && dx * dx + dy * dy > halfR * halfR + 1) continue;
+        final ni = ny * _gridW + nx;
+        if (_selectedElement == El.eraser) {
+          _grid[ni] = El.empty;
+          _life[ni] = 0;
+          _velX[ni] = 0;
+          _velY[ni] = 0;
+          continue;
+        }
+        if (_grid[ni] != El.empty && _selectedElement != El.lightning) continue;
+        _grid[ni] = _selectedElement;
+        _life[ni] = 0;
+        _velX[ni] = _selectedElement == El.seed ? _selectedSeedType : 0;
         _velY[ni] = 0;
       }
     }
@@ -1338,11 +3055,15 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   void _addMoreTime() {
-    final balance = widget.progressService.starCoins;
-    if (balance < kExtensionCost) return;
-    widget.progressService.spendStarCoins(kExtensionCost);
+    if (!widget.freePlay) {
+      final balance = widget.progressService.starCoins;
+      if (balance < kExtensionCost) return;
+      widget.progressService.spendStarCoins(kExtensionCost);
+    }
     setState(() {
-      _remainingSeconds += kExtensionDuration.inSeconds;
+      _remainingSeconds += widget.freePlay
+          ? const Duration(minutes: 999).inSeconds
+          : kExtensionDuration.inSeconds;
       _sessionExpired = false;
     });
   }
@@ -1368,29 +3089,34 @@ class _ElementLabGameState extends State<ElementLabGame>
       body: SafeArea(
         child: Stack(
           children: [
-            Column(
+            Transform.translate(
+              offset: _shakeOffset,
+              child: Column(
               children: [
-                _buildTopBar(),
+                RepaintBoundary(child: _buildTopBar()),
                 Expanded(
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      if (!_gridInitialized) {
-                        WidgetsBinding.instance.addPostFrameCallback((_) {
-                          _initGrid(constraints.maxWidth, constraints.maxHeight);
-                        });
-                        return const Center(
-                          child: CircularProgressIndicator(
-                            color: AppColors.electricBlue,
-                          ),
-                        );
-                      }
-                      return _buildCanvas(constraints);
-                    },
+                  child: RepaintBoundary(
+                    child: LayoutBuilder(
+                      builder: (context, constraints) {
+                        if (!_gridInitialized) {
+                          WidgetsBinding.instance.addPostFrameCallback((_) {
+                            _initGrid(constraints.maxWidth, constraints.maxHeight);
+                          });
+                          return const Center(
+                            child: CircularProgressIndicator(
+                              color: AppColors.electricBlue,
+                            ),
+                          );
+                        }
+                        return _buildCanvas(constraints);
+                      },
+                    ),
                   ),
                 ),
-                _buildPalette(),
-                _buildBottomBar(),
+                RepaintBoundary(child: _buildPalette()),
+                RepaintBoundary(child: _buildBottomBar()),
               ],
+            ),
             ),
             // Time warning overlay
             if (_showTimeWarning) _buildTimeWarningOverlay(),
@@ -1445,6 +3171,31 @@ class _ElementLabGameState extends State<ElementLabGame>
               iconSize: 22,
               padding: EdgeInsets.zero,
               tooltip: _isMuted ? 'Sound on' : 'Sound off',
+            ),
+          ),
+          // Day/Night toggle
+          SizedBox(
+            width: 40,
+            height: 40,
+            child: IconButton(
+              onPressed: _toggleDayNight,
+              icon: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                transitionBuilder: (child, animation) => RotationTransition(
+                  turns: Tween(begin: 0.0, end: 1.0).animate(animation),
+                  child: FadeTransition(opacity: animation, child: child),
+                ),
+                child: Icon(
+                  _isNight ? Icons.nightlight_round : Icons.wb_sunny_rounded,
+                  key: ValueKey(_isNight),
+                  color: _isNight
+                      ? const Color(0xFF8888CC)
+                      : const Color(0xFFFFAA33),
+                ),
+              ),
+              iconSize: 22,
+              padding: EdgeInsets.zero,
+              tooltip: _isNight ? 'Switch to day' : 'Switch to night',
             ),
           ),
           const Spacer(),
@@ -1532,24 +3283,29 @@ class _ElementLabGameState extends State<ElementLabGame>
         color: AppColors.background,
         width: constraints.maxWidth,
         height: constraints.maxHeight,
-        child: CustomPaint(
-          painter: _GridPainter(
-            image: _frameImage,
-            canvasLeft: _canvasLeft,
-            canvasTop: _canvasTop,
-            canvasPixelW: _canvasPixelW,
-            canvasPixelH: _canvasPixelH,
-            lightningFlash: _lightningFlashFrames > 0,
-          ),
-          size: Size(constraints.maxWidth, constraints.maxHeight),
+        child: ValueListenableBuilder<ui.Image?>(
+          valueListenable: _frameImageNotifier,
+          builder: (context, frameImage, _) {
+            return CustomPaint(
+              painter: _GridPainter(
+                image: frameImage,
+                canvasLeft: _canvasLeft,
+                canvasTop: _canvasTop,
+                canvasPixelW: _canvasPixelW,
+                canvasPixelH: _canvasPixelH,
+                lightningFlash: _lightningFlashFrames > 0,
+              ),
+              size: Size(constraints.maxWidth, constraints.maxHeight),
+            );
+          },
         ),
       ),
     );
   }
 
   Widget _buildPalette() {
+    final tabElements = _tabElements[_selectedTab];
     return Container(
-      height: 72,
       decoration: BoxDecoration(
         color: AppColors.surface,
         border: Border(
@@ -1558,14 +3314,70 @@ class _ElementLabGameState extends State<ElementLabGame>
           ),
         ),
       ),
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-        itemCount: El.count + 1, // +1 for eraser
-        itemBuilder: (context, index) {
-          if (index == 0) return _buildEraserChip();
-          return _buildElementChip(index); // index 1..15 maps to El types 1..15
-        },
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Tab bar
+          SizedBox(
+            height: 32,
+            child: Row(
+              children: [
+                for (int i = 0; i < _tabIcons.length; i++)
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () {
+                        setState(() => _selectedTab = i);
+                        Haptics.tap();
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: _selectedTab == i
+                              ? AppColors.electricBlue.withValues(alpha: 0.15)
+                              : Colors.transparent,
+                          border: Border(
+                            bottom: BorderSide(
+                              color: _selectedTab == i
+                                  ? AppColors.electricBlue
+                                  : Colors.transparent,
+                              width: 2,
+                            ),
+                          ),
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _tabIcons[i],
+                              size: 16,
+                              color: _selectedTab == i
+                                  ? AppColors.electricBlue
+                                  : AppColors.secondaryText,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          // Element chips for selected tab
+          SizedBox(
+            height: 60,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                for (final elType in tabElements)
+                  if (elType == El.eraser)
+                    _buildEraserChip()
+                  else if (elType == El.seed)
+                    _buildSeedChip()
+                  else
+                    _buildElementChip(elType),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -1701,6 +3513,132 @@ class _ElementLabGameState extends State<ElementLabGame>
     );
   }
 
+  bool _showSeedPopup = false;
+
+  Widget _buildSeedChip() {
+    final isSelected = _selectedElement == El.seed;
+    final color = _baseColors[El.seed];
+    const seedNames = ['', 'Grass', 'Flower', 'Tree', 'Shroom', 'Vine'];
+    const seedColors = [
+      Colors.transparent,
+      Color(0xFF33CC33), // grass
+      Color(0xFFFF88CC), // flower
+      Color(0xFF8B6914), // tree
+      Color(0xFFCC4444), // mushroom
+      Color(0xFF33AA33), // vine
+    ];
+
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          _selectedElement = El.seed;
+          _showSeedPopup = !_showSeedPopup;
+        });
+        Haptics.tap();
+        _speakElementName(El.seed);
+      },
+      onLongPress: () {
+        setState(() { _showElementInfo = true; _infoElement = El.seed; });
+        Haptics.tap();
+      },
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            decoration: BoxDecoration(
+              color: isSelected ? color.withValues(alpha: 0.3) : AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isSelected ? color : AppColors.border,
+                width: isSelected ? 2 : 1,
+              ),
+              boxShadow: isSelected ? [BoxShadow(color: color.withValues(alpha: 0.4), blurRadius: 8, spreadRadius: 1)] : null,
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 24, height: 24,
+                  decoration: BoxDecoration(
+                    color: seedColors[_selectedSeedType.clamp(1, 5)],
+                    shape: BoxShape.circle,
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
+                  ),
+                  child: const Icon(Icons.eco_rounded, size: 14, color: Colors.white),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  seedNames[_selectedSeedType.clamp(1, 5)],
+                  style: AppFonts.fredoka(fontSize: 9, fontWeight: FontWeight.w500,
+                    color: isSelected ? color : AppColors.secondaryText),
+                ),
+              ],
+            ),
+          ),
+          // Seed type popup
+          if (_showSeedPopup && isSelected)
+            Positioned(
+              bottom: 64,
+              left: -40,
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.electricBlue.withValues(alpha: 0.4), width: 1.5),
+                  boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.3), blurRadius: 12, spreadRadius: 2)],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    for (int st = 1; st <= 5; st++)
+                      GestureDetector(
+                        onTap: () {
+                          setState(() { _selectedSeedType = st; _showSeedPopup = false; });
+                          Haptics.tap();
+                        },
+                        child: Container(
+                          width: 40, height: 48,
+                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          decoration: BoxDecoration(
+                            color: _selectedSeedType == st
+                                ? seedColors[st].withValues(alpha: 0.25)
+                                : AppColors.surfaceVariant,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                              color: _selectedSeedType == st ? seedColors[st] : AppColors.border,
+                              width: _selectedSeedType == st ? 2 : 1,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              CustomPaint(
+                                size: const Size(24, 24),
+                                painter: _SeedIconPainter(st),
+                              ),
+                              Text(
+                                seedNames[st],
+                                style: AppFonts.fredoka(fontSize: 7, fontWeight: FontWeight.w500,
+                                  color: _selectedSeedType == st ? seedColors[st] : AppColors.secondaryText),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildBottomBar() {
     return Container(
       height: 44,
@@ -1756,6 +3694,122 @@ class _ElementLabGameState extends State<ElementLabGame>
                 ),
               ),
             ),
+          const SizedBox(width: 6),
+          // Brush mode toggles
+          for (final entry in const [
+            [0, Icons.circle, 'Circle'],
+            [1, Icons.horizontal_rule_rounded, 'Line'],
+            [2, Icons.grain_rounded, 'Spray'],
+          ])
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 1),
+              child: GestureDetector(
+                onTap: () {
+                  setState(() => _brushMode = entry[0] as int);
+                  Haptics.tap();
+                },
+                child: Container(
+                  width: 26,
+                  height: 26,
+                  decoration: BoxDecoration(
+                    color: _brushMode == entry[0]
+                        ? AppColors.electricBlue.withValues(alpha: 0.2)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: _brushMode == entry[0]
+                          ? AppColors.electricBlue
+                          : AppColors.border.withValues(alpha: 0.3),
+                      width: _brushMode == entry[0] ? 2 : 1,
+                    ),
+                  ),
+                  child: Icon(
+                    entry[1] as IconData,
+                    size: 14,
+                    color: _brushMode == entry[0]
+                        ? AppColors.electricBlue
+                        : AppColors.secondaryText,
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(width: 4),
+          // Gravity flip
+          IconButton(
+            onPressed: () {
+              setState(() => _gravityDir = -_gravityDir);
+              Haptics.tap();
+            },
+            icon: Icon(
+              Icons.swap_vert_rounded,
+              color: _gravityDir == -1
+                  ? AppColors.starGold
+                  : AppColors.secondaryText,
+            ),
+            iconSize: 18,
+            tooltip: 'Flip gravity',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+          // Wind left
+          IconButton(
+            onPressed: () {
+              setState(() => _windForce = (_windForce - 1).clamp(-3, 3));
+              Haptics.tap();
+            },
+            icon: Icon(
+              Icons.arrow_back_rounded,
+              color: _windForce < 0
+                  ? AppColors.electricBlue
+                  : AppColors.secondaryText.withValues(alpha: 0.4),
+            ),
+            iconSize: 16,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            tooltip: 'Wind left',
+          ),
+          // Wind indicator
+          Text(
+            _windForce == 0 ? '0' : '${_windForce > 0 ? "+" : ""}$_windForce',
+            style: AppFonts.fredoka(
+              fontSize: 10,
+              fontWeight: FontWeight.w600,
+              color: _windForce != 0
+                  ? AppColors.electricBlue
+                  : AppColors.secondaryText.withValues(alpha: 0.5),
+            ),
+          ),
+          // Wind right
+          IconButton(
+            onPressed: () {
+              setState(() => _windForce = (_windForce + 1).clamp(-3, 3));
+              Haptics.tap();
+            },
+            icon: Icon(
+              Icons.arrow_forward_rounded,
+              color: _windForce > 0
+                  ? AppColors.electricBlue
+                  : AppColors.secondaryText.withValues(alpha: 0.4),
+            ),
+            iconSize: 16,
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
+            tooltip: 'Wind right',
+          ),
+          // Shake
+          IconButton(
+            onPressed: _shakeCooldown <= 0 ? _doShake : null,
+            icon: Icon(
+              Icons.vibration_rounded,
+              color: _shakeCooldown <= 0
+                  ? AppColors.electricBlue
+                  : AppColors.secondaryText.withValues(alpha: 0.3),
+            ),
+            iconSize: 18,
+            tooltip: 'Shake',
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
           const Spacer(),
           // Undo button
           IconButton(
@@ -1767,7 +3821,7 @@ class _ElementLabGameState extends State<ElementLabGame>
             iconSize: 20,
             tooltip: 'Undo',
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
           // Pause/Play button
           IconButton(
@@ -1777,7 +3831,7 @@ class _ElementLabGameState extends State<ElementLabGame>
             iconSize: 20,
             tooltip: _isPaused ? 'Resume' : 'Pause',
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
           // Clear button
           IconButton(
@@ -1787,7 +3841,7 @@ class _ElementLabGameState extends State<ElementLabGame>
             iconSize: 20,
             tooltip: 'Clear all',
             padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
           ),
         ],
       ),
@@ -2272,4 +4326,60 @@ class BeakerIconPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ── Seed type icon painter ───────────────────────────────────────────────
+
+class _SeedIconPainter extends CustomPainter {
+  final int seedType;
+  const _SeedIconPainter(this.seedType);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    switch (seedType) {
+      case 1: // Grass — small green blades
+        final p = Paint()..color = const Color(0xFF33CC33)..strokeWidth = 1.5..strokeCap = StrokeCap.round;
+        canvas.drawLine(Offset(cx - 4, cy + 6), Offset(cx - 5, cy - 4), p);
+        canvas.drawLine(Offset(cx, cy + 6), Offset(cx, cy - 6), p);
+        canvas.drawLine(Offset(cx + 4, cy + 6), Offset(cx + 5, cy - 4), p);
+      case 2: // Flower — stem + bloom
+        final stem = Paint()..color = const Color(0xFF33AA33)..strokeWidth = 1.5..strokeCap = StrokeCap.round;
+        canvas.drawLine(Offset(cx, cy + 7), Offset(cx, cy - 1), stem);
+        final bloom = Paint()..color = const Color(0xFFFF88CC);
+        for (int i = 0; i < 5; i++) {
+          final a = i * 3.14159 * 2 / 5 - 1.57;
+          canvas.drawCircle(Offset(cx + cos(a) * 3.5, cy - 4 + sin(a) * 3.5), 2, bloom);
+        }
+        canvas.drawCircle(Offset(cx, cy - 4), 1.5, Paint()..color = const Color(0xFFFFDD44));
+      case 3: // Tree — trunk + canopy
+        final trunk = Paint()..color = const Color(0xFF8B6914)..strokeWidth = 2.5..strokeCap = StrokeCap.round;
+        canvas.drawLine(Offset(cx, cy + 7), Offset(cx, cy - 1), trunk);
+        final canopy = Paint()..color = const Color(0xFF228B22);
+        canvas.drawCircle(Offset(cx, cy - 5), 5, canopy);
+      case 4: // Mushroom — cap + stem
+        final stem = Paint()..color = const Color(0xFFF0E0D0)..strokeWidth = 2..strokeCap = StrokeCap.round;
+        canvas.drawLine(Offset(cx, cy + 6), Offset(cx, cy - 1), stem);
+        final cap = Paint()..color = const Color(0xFFCC3333);
+        canvas.drawArc(Rect.fromCenter(center: Offset(cx, cy - 2), width: 14, height: 10), 3.14159, 3.14159, true, cap);
+        // White spots
+        final spot = Paint()..color = Colors.white;
+        canvas.drawCircle(Offset(cx - 2, cy - 4), 1.2, spot);
+        canvas.drawCircle(Offset(cx + 3, cy - 3), 1, spot);
+      case 5: // Vine — curling tendril
+        final p = Paint()..color = const Color(0xFF33AA33)..strokeWidth = 1.5..style = PaintingStyle.stroke..strokeCap = StrokeCap.round;
+        final path = Path()
+          ..moveTo(cx - 4, cy + 6)
+          ..quadraticBezierTo(cx - 6, cy, cx - 2, cy - 2)
+          ..quadraticBezierTo(cx + 4, cy - 5, cx + 2, cy - 8);
+        canvas.drawPath(path, p);
+        // Leaf
+        final leaf = Paint()..color = const Color(0xFF33CC33);
+        canvas.drawOval(Rect.fromCenter(center: Offset(cx + 3, cy - 4), width: 5, height: 3), leaf);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SeedIconPainter old) => old.seedType != seedType;
 }

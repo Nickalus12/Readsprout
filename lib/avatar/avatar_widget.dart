@@ -637,7 +637,7 @@ class _AvatarWidgetState extends State<AvatarWidget>
     Animation<double> pupilAnim,
   ) {
     final headSize = _headSize(size);
-    final headTop = widgetH * 0.65 - headSize * 0.78; // chin overlaps neck top
+    final headTop = widgetH * 0.65 - headSize * 0.62; // chin well into neck for seamless join
     final headLeft = (widgetW - headSize) / 2;
 
     // Hair is 15% larger for volume, centered on head

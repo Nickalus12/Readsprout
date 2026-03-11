@@ -37,6 +37,10 @@ Usage:
     # Dry run (show what would be generated without making API calls)
     python generate_tts_deepgram.py --api-key "YOUR_KEY" --dry-run
 
+    # Force regeneration of existing files (useful after fixing pronunciations)
+    python generate_tts_deepgram.py --api-key "YOUR_KEY" --force
+    python generate_tts_deepgram.py --api-key "YOUR_KEY" --force --only words
+
 Voices — Recommended for kids apps (Aura-2):
     Warm/Caring:   aura-2-cordelia-en (Young, Warm, Polite — BEST for kids)
                    aura-2-cora-en     (Smooth, Melodic, Caring — storytelling)
@@ -311,13 +315,112 @@ EXTRA_WORDS = [
     # Element Lab elements
     "sand", "water", "fire", "ice", "lightning", "plant", "stone",
     "mud", "steam", "ant", "oil", "acid", "glass", "rainbow",
+    "lava", "wood", "metal", "smoke", "bubble", "dirt", "seed", "ash",
+    # Element Lab seed types / plant names
+    "grass", "flower", "mushroom", "vine",
     # Element Lab timer
     "minute", "thirty", "seconds", "time",
 ]
 
-# Special pronunciation overrides (key = filename, value = spoken text)
-EXTRA_WORD_PRONUNCIATIONS = {
-    "tnt": "T N T",
+# ============================================================================
+#  WORD PRONUNCIATION OVERRIDES
+# ============================================================================
+#
+# Deepgram Aura-2 is context-aware: it uses surrounding text to decide
+# pronunciation, pacing, and intonation. For isolated single-word generation
+# this means very short words (1-3 letters) can sound clipped, be spelled
+# out letter-by-letter, or pronounced ambiguously.
+#
+# Deepgram does NOT support SSML. The recommended approach from their docs
+# is to provide phonetic hints inline. For isolated words, the most reliable
+# techniques are:
+#
+#   1. Sentence framing:  "The word is go." — but we'd get the whole phrase.
+#   2. Trailing period:   "go." — signals a complete utterance to the model,
+#      preventing the word from sounding cut off or question-like.
+#   3. Phonetic spelling: "goh" — for words the model misreads (e.g., "a"
+#      might be read as the letter name "ay" instead of the article "uh").
+#   4. Capitalization:    "I." vs "i." — uppercase I is always the pronoun.
+#
+# Strategy: We add a trailing period to ALL words so Aura-2 treats each as a
+# complete utterance with natural falling intonation. For words that are still
+# problematic even with a period (single letters, ambiguous short words), we
+# provide explicit phonetic overrides.
+#
+# The generate_words() function applies this logic:
+#   - If a word is in WORD_PRONUNCIATIONS, use the override text as-is
+#   - Otherwise, send "word." (word + period) for clean isolated speech
+#
+WORD_PRONUNCIATIONS = {
+    # ── Single-letter words ──────────────────────────────────────────────
+    # "a" alone could be read as letter name "ay"; we want the article "uh"
+    "a":  "A.",        # Uppercase + period: Aura-2 reads as the article
+    "i":  "I.",        # Uppercase pronoun — Aura-2 knows "I" is the pronoun
+    "I":  "I.",        # Uppercase pronoun — already natural, period for clean stop
+
+    # ── Two-letter words that could be misread as initials/abbreviations ─
+    # These are all common English words. The period forces word-mode reading.
+    # Phonetic overrides only where the default "word." still fails.
+    "am": "am.",
+    "an": "an.",
+    "as": "as.",
+    "at": "at.",
+    "be": "be.",
+    "by": "by.",
+    "do": "do.",
+    "go": "go.",
+    "he": "he.",
+    "if": "if.",
+    "in": "in.",
+    "is": "is.",
+    "it": "it.",
+    "me": "me.",
+    "my": "my.",
+    "no": "no.",
+    "of": "of.",
+    "on": "on.",
+    "or": "or.",
+    "so": "so.",
+    "to": "to.",
+    "up": "up.",
+    "us": "us.",
+    "we": "we.",
+
+    # ── Three-letter words that might sound like abbreviations ───────────
+    "are": "are.",
+    "ate": "ate.",
+    "its": "its.",
+    "off": "off.",
+    "our": "our.",
+    "own": "own.",
+    "the": "the.",
+    "two": "two.",
+    "who": "who.",
+    "why": "why.",
+    "yes": "yes.",
+    "you": "you.",
+
+    # ── Words that could be misread (homophones, unusual patterns) ───────
+    "read":  "read.",      # Could be "reed" or "red" — period helps default to present tense
+    "live":  "live.",      # Could be "liv" or "lyve"
+    "does":  "does.",      # Rhymes with "buzz", not "toes"
+    "said":  "said.",      # Irregular pronunciation: "sed"
+    "says":  "says.",      # Irregular: "sez"
+    "been":  "been.",      # "bin" not "bean"
+    "done":  "done.",      # "dun" not "doan"
+    "gone":  "gone.",      # "gon" not "goan"
+    "give":  "give.",      # Short i, not "jive"
+    "have":  "have.",      # Short a
+    "come":  "come.",      # "kum" not "kohm"
+    "some":  "some.",      # "sum" not "sohm"
+    "once":  "once.",      # "wunce"
+    "were":  "were.",      # "wur"
+    "where": "where.",     # "wair"
+    "there": "there.",     # "thair"
+    "their": "their.",     # "thair" (possessive)
+
+    # ── Extra words with special pronunciation ───────────────────────────
+    "tnt": "T N T",        # Spell out as initials
 }
 
 
@@ -418,18 +521,20 @@ def _generate_batch(
     label: str,
     workers: int,
     dry_run: bool = False,
+    force: bool = False,
 ) -> tuple[int, int, int]:
     """
     Generate a batch of (display_name, text, output_path) items.
     Returns (skipped, generated, failed) counts.
 
+    When force=True, existing files are regenerated instead of skipped.
     Uses ThreadPoolExecutor for parallel generation.
     """
-    # Filter out existing files
+    # Filter out existing files (unless --force)
     to_generate = []
     skipped = 0
     for display_name, text, output_path in items:
-        if output_path.exists():
+        if output_path.exists() and not force:
             skipped += 1
         else:
             to_generate.append((display_name, text, output_path))
@@ -441,8 +546,12 @@ def _generate_batch(
     print(f"  {label}")
     print(f"  {'='*52}")
     print(f"  Total:      {total}")
-    print(f"  Existing:   {skipped} (skipped)")
-    print(f"  To generate: {needed}")
+    if force:
+        print(f"  Existing:   {skipped} (skipped — not in scope)")
+        print(f"  To generate: {needed} (FORCE mode — regenerating all)")
+    else:
+        print(f"  Existing:   {skipped} (skipped)")
+        print(f"  To generate: {needed}")
     print(f"  Voice:      {tts.voice}")
     if workers > 1:
         print(f"  Workers:    {workers} (parallel)")
@@ -505,25 +614,49 @@ def _generate_batch(
 
 # ── Category generators ────────────────────────────────────────────────────
 
-def generate_words(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool):
+def _get_spoken_text(word: str) -> str:
+    """
+    Get the spoken text to send to Deepgram for a given word.
+
+    Priority:
+      1. Explicit override from WORD_PRONUNCIATIONS (used as-is)
+      2. Default: "word." — trailing period forces Aura-2 to treat it
+         as a complete utterance with natural falling intonation, preventing
+         clipped/question-like pronunciation on short words.
+    """
+    if word in WORD_PRONUNCIATIONS:
+        return WORD_PRONUNCIATIONS[word]
+    if word.lower() in WORD_PRONUNCIATIONS:
+        return WORD_PRONUNCIATIONS[word.lower()]
+    # Default: word with trailing period for clean isolated utterance
+    return f"{word}."
+
+
+def generate_words(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool, force: bool = False):
     """Generate all Dolch + Bonus sight word pronunciations."""
     words_dir = base / "words"
-    items = [(w, w, words_dir / f"{w}.mp3") for w in ALL_WORDS]
+    items = []
 
-    # Add the extra UI words (element names, timer words, etc.)
-    for w in EXTRA_WORDS:
-        spoken = EXTRA_WORD_PRONUNCIATIONS.get(w, w)
+    # All Dolch + Bonus words — apply pronunciation overrides
+    for w in ALL_WORDS:
+        spoken = _get_spoken_text(w)
         items.append((w, spoken, words_dir / f"{w}.mp3"))
 
-    # Add any pronunciation-override-only entries not already in EXTRA_WORDS
-    for key, spoken in EXTRA_WORD_PRONUNCIATIONS.items():
-        if key not in EXTRA_WORDS:
+    # Extra UI words (element names, timer words, etc.)
+    for w in EXTRA_WORDS:
+        spoken = _get_spoken_text(w)
+        items.append((w, spoken, words_dir / f"{w}.mp3"))
+
+    # Any pronunciation-override-only entries not already covered
+    all_word_keys = set(ALL_WORDS) | set(EXTRA_WORDS)
+    for key, spoken in WORD_PRONUNCIATIONS.items():
+        if key not in all_word_keys:
             items.append((key, spoken, words_dir / f"{key}.mp3"))
 
-    return _generate_batch(tts, items, "WORDS (Dolch + Bonus)", workers, dry_run)
+    return _generate_batch(tts, items, "WORDS (Dolch + Bonus)", workers, dry_run, force)
 
 
-def generate_letter_names(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool):
+def generate_letter_names(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool, force: bool = False):
     """Generate letter NAME audio (A = 'ay', B = 'bee', etc.)."""
     out_dir = base / "letter_names"
     items = []
@@ -532,40 +665,40 @@ def generate_letter_names(tts: DeepgramTTS, base: Path, workers: int, dry_run: b
         text = pronunciation
         items.append((f"{letter.upper()} ({pronunciation})", text, out_dir / f"{letter}.mp3"))
 
-    return _generate_batch(tts, items, "LETTER NAMES (A-Z)", workers, dry_run)
+    return _generate_batch(tts, items, "LETTER NAMES (A-Z)", workers, dry_run, force)
 
 
-def generate_phonics(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool):
+def generate_phonics(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool, force: bool = False):
     """Generate phonetic SOUND audio (A = 'ah', B = 'buh', etc.)."""
     out_dir = base / "phonics"
     items = []
     for letter, sound in LETTER_PHONICS.items():
         items.append((f"{letter.upper()} ({sound})", sound, out_dir / f"{letter}.mp3"))
 
-    return _generate_batch(tts, items, "PHONICS (letter sounds)", workers, dry_run)
+    return _generate_batch(tts, items, "PHONICS (letter sounds)", workers, dry_run, force)
 
 
-def generate_stickers(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool):
+def generate_stickers(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool, force: bool = False):
     """Generate spoken sticker name audio."""
     words_dir = base / "words"
     items = []
     for audio_key, spoken_text in STICKER_AUDIO.items():
         items.append((audio_key, spoken_text, words_dir / f"{audio_key}.mp3"))
 
-    return _generate_batch(tts, items, "STICKER NAMES", workers, dry_run)
+    return _generate_batch(tts, items, "STICKER NAMES", workers, dry_run, force)
 
 
-def generate_generic_welcomes(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool):
+def generate_generic_welcomes(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool, force: bool = False):
     """Generate generic welcome phrases (no child name)."""
     words_dir = base / "words"
     items = []
     for audio_key, spoken_text in GENERIC_WELCOMES.items():
         items.append((audio_key, spoken_text, words_dir / f"{audio_key}.mp3"))
 
-    return _generate_batch(tts, items, "GENERIC WELCOMES", workers, dry_run)
+    return _generate_batch(tts, items, "GENERIC WELCOMES", workers, dry_run, force)
 
 
-def generate_phrases(tts: DeepgramTTS, base: Path, name: str, workers: int, dry_run: bool):
+def generate_phrases(tts: DeepgramTTS, base: Path, name: str, workers: int, dry_run: bool, force: bool = False):
     """Generate personalized encouragement phrases for a specific child."""
     if not name:
         print("\n  SKIP phrases — no --name provided")
@@ -583,10 +716,10 @@ def generate_phrases(tts: DeepgramTTS, base: Path, name: str, workers: int, dry_
     # Also generate just the child's name as a standalone audio file
     items.append((f"name: {name}", name, phrases_dir / "name.mp3"))
 
-    return _generate_batch(tts, items, f"PERSONALIZED PHRASES (for {name})", workers, dry_run)
+    return _generate_batch(tts, items, f"PERSONALIZED PHRASES (for {name})", workers, dry_run, force)
 
 
-def generate_effects(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool):
+def generate_effects(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool, force: bool = False):
     """
     Generate UI sound effects.
     NOTE: TTS voices aren't great for sound effects. These are placeholder
@@ -599,7 +732,7 @@ def generate_effects(tts: DeepgramTTS, base: Path, workers: int, dry_run: bool):
         ("level_complete", "Level complete!",   effects_dir / "level_complete.mp3"),
     ]
 
-    return _generate_batch(tts, items, "SOUND EFFECTS", workers, dry_run)
+    return _generate_batch(tts, items, "SOUND EFFECTS", workers, dry_run, force)
 
 
 # ============================================================================
@@ -677,8 +810,9 @@ def print_inventory(base: Path):
     print(f"  {'─'*30}")
     print(f"  {'TOTAL':15s}  {total:4d} files")
 
-    # Check expected counts
-    expected_words = len(ALL_WORDS) + len(EXTRA_WORDS) + len(STICKER_AUDIO) + len(GENERIC_WELCOMES)
+    # Check expected counts (includes pronunciation-override-only entries not in word lists)
+    pron_only = len(set(WORD_PRONUNCIATIONS.keys()) - set(ALL_WORDS) - set(EXTRA_WORDS))
+    expected_words = len(ALL_WORDS) + len(EXTRA_WORDS) + pron_only + len(STICKER_AUDIO) + len(GENERIC_WELCOMES)
     words_count = len(list((base / "words").glob("*.mp3"))) if (base / "words").exists() else 0
     letters_count = len(list((base / "letter_names").glob("*.mp3"))) if (base / "letter_names").exists() else 0
     phonics_count = len(list((base / "phonics").glob("*.mp3"))) if (base / "phonics").exists() else 0
@@ -706,6 +840,7 @@ def main():
                         help="Generate only a specific category")
     parser.add_argument("--preview", metavar="TEXT", help="Generate and play a single word/phrase")
     parser.add_argument("--dry-run", action="store_true", help="Show what would be generated without API calls")
+    parser.add_argument("--force", action="store_true", help="Regenerate files even if they exist (for re-recording fixed pronunciations)")
     parser.add_argument("--output", default=None, help="Output base directory (default: assets/audio/)")
     parser.add_argument("--inventory", action="store_true", help="Show current audio file inventory and exit")
 
@@ -727,6 +862,8 @@ def main():
     print(f"  ║  Workers: {args.workers:<39} ║")
     if args.name:
         print(f"  ║  Name:    {args.name:39s} ║")
+    if args.force:
+        print(f"  ║  Force:   {'YES — regenerating all files':39s} ║")
     print("  ╚══════════════════════════════════════════════════╝")
 
     # Inventory mode
@@ -755,32 +892,34 @@ def main():
 
     start_time = time.time()
 
+    force = args.force
+
     if args.only:
         # Single category
         if args.only == "words":
-            _track(generate_words(tts, base, args.workers, args.dry_run))
+            _track(generate_words(tts, base, args.workers, args.dry_run, force))
         elif args.only == "letters":
-            _track(generate_letter_names(tts, base, args.workers, args.dry_run))
+            _track(generate_letter_names(tts, base, args.workers, args.dry_run, force))
         elif args.only == "phonics":
-            _track(generate_phonics(tts, base, args.workers, args.dry_run))
+            _track(generate_phonics(tts, base, args.workers, args.dry_run, force))
         elif args.only == "stickers":
-            _track(generate_stickers(tts, base, args.workers, args.dry_run))
+            _track(generate_stickers(tts, base, args.workers, args.dry_run, force))
         elif args.only == "phrases":
-            _track(generate_phrases(tts, base, args.name, args.workers, args.dry_run))
+            _track(generate_phrases(tts, base, args.name, args.workers, args.dry_run, force))
         elif args.only == "effects":
-            _track(generate_effects(tts, base, args.workers, args.dry_run))
+            _track(generate_effects(tts, base, args.workers, args.dry_run, force))
         elif args.only == "welcome":
-            _track(generate_generic_welcomes(tts, base, args.workers, args.dry_run))
+            _track(generate_generic_welcomes(tts, base, args.workers, args.dry_run, force))
     else:
         # Generate everything (except personalized phrases without a name)
-        _track(generate_words(tts, base, args.workers, args.dry_run))
-        _track(generate_letter_names(tts, base, args.workers, args.dry_run))
-        _track(generate_phonics(tts, base, args.workers, args.dry_run))
-        _track(generate_stickers(tts, base, args.workers, args.dry_run))
-        _track(generate_generic_welcomes(tts, base, args.workers, args.dry_run))
-        _track(generate_effects(tts, base, args.workers, args.dry_run))
+        _track(generate_words(tts, base, args.workers, args.dry_run, force))
+        _track(generate_letter_names(tts, base, args.workers, args.dry_run, force))
+        _track(generate_phonics(tts, base, args.workers, args.dry_run, force))
+        _track(generate_stickers(tts, base, args.workers, args.dry_run, force))
+        _track(generate_generic_welcomes(tts, base, args.workers, args.dry_run, force))
+        _track(generate_effects(tts, base, args.workers, args.dry_run, force))
         if args.name:
-            _track(generate_phrases(tts, base, args.name, args.workers, args.dry_run))
+            _track(generate_phrases(tts, base, args.name, args.workers, args.dry_run, force))
 
     elapsed = time.time() - start_time
 

@@ -12,10 +12,23 @@ class ProgressService {
   late Map<int, LevelProgress> _progress;
   String _profileId = '';
 
+  static const _freePlayKey = 'free_play_mode';
+
   String get _key => _profileId.isEmpty ? _baseKey : '${_baseKey}_$_profileId';
   String get _coinsKey => _profileId.isEmpty
       ? _starCoinsKey
       : '${_starCoinsKey}_$_profileId';
+  String get _freePlayModeKey => _profileId.isEmpty
+      ? _freePlayKey
+      : '${_freePlayKey}_$_profileId';
+
+  // ── Free Play Mode ─────────────────────────────────────────────────────
+
+  /// Whether free play mode is enabled (skips coin costs and time limits).
+  bool get freePlayMode => _prefs.getBool(_freePlayModeKey) ?? false;
+
+  /// Enable or disable free play mode.
+  set freePlayMode(bool value) => _prefs.setBool(_freePlayModeKey, value);
 
   // ── Star Coins ──────────────────────────────────────────────────────────
 
