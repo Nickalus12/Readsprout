@@ -382,17 +382,17 @@ class AvatarTouchHandler {
   /// Bone anchor positions in normalized space (0-1).
   /// These represent approximate positions of each bone on the avatar.
   static const Map<String, _BoneAnchor> _anchors = {
-    'head': _BoneAnchor(0.50, 0.15, 0.12),
-    'chest': _BoneAnchor(0.50, 0.40, 0.15),
-    'root': _BoneAnchor(0.50, 0.55, 0.12),
-    'leftShoulder': _BoneAnchor(0.30, 0.32, 0.08),
-    'rightShoulder': _BoneAnchor(0.70, 0.32, 0.08),
-    'leftUpperArm': _BoneAnchor(0.22, 0.40, 0.08),
-    'rightUpperArm': _BoneAnchor(0.78, 0.40, 0.08),
-    'leftForearm': _BoneAnchor(0.18, 0.52, 0.07),
-    'rightForearm': _BoneAnchor(0.82, 0.52, 0.07),
-    'leftHand': _BoneAnchor(0.15, 0.62, 0.06),
-    'rightHand': _BoneAnchor(0.85, 0.62, 0.06),
+    'head': _BoneAnchor(0.50, 0.15),
+    'chest': _BoneAnchor(0.50, 0.40),
+    'root': _BoneAnchor(0.50, 0.55),
+    'leftShoulder': _BoneAnchor(0.30, 0.32),
+    'rightShoulder': _BoneAnchor(0.70, 0.32),
+    'leftUpperArm': _BoneAnchor(0.22, 0.40),
+    'rightUpperArm': _BoneAnchor(0.78, 0.40),
+    'leftForearm': _BoneAnchor(0.18, 0.52),
+    'rightForearm': _BoneAnchor(0.82, 0.52),
+    'leftHand': _BoneAnchor(0.15, 0.62),
+    'rightHand': _BoneAnchor(0.85, 0.62),
   };
 
   /// Active touch force per bone. Decays over time when not touched.
@@ -483,8 +483,7 @@ class AvatarTouchHandler {
 class _BoneAnchor {
   final double x;
   final double y;
-  final double radius;
-  const _BoneAnchor(this.x, this.y, this.radius);
+  const _BoneAnchor(this.x, this.y);
 }
 
 // ══════════════════════════════════════════════════════════════════════

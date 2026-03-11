@@ -2,7 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../data/avatar_options.dart';
+import '../avatar/data/avatar_options.dart';
 import '../models/player_profile.dart';
 import '../services/profile_service.dart';
 import '../theme/app_theme.dart';
@@ -647,87 +647,94 @@ class _TreasureChestPainter extends CustomPainter {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
-// _TreasureChestMiniPainter — Simplified 14x14 version for daily tracker
+// _ChestProgressArcPainter — Circular arc around the chest showing progress
 // ═══════════════════════════════════════════════════════════════════════════
 
-class _TreasureChestMiniPainter extends CustomPainter {
-  final Color tierColor;
-  final bool isClaimed;
-  final bool isEarned;
+class _ChestProgressArcPainter extends CustomPainter {
+  final double progress;
+  final Color color;
+  final double glowPulse;
 
-  _TreasureChestMiniPainter({
-    required this.tierColor,
-    this.isClaimed = false,
-    this.isEarned = false,
+  _ChestProgressArcPainter({
+    required this.progress,
+    required this.color,
+    this.glowPulse = 0.0,
   });
 
   @override
   void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final alpha = isClaimed ? 1.0 : isEarned ? 0.9 : 0.3;
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+    final radius = min(cx, cy) - 6;
+    final center = Offset(cx, cy);
+    const strokeWidth = 5.0;
+    const startAngle = -pi / 2; // Start from top
 
-    // Body
-    final bodyRect =
-        Rect.fromLTWH(w * 0.1, h * 0.4, w * 0.8, h * 0.5);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(bodyRect, const Radius.circular(1.5)),
-      Paint()..color = tierColor.withValues(alpha: alpha * 0.8),
+    // Background track
+    final trackPaint = Paint()
+      ..color = color.withValues(alpha: 0.12)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawCircle(center, radius, trackPaint);
+
+    if (progress <= 0) return;
+
+    // Glow behind the arc
+    final glowAlpha = (0.2 + glowPulse * 0.15).clamp(0.0, 1.0);
+    final glowPaint = Paint()
+      ..color = color.withValues(alpha: glowAlpha)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth + 6
+      ..strokeCap = StrokeCap.round
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6);
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      2 * pi * progress,
+      false,
+      glowPaint,
     );
 
-    // Lid
-    final lidPath = Path()
-      ..moveTo(w * 0.05, h * 0.42)
-      ..lineTo(w * 0.05, h * 0.25)
-      ..quadraticBezierTo(w * 0.5, h * 0.1, w * 0.95, h * 0.25)
-      ..lineTo(w * 0.95, h * 0.42)
-      ..close();
-    canvas.drawPath(
-      lidPath,
-      Paint()..color = tierColor.withValues(alpha: alpha),
+    // Filled arc
+    final arcPaint = Paint()
+      ..color = color
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = strokeWidth
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromCircle(center: center, radius: radius),
+      startAngle,
+      2 * pi * progress,
+      false,
+      arcPaint,
     );
 
-    // Metal band
-    canvas.drawLine(
-      Offset(w * 0.08, h * 0.55),
-      Offset(w * 0.92, h * 0.55),
-      Paint()
-        ..color = Colors.white.withValues(alpha: alpha * 0.4)
-        ..strokeWidth = 1.2,
-    );
-
-    // Clasp dot
-    canvas.drawCircle(
-      Offset(w * 0.5, h * 0.55),
-      1.2,
-      Paint()..color = Colors.white.withValues(alpha: alpha * 0.5),
-    );
-
-    // Checkmark for claimed
-    if (isClaimed) {
-      final checkPaint = Paint()
-        ..color = AppColors.success
-        ..strokeWidth = 1.5
-        ..style = PaintingStyle.stroke
-        ..strokeCap = StrokeCap.round;
-      canvas.drawLine(
-        Offset(w * 0.25, h * 0.55),
-        Offset(w * 0.45, h * 0.75),
-        checkPaint,
+    // Bright dot at the leading edge
+    if (progress > 0.02 && progress < 1.0) {
+      final endAngle = startAngle + 2 * pi * progress;
+      final dotX = cx + cos(endAngle) * radius;
+      final dotY = cy + sin(endAngle) * radius;
+      canvas.drawCircle(
+        Offset(dotX, dotY),
+        4,
+        Paint()
+          ..color = color
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
       );
-      canvas.drawLine(
-        Offset(w * 0.45, h * 0.75),
-        Offset(w * 0.8, h * 0.3),
-        checkPaint,
+      canvas.drawCircle(
+        Offset(dotX, dotY),
+        2.5,
+        Paint()..color = Colors.white,
       );
     }
   }
 
   @override
-  bool shouldRepaint(_TreasureChestMiniPainter oldDelegate) =>
-      oldDelegate.tierColor != tierColor ||
-      oldDelegate.isClaimed != isClaimed ||
-      oldDelegate.isEarned != isEarned;
+  bool shouldRepaint(_ChestProgressArcPainter oldDelegate) =>
+      oldDelegate.progress != progress ||
+      oldDelegate.color != color ||
+      oldDelegate.glowPulse != glowPulse;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
@@ -1125,22 +1132,26 @@ class _DailyTreasureState extends State<DailyTreasure>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Simple title header — no confusing mini-chest tracker
         Padding(
           padding: const EdgeInsets.symmetric(
               horizontal: 20, vertical: 8),
           child: Row(
             children: [
-              RepaintBoundary(
-                child: CustomPaint(
-                  size: const Size(22, 22),
-                  painter: _TreasureChestMiniPainter(
-                    tierColor: _tierColor,
-                    isEarned: true,
-                  ),
-                ),
+              Icon(
+                Icons.card_giftcard_rounded,
+                size: 20,
+                color: _tierColor.withValues(alpha: 0.8),
               ),
               const SizedBox(width: 8),
-              _buildDailyChestTracker(),
+              Text(
+                'Daily Treasure',
+                style: AppFonts.fredoka(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryText.withValues(alpha: 0.8),
+                ),
+              ),
             ],
           ),
         ),
@@ -1169,59 +1180,6 @@ class _DailyTreasureState extends State<DailyTreasure>
     );
   }
 
-  Widget _buildDailyChestTracker() {
-    final claimed = widget.profileService.allDailyChestsComplete
-        ? ProfileService.maxDailyChests
-        : _chestsClaimedToday.clamp(0, ProfileService.maxDailyChests);
-    final earned =
-        _chestsEarnedToday.clamp(0, ProfileService.maxDailyChests);
-
-    return Container(
-      padding:
-          const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      decoration: BoxDecoration(
-        color: _tierColor.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children:
-            List.generate(ProfileService.maxDailyChests, (i) {
-          final isClaimed = i < claimed;
-          final isEarned = i < earned;
-          final miniChest = RepaintBoundary(
-            child: CustomPaint(
-              size: const Size(14, 14),
-              painter: _TreasureChestMiniPainter(
-                tierColor:
-                    isClaimed ? AppColors.success : _tierColor,
-                isClaimed: isClaimed,
-                isEarned: isEarned,
-              ),
-            ),
-          );
-
-          if (isEarned && !isClaimed) {
-            return Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 2),
-              child: miniChest
-                  .animate(
-                      onPlay: (c) => c.repeat(reverse: true))
-                  .scaleXY(
-                      begin: 0.9, end: 1.15, duration: 800.ms),
-            );
-          }
-
-          return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: miniChest,
-          );
-        }),
-      ),
-    );
-  }
-
   Widget _buildCurrentState() {
     return switch (_state) {
       _ChestState.earning => _buildEarning(),
@@ -1235,23 +1193,12 @@ class _DailyTreasureState extends State<DailyTreasure>
   // ── Earning State ─────────────────────────────────────────────────
 
   Widget _buildEarning() {
+    final wordsNeeded = widget.profileService.wordsUntilNextChest;
     final chestNumber = _chestsEarnedToday + 1;
-    final thresholdIdx = _chestsEarnedToday;
-    final currentTarget =
-        thresholdIdx < ProfileService.chestThresholds.length
-            ? ProfileService.chestThresholds[thresholdIdx]
-            : ProfileService.chestThresholds.last;
-    final previousTarget = thresholdIdx > 0
-        ? ProfileService.chestThresholds[thresholdIdx - 1]
-        : 0;
-    final wordsInRange =
-        (widget.wordsPlayedToday - previousTarget)
-            .clamp(0, currentTarget - previousTarget);
-    final totalInRange = currentTarget - previousTarget;
 
     return AnimatedBuilder(
       animation:
-          Listenable.merge([_wobbleController, _particleController]),
+          Listenable.merge([_wobbleController, _particleController, _glowController]),
       builder: (context, child) {
         final wobble = sin(_wobbleController.value * pi * 4) *
             (1 - _wobbleController.value) *
@@ -1271,12 +1218,28 @@ class _DailyTreasureState extends State<DailyTreasure>
         key: const ValueKey('earning'),
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // Chest with circular progress arc around it
           SizedBox(
-            width: 120,
-            height: 100,
+            width: 130,
+            height: 110,
             child: Stack(
               alignment: Alignment.center,
               children: [
+                // Progress arc around the chest
+                AnimatedBuilder(
+                  animation: _glowController,
+                  builder: (context, _) {
+                    return CustomPaint(
+                      size: const Size(130, 110),
+                      painter: _ChestProgressArcPainter(
+                        progress: _progress,
+                        color: _tierColor,
+                        glowPulse: _glowController.value,
+                      ),
+                    );
+                  },
+                ),
+                // Magic particles (subtle, scales with progress)
                 AnimatedBuilder(
                   animation: _particleController,
                   builder: (context, _) {
@@ -1285,14 +1248,15 @@ class _DailyTreasureState extends State<DailyTreasure>
                       painter: _MagicParticlesPainter(
                         color: _tierColor,
                         progress: _particleController.value,
-                        intensity: _progress,
+                        intensity: _progress * 0.6,
                       ),
                     );
                   },
                 ),
+                // The chest itself
                 RepaintBoundary(
                   child: CustomPaint(
-                    size: const Size(90, 70),
+                    size: const Size(80, 62),
                     painter: _TreasureChestPainter(
                       tierColor: _tierColor,
                       tier: _tier,
@@ -1303,78 +1267,67 @@ class _DailyTreasureState extends State<DailyTreasure>
               ],
             ),
           ),
-          const SizedBox(height: 6),
-          _buildCompactProgressDots(wordsInRange, totalInRange),
-          const SizedBox(height: 6),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children:
-                List.generate(ProfileService.maxDailyChests, (i) {
-              final isTarget = i == chestNumber - 1;
-              return Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 3),
-                child: Container(
-                  width: isTarget ? 10 : 6,
-                  height: isTarget ? 10 : 6,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: i < chestNumber - 1
-                        ? AppColors.success
-                        : isTarget
-                            ? _tierColor
-                            : _tierColor.withValues(alpha: 0.2),
-                    boxShadow: isTarget
-                        ? [
-                            BoxShadow(
-                              color: _tierColor
-                                  .withValues(alpha: 0.4),
-                              blurRadius: 4,
-                              spreadRadius: 1,
-                            ),
-                          ]
-                        : null,
-                  ),
-                ),
-              );
-            }),
+          const SizedBox(height: 8),
+          // Kid-friendly progress text
+          Text(
+            wordsNeeded > 0
+                ? 'Play $wordsNeeded more word${wordsNeeded == 1 ? '' : 's'}!'
+                : 'Almost there!',
+            style: AppFonts.fredoka(
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+              color: _tierColor,
+            ),
           ),
+          const SizedBox(height: 6),
+          // Simple chest counter: "Chest 1 of 3" with indicator circles
+          _buildChestCounter(chestNumber),
         ],
       ),
     );
   }
 
-  Widget _buildCompactProgressDots(int filled, int total) {
-    const maxDots = 10;
-    final segments = total <= maxDots ? total : maxDots;
-    final filledSegments = total <= maxDots
-        ? filled
-        : (filled * maxDots / total).round();
+  /// Three small circles showing chest progress: filled = claimed,
+  /// outlined with ring = current target, dim = remaining.
+  Widget _buildChestCounter(int currentChestNumber) {
+    final claimed = _chestsClaimedToday.clamp(0, ProfileService.maxDailyChests);
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 40),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: List.generate(segments, (i) {
-          final isFilled = i < filledSegments;
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Text(
+          'Chest $currentChestNumber of ${ProfileService.maxDailyChests}',
+          style: AppFonts.fredoka(
+            fontSize: 12,
+            fontWeight: FontWeight.w400,
+            color: AppColors.secondaryText,
+          ),
+        ),
+        const SizedBox(width: 8),
+        ...List.generate(ProfileService.maxDailyChests, (i) {
+          final isClaimed = i < claimed;
+          final isCurrent = i == currentChestNumber - 1;
           return Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 2),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 300),
-              width: 8,
-              height: 8,
+            padding: const EdgeInsets.symmetric(horizontal: 3),
+            child: Container(
+              width: isCurrent ? 10 : 8,
+              height: isCurrent ? 10 : 8,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
-                color: isFilled
-                    ? AppColors.starGold
-                    : AppColors.border.withValues(alpha: 0.3),
-                boxShadow: isFilled
+                color: isClaimed
+                    ? AppColors.success
+                    : isCurrent
+                        ? _tierColor.withValues(alpha: 0.3)
+                        : AppColors.border.withValues(alpha: 0.2),
+                border: isCurrent && !isClaimed
+                    ? Border.all(color: _tierColor, width: 2)
+                    : null,
+                boxShadow: isCurrent
                     ? [
                         BoxShadow(
-                          color: AppColors.starGold
-                              .withValues(alpha: 0.4),
-                          blurRadius: 3,
-                          spreadRadius: 0.5,
+                          color: _tierColor.withValues(alpha: 0.3),
+                          blurRadius: 4,
+                          spreadRadius: 1,
                         ),
                       ]
                     : null,
@@ -1382,7 +1335,7 @@ class _DailyTreasureState extends State<DailyTreasure>
             ),
           );
         }),
-      ),
+      ],
     );
   }
 
@@ -1402,76 +1355,89 @@ class _DailyTreasureState extends State<DailyTreasure>
         key: const ValueKey('complete'),
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Stack(
-            alignment: Alignment.center,
-            children: [
-              AnimatedBuilder(
-                animation: _glowController,
-                builder: (context, _) {
-                  return Container(
-                    width: 100,
-                    height: 80,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(40),
-                      gradient: RadialGradient(
-                        colors: [
-                          _tierColor.withValues(
-                              alpha: 0.08 +
-                                  _glowController.value * 0.06),
-                          _tierColor.withValues(alpha: 0.0),
-                        ],
-                      ),
+          // Three claimed chests in a row
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: List.generate(ProfileService.maxDailyChests, (i) {
+              return Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 6),
+                child: Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    AnimatedBuilder(
+                      animation: _glowController,
+                      builder: (context, _) {
+                        return Opacity(
+                          opacity: 0.7,
+                          child: RepaintBoundary(
+                            child: CustomPaint(
+                              size: const Size(50, 40),
+                              painter: _TreasureChestPainter(
+                                tierColor: _tierColor,
+                                tier: _tier,
+                                glowIntensity:
+                                    _glowController.value * 0.1,
+                              ),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                  );
-                },
-              ),
-              RepaintBoundary(
-                child: AnimatedBuilder(
-                  animation: _glowController,
-                  builder: (context, _) {
-                    return Opacity(
-                      opacity: 0.5,
-                      child: CustomPaint(
-                        size: const Size(80, 62),
-                        painter: _TreasureChestPainter(
-                          tierColor: _tierColor,
-                          tier: _tier,
-                          glowIntensity:
-                              _glowController.value * 0.15,
+                    Positioned(
+                      bottom: 0,
+                      right: 0,
+                      child: Container(
+                        width: 16,
+                        height: 16,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.success,
+                          border: Border.all(
+                            color: AppColors.surface,
+                            width: 1.5,
+                          ),
+                        ),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          size: 10,
+                          color: Colors.white,
                         ),
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
+              );
+            }),
+          ),
+          const SizedBox(height: 12),
+          // Moon icon + "Come back tomorrow!" text
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.nightlight_rounded,
+                size: 18,
+                color: AppColors.starGold.withValues(alpha: 0.6),
               ),
-              Positioned(
-                top: 0,
-                right: 10,
-                child: Icon(
-                  Icons.nightlight_rounded,
-                  size: 20,
-                  color:
-                      AppColors.starGold.withValues(alpha: 0.5),
+              const SizedBox(width: 6),
+              Text(
+                'Come back tomorrow!',
+                style: AppFonts.fredoka(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.secondaryText,
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: List.generate(
-                ProfileService.maxDailyChests, (i) {
-              return Padding(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 4),
-                child: Icon(
-                  Icons.check_circle_rounded,
-                  size: 18,
-                  color:
-                      AppColors.success.withValues(alpha: 0.6),
-                ),
-              );
-            }),
+          const SizedBox(height: 4),
+          Text(
+            'All 3 chests collected today',
+            style: AppFonts.fredoka(
+              fontSize: 12,
+              fontWeight: FontWeight.w400,
+              color: AppColors.secondaryText.withValues(alpha: 0.6),
+            ),
           ),
         ],
       ),
@@ -1557,18 +1523,19 @@ class _DailyTreasureState extends State<DailyTreasure>
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          Icon(
-            Icons.touch_app_rounded,
-            size: 28,
-            color: AppColors.starGold.withValues(alpha: 0.8),
+          const SizedBox(height: 4),
+          // Pulsing "Tap to open!" text
+          Text(
+            'Tap to open!',
+            style: AppFonts.fredoka(
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+              color: _tierColor,
+            ),
           )
               .animate(
                   onPlay: (c) => c.repeat(reverse: true))
-              .moveY(begin: 0, end: -4, duration: 600.ms)
-              .fadeIn(duration: 400.ms)
-              .then()
-              .fadeOut(duration: 400.ms),
+              .fadeIn(begin: 0.5, duration: 800.ms),
         ],
       ),
     );

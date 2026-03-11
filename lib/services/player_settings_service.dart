@@ -156,6 +156,24 @@ class PlayerSettingsService {
     await _saveProfiles();
   }
 
+  /// Rename an existing profile.
+  Future<void> renameProfile(String profileId, String newName) async {
+    final idx = _profiles.indexWhere((p) => p.id == profileId);
+    if (idx < 0) return;
+    final old = _profiles[idx];
+    _profiles[idx] = PlayerEntry(
+      id: old.id,
+      name: newName.trim(),
+      colorIndex: old.colorIndex,
+      createdAt: old.createdAt,
+    );
+    if (_activeProfileId == profileId) {
+      _playerName = newName.trim();
+      await _prefs.setString(_nameKey, _playerName);
+    }
+    await _saveProfiles();
+  }
+
   /// Remove a profile. If it's the active one, clear active.
   Future<void> removeProfile(String profileId) async {
     _profiles.removeWhere((p) => p.id == profileId);

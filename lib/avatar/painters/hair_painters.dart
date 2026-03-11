@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../shader_loader.dart';
 
 /// Whether the hair color index is the special rainbow gradient.
 bool isRainbowHair(int colorIndex) => colorIndex == 13;
@@ -247,27 +248,33 @@ void _drawSpiralCurl(Canvas canvas, double cx, double cy, double radius,
   canvas.drawPath(spiral, hlPaint);
 }
 
+/// Reusable Paint for hair tie band fill.
+final Paint _hairTiePaint = Paint()..style = PaintingStyle.fill;
+
+/// Reusable Paint for hair tie highlight.
+final Paint _hairTieHighlightPaint = Paint();
+
 /// Draw a small hair tie band.
 void _drawHairTie(Canvas canvas, Offset center, double radius, Color baseColor,
     {bool showHighlight = true}) {
   // Band
-  canvas.drawCircle(
-    center,
-    radius,
-    Paint()
-      ..color = _coolShadow(baseColor, 0.45)
-      ..style = PaintingStyle.fill,
-  );
+  _hairTiePaint.color = _coolShadow(baseColor, 0.45);
+  canvas.drawCircle(center, radius, _hairTiePaint);
   // Highlight on tie
   if (showHighlight) {
+    _hairTieHighlightPaint.color =
+        _warmHighlight(baseColor, 0.30).withValues(alpha: 0.40);
     canvas.drawCircle(
       center.translate(-radius * 0.3, -radius * 0.3),
       radius * 0.35,
-      Paint()
-        ..color = _warmHighlight(baseColor, 0.30).withValues(alpha: 0.40),
+      _hairTieHighlightPaint,
     );
   }
 }
+
+/// Reusable Paint for shine spot.
+final Paint _shineSpotPaint = Paint()
+  ..color = Colors.white.withValues(alpha: 0.30);
 
 /// Draw a shine spot (small white oval) on a bun/space bun.
 void _drawShineSpot(Canvas canvas, Offset center, double radius) {
@@ -277,7 +284,7 @@ void _drawShineSpot(Canvas canvas, Offset center, double radius) {
       width: radius * 0.55,
       height: radius * 0.35,
     ),
-    Paint()..color = Colors.white.withValues(alpha: 0.30),
+    _shineSpotPaint,
   );
 }
 
@@ -383,7 +390,7 @@ class HairBackPainter extends CustomPainter {
       ).createShader(bounds);
   }
 
-  Paint get _shadowPaint => Paint()
+  static final Paint _shadowPaint = Paint()
     ..color = const Color(0xFF0A0A1A).withValues(alpha: 0.18)
     ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
 
@@ -825,7 +832,7 @@ class HairFrontPainter extends CustomPainter {
       ).createShader(bounds);
   }
 
-  Paint get _contactShadow => Paint()
+  static final Paint _contactShadow = Paint()
     ..color = const Color(0xFF0A0A1A).withValues(alpha: 0.12)
     ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
 
@@ -872,6 +879,39 @@ class HairFrontPainter extends CustomPainter {
         _drawLongWavyFront(canvas, w, h, e, paint, hlPaint);
       case 15:
         _drawFishtailFront(canvas, w, h, e, paint, hlPaint);
+    }
+
+    // ── Hair shimmer shader overlay ──
+    // Adds anisotropic specular highlights via GPU for realistic
+    // hair shine. Clips to the hair cap region so shimmer doesn't
+    // bleed onto skin. Skipped on platforms without shader support.
+    if (!isRainbow) {
+      final hairShader = ShaderLoader.hairShimmer;
+      if (hairShader != null) {
+        hairShader.setFloat(0, w);          // uSize.x
+        hairShader.setFloat(1, h);          // uSize.y
+        hairShader.setFloat(2, swayValue * 0.8); // uTime (driven by sway)
+        hairShader.setFloat(3, swayValue);  // uSway
+        // Clip to hair cap region (top portion of the head)
+        final clipPath = Path()
+          ..moveTo(w * e.oL, h * e.oB)
+          ..cubicTo(
+              w * e.oL, h * 0.12, w * 0.30, h * 0.06, w * 0.50, h * 0.055)
+          ..cubicTo(
+              w * 0.70, h * 0.06, w * e.oR, h * 0.12, w * e.oR, h * e.oB)
+          ..lineTo(w * e.iR, h * 0.28)
+          ..quadraticBezierTo(
+              w * e.iR, h * e.iT, w * 0.50, h * (e.iT + 0.02))
+          ..quadraticBezierTo(w * e.iL, h * e.iT, w * e.iL, h * 0.28)
+          ..close();
+        canvas.save();
+        canvas.clipPath(clipPath);
+        canvas.drawRect(
+          bounds,
+          Paint()..shader = hairShader,
+        );
+        canvas.restore();
+      }
     }
   }
 
@@ -1028,8 +1068,8 @@ class HairFrontPainter extends CustomPainter {
       (x: 0.25, y: 0.12, r: 0.030, t: 1.2),
       (x: 0.75, y: 0.12, r: 0.030, t: 1.2),
     ];
-    for (final curl in curlSpots) {
-      final idx = curlSpots.indexOf(curl);
+    for (int idx = 0; idx < curlSpots.length; idx++) {
+      final curl = curlSpots[idx];
       final cSway = _computeSway(swayValue, style, idx % 5, windStrength);
       _drawSpiralCurl(
         canvas,

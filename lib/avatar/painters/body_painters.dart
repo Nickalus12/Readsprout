@@ -84,25 +84,37 @@ class NeckPainter extends CustomPainter {
     final highlight = _warmHighlight(skinColor);
     final shadow = _coolShadow(skinColor);
 
-    final neckW = w * 0.18;
+    final neckW = w * 0.20;
     final neckH = h * 0.12;
     final cx = w * 0.5;
-    final top = h * 0.70;
+    final top = h * 0.68;
 
     // Head tilt stretches neck on opposite side
     final tiltStretch = headTilt.clamp(-0.3, 0.3);
     final leftH = neckH * (1.0 + tiltStretch * 0.3);
     final rightH = neckH * (1.0 - tiltStretch * 0.3);
 
-    // Build asymmetric neck shape
+    // Build asymmetric neck shape with organic curves
     final neckPath = Path();
-    neckPath.moveTo(cx - neckW * 0.5, top);
-    neckPath.lineTo(cx - neckW * 0.55, top + leftH); // left side (wider at base)
-    neckPath.quadraticBezierTo(
-      cx, top + (leftH + rightH) / 2 + 2,
-      cx + neckW * 0.55, top + rightH,
+    // Start at top-left of neck (under chin)
+    neckPath.moveTo(cx - neckW * 0.45, top);
+    // Left side curves out slightly toward base (trapezoid, not rectangle)
+    neckPath.cubicTo(
+      cx - neckW * 0.48, top + leftH * 0.3,
+      cx - neckW * 0.55, top + leftH * 0.7,
+      cx - neckW * 0.58, top + leftH,
     );
-    neckPath.lineTo(cx + neckW * 0.5, top);
+    // Bottom curve (natural base, wider than top)
+    neckPath.quadraticBezierTo(
+      cx, top + (leftH + rightH) / 2 + 3,
+      cx + neckW * 0.58, top + rightH,
+    );
+    // Right side curves in toward top
+    neckPath.cubicTo(
+      cx + neckW * 0.55, top + rightH * 0.7,
+      cx + neckW * 0.48, top + rightH * 0.3,
+      cx + neckW * 0.45, top,
+    );
     neckPath.close();
 
     final neckRect = Rect.fromLTRB(
@@ -136,11 +148,12 @@ class NeckPainter extends CustomPainter {
     // Throat shadow — subtle vertical crease
     final throatPaint = Paint()
       ..color = shadow.withValues(alpha: 0.12)
+      ..strokeWidth = 1.5
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
     canvas.drawLine(
       Offset(cx, top + 3),
       Offset(cx, top + neckH * 0.7),
-      throatPaint..strokeWidth = 1.5,
+      throatPaint,
     );
 
     // Collarbone hints at base
@@ -203,35 +216,50 @@ class TorsoPainter extends CustomPainter {
     final shirtHL = Color.lerp(shirtColor, Colors.white, 0.15)!;
     final shirtSH = Color.lerp(shirtColor, Colors.black, 0.22)!;
 
-    // ── Torso shape: rounded shoulders, slight taper to bottom ──
+    // ── Torso shape: organic rounded shoulders, natural waist taper ──
     final torsoPath = Path();
-    torsoPath.moveTo(cx, shoulderY + h * 0.02);
+    torsoPath.moveTo(cx, shoulderY + h * 0.015);
 
-    // Right shoulder
+    // Right shoulder — rounded dome curve (kids have soft round shoulders)
     torsoPath.cubicTo(
-      cx + shoulderW * 0.15, shoulderY - h * 0.01,
-      cx + shoulderW * 0.38, shoulderY - h * 0.005,
+      cx + shoulderW * 0.12, shoulderY - h * 0.012,
+      cx + shoulderW * 0.32, shoulderY - h * 0.018,
+      cx + shoulderW * 0.46, shoulderY + h * 0.02,
+    );
+    // Right shoulder cap transition (smooth connection to arm area)
+    torsoPath.cubicTo(
       cx + shoulderW * 0.50, shoulderY + h * 0.035,
+      cx + shoulderW * 0.51, shoulderY + h * 0.055,
+      cx + shoulderW * 0.50, shoulderY + h * 0.075,
     );
-    // Right side (slight taper in)
+    // Right side — natural waist tapering inward with organic curve
     torsoPath.cubicTo(
-      cx + shoulderW * 0.50, shoulderY + h * 0.08,
-      cx + shoulderW * 0.46, torsoBottom - h * 0.04,
-      cx + shoulderW * 0.44, torsoBottom,
+      cx + shoulderW * 0.48, shoulderY + h * 0.12,
+      cx + shoulderW * 0.42, torsoBottom - h * 0.06,
+      cx + shoulderW * 0.40, torsoBottom,
     );
-    // Bottom
-    torsoPath.lineTo(cx - shoulderW * 0.44, torsoBottom);
-    // Left side
+    // Bottom — gentle belly curve
+    torsoPath.quadraticBezierTo(
+      cx, torsoBottom + h * 0.008,
+      cx - shoulderW * 0.40, torsoBottom,
+    );
+    // Left side — mirror waist curve
     torsoPath.cubicTo(
-      cx - shoulderW * 0.46, torsoBottom - h * 0.04,
-      cx - shoulderW * 0.50, shoulderY + h * 0.08,
+      cx - shoulderW * 0.42, torsoBottom - h * 0.06,
+      cx - shoulderW * 0.48, shoulderY + h * 0.12,
+      cx - shoulderW * 0.50, shoulderY + h * 0.075,
+    );
+    // Left shoulder cap transition
+    torsoPath.cubicTo(
+      cx - shoulderW * 0.51, shoulderY + h * 0.055,
       cx - shoulderW * 0.50, shoulderY + h * 0.035,
+      cx - shoulderW * 0.46, shoulderY + h * 0.02,
     );
-    // Left shoulder
+    // Left shoulder — rounded dome
     torsoPath.cubicTo(
-      cx - shoulderW * 0.38, shoulderY - h * 0.005,
-      cx - shoulderW * 0.15, shoulderY - h * 0.01,
-      cx, shoulderY + h * 0.02,
+      cx - shoulderW * 0.32, shoulderY - h * 0.018,
+      cx - shoulderW * 0.12, shoulderY - h * 0.012,
+      cx, shoulderY + h * 0.015,
     );
     torsoPath.close();
 
@@ -312,27 +340,66 @@ class TorsoPainter extends CustomPainter {
 
   void _drawFolds(Canvas canvas, double cx, double sy, double sw, double h,
       double bottom) {
-    final foldPaint = Paint()
+    final foldDark = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 0.8
       ..color = Color.lerp(shirtColor, Colors.black, 0.10)!
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1);
 
-    // Center fold
+    final foldLight = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 0.6
+      ..color = Color.lerp(shirtColor, Colors.white, 0.08)!
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.2);
+
+    // Center fold — subtle vertical crease
     final fold1 = Path()
       ..moveTo(cx - 1, sy + h * 0.06)
       ..quadraticBezierTo(cx + 1, (sy + bottom) * 0.52, cx, bottom);
-    canvas.drawPath(fold1, foldPaint);
+    canvas.drawPath(fold1, foldDark);
 
-    // Side folds
+    // Center fold highlight (offset slightly for 3D)
+    final fold1hl = Path()
+      ..moveTo(cx + 1.5, sy + h * 0.065)
+      ..quadraticBezierTo(cx + 2.5, (sy + bottom) * 0.52, cx + 1.5, bottom);
+    canvas.drawPath(fold1hl, foldLight);
+
+    // Side folds — converge toward waist
     for (final side in [-1.0, 1.0]) {
+      // Dark fold line
       final fold = Path()
-        ..moveTo(cx + side * sw * 0.30, sy + h * 0.04)
-        ..quadraticBezierTo(
-          cx + side * sw * 0.25, (sy + bottom) * 0.53,
-          cx + side * sw * 0.28, bottom,
+        ..moveTo(cx + side * sw * 0.32, sy + h * 0.04)
+        ..cubicTo(
+          cx + side * sw * 0.30, sy + h * 0.10,
+          cx + side * sw * 0.24, (sy + bottom) * 0.52,
+          cx + side * sw * 0.26, bottom,
         );
-      canvas.drawPath(fold, foldPaint);
+      canvas.drawPath(fold, foldDark);
+
+      // Highlight ridge next to fold
+      final foldHL = Path()
+        ..moveTo(cx + side * sw * 0.28, sy + h * 0.04)
+        ..cubicTo(
+          cx + side * sw * 0.26, sy + h * 0.10,
+          cx + side * sw * 0.20, (sy + bottom) * 0.52,
+          cx + side * sw * 0.22, bottom,
+        );
+      canvas.drawPath(foldHL, foldLight);
+
+      // Armpit crease shadow — soft curved shadow under the arm
+      final armpitShadow = Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.0
+        ..color = Color.lerp(shirtColor, Colors.black, 0.12)!
+            .withValues(alpha: 0.3)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+      final armpit = Path()
+        ..moveTo(cx + side * sw * 0.46, sy + h * 0.04)
+        ..quadraticBezierTo(
+          cx + side * sw * 0.42, sy + h * 0.065,
+          cx + side * sw * 0.36, sy + h * 0.05,
+        );
+      canvas.drawPath(armpit, armpitShadow);
     }
   }
 
@@ -716,6 +783,7 @@ class HandPainter extends CustomPainter {
       double side, Color highlight, Color shadow) {
     final palmW = hs * 0.85;
     final palmH = hs * 0.75;
+    final skinPaint = Paint()..color = skinColor;
 
     final palmRect = Rect.fromCenter(
       center: Offset(cx, cy + palmH * 0.2),
@@ -747,17 +815,18 @@ class HandPainter extends CustomPainter {
         width: hs * 0.25,
         height: hs * 0.32,
       ),
-      Paint()..color = skinColor,
+      skinPaint,
     );
 
     // Knuckle line hint
     final knucklePaint = Paint()
       ..color = shadow.withValues(alpha: 0.12)
+      ..strokeWidth = 1.0
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
     canvas.drawLine(
       Offset(cx - palmW * 0.25, cy - palmH * 0.05),
       Offset(cx + palmW * 0.25, cy - palmH * 0.05),
-      knucklePaint..strokeWidth = 1.0,
+      knucklePaint,
     );
   }
 
@@ -870,6 +939,8 @@ class HandPainter extends CustomPainter {
       double side, Color highlight, Color shadow) {
     final palmW = hs * 0.7;
     final palmH = hs * 0.6;
+    final skinPaint = Paint()..color = skinColor;
+    final nailPaint = Paint()..color = highlight.withValues(alpha: 0.5);
 
     // Fist base (rounded, compact)
     final fistRect = Rect.fromCenter(
@@ -889,7 +960,6 @@ class HandPainter extends CustomPainter {
     );
 
     // Curled finger bumps on top (3 small arcs)
-    final bumpPaint = Paint()..color = skinColor;
     for (int i = 0; i < 3; i++) {
       final bx = cx - palmW * 0.15 + i * palmW * 0.18;
       canvas.drawOval(
@@ -898,7 +968,7 @@ class HandPainter extends CustomPainter {
           width: palmW * 0.16,
           height: palmW * 0.12,
         ),
-        bumpPaint,
+        skinPaint,
       );
     }
 
@@ -916,7 +986,7 @@ class HandPainter extends CustomPainter {
         ),
         Radius.circular(fingerW * 0.5),
       ),
-      Paint()..color = skinColor,
+      skinPaint,
     );
 
     // Nail on index
@@ -929,7 +999,7 @@ class HandPainter extends CustomPainter {
         ),
         Radius.circular(fingerW * 0.4),
       ),
-      Paint()..color = highlight.withValues(alpha: 0.5),
+      nailPaint,
     );
 
     // Thumb
@@ -940,7 +1010,7 @@ class HandPainter extends CustomPainter {
         width: hs * 0.22,
         height: hs * 0.28,
       ),
-      Paint()..color = skinColor,
+      skinPaint,
     );
   }
 
@@ -949,6 +1019,8 @@ class HandPainter extends CustomPainter {
       double side, Color highlight, Color shadow) {
     final palmW = hs * 0.7;
     final palmH = hs * 0.6;
+    final skinPaint = Paint()..color = skinColor;
+    final nailPaint = Paint()..color = highlight.withValues(alpha: 0.5);
 
     // Fist
     final fistRect = Rect.fromCenter(
@@ -1002,7 +1074,7 @@ class HandPainter extends CustomPainter {
         ),
         Radius.circular(thumbW * 0.5),
       ),
-      Paint()..color = skinColor,
+      skinPaint,
     );
 
     // Thumbnail
@@ -1015,7 +1087,7 @@ class HandPainter extends CustomPainter {
         ),
         Radius.circular(thumbW * 0.4),
       ),
-      Paint()..color = highlight.withValues(alpha: 0.5),
+      nailPaint,
     );
 
     canvas.restore();

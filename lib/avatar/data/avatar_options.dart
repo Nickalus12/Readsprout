@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 
 /// Metadata for all avatar customization options: labels, colors, and unlock conditions.
 ///

@@ -1,7 +1,7 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 
-import 'avatar_animation_system.dart' show BonePose, BoneTransform;
+import 'animation_system.dart' show BonePose, BoneTransform;
 
 // ═══════════════════════════════════════════════════════════════════════
 //  BONE SPRING — Damped harmonic oscillator for touch interaction

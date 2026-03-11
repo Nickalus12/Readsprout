@@ -3,11 +3,11 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
-import '../data/avatar_options.dart';
+import '../avatar/data/avatar_options.dart';
 import '../models/player_profile.dart';
 import '../services/profile_service.dart';
 import '../theme/app_theme.dart';
-import '../widgets/avatar_widget.dart';
+import '../avatar/avatar_widget.dart';
 
 /// Full-screen avatar editor with live preview and category-based customization.
 ///

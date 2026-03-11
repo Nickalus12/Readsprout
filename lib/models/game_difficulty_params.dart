@@ -113,6 +113,40 @@ class GameDifficultyParams {
           gameSpeed: lerp(0.5, 1.5, difficulty),
           distractorCount: lerpInt(2, 8, difficulty),
         );
+      case 'word_rocket':
+        return GameDifficultyParams(
+          difficulty: difficulty,
+          lives: lerpInt(5, 2, difficulty),
+          gameSpeed: lerp(0.8, 1.5, difficulty),
+          wordCount: lerpInt(8, 15, difficulty),
+        );
+      case 'sight_word_safari':
+        return GameDifficultyParams(
+          difficulty: difficulty,
+          gameDurationSeconds: lerp(10, 5, difficulty),
+          distractorCount: lerpInt(3, 6, difficulty),
+          wordCount: lerpInt(10, 18, difficulty),
+        );
+      case 'word_ninja':
+        return GameDifficultyParams(
+          difficulty: difficulty,
+          lives: lerpInt(5, 2, difficulty),
+          gameDurationSeconds: lerp(60, 30, difficulty),
+          spawnInterval: lerp(1.5, 0.6, difficulty),
+          distractorCount: lerpInt(2, 5, difficulty),
+        );
+      case 'spelling_bee':
+        return GameDifficultyParams(
+          difficulty: difficulty,
+          wordCount: lerpInt(8, 15, difficulty),
+          distractorCount: lerpInt(3, 6, difficulty),
+        );
+      case 'word_train':
+        return GameDifficultyParams(
+          difficulty: difficulty,
+          wordCount: lerpInt(6, 12, difficulty),
+          distractorCount: lerpInt(2, 5, difficulty),
+        );
       default:
         return GameDifficultyParams(difficulty: difficulty);
     }

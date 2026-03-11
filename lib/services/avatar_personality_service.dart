@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:hive/hive.dart';
 
-import '../widgets/avatar_widget.dart' show AvatarExpression;
+import '../avatar/avatar_widget.dart' show AvatarExpression;
 
 // ══════════════════════════════════════════════════════════════════════
 //  AVATAR PERSONALITY — Hive-persisted, evolves over weeks of play

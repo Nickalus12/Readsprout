@@ -2,16 +2,17 @@ import 'dart:async';
 import 'dart:math';
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import '../data/avatar_options.dart';
+import 'data/avatar_options.dart';
 import '../models/player_profile.dart';
-import 'avatar_gyroscope.dart';
+import 'animation/gyroscope.dart';
 import '../theme/app_theme.dart';
-import 'avatar_accessory_painters.dart';
-import 'avatar_animation_system.dart';
-import 'avatar_body_painters.dart' hide shirtColorOptions;
-import 'avatar_effects_painters.dart';
-import 'avatar_hair_painters.dart' show HairBackPainter, HairFrontPainter;
-import 'avatar_skeleton.dart';
+import 'painters/accessory_painters.dart';
+import 'animation/animation_system.dart';
+import 'painters/body_painters.dart' hide shirtColorOptions;
+import 'painters/effects_painters.dart';
+import 'painters/hair_painters.dart' show HairBackPainter, HairFrontPainter;
+import 'shader_loader.dart';
+import 'animation/skeleton.dart';
 
 /// Avatar rendering engine — Pixar-quality character rendering in code.
 ///
@@ -456,7 +457,10 @@ class _AvatarWidgetState extends State<AvatarWidget>
 
   // ── Face geometry ──────────────────────────────────────────────────
 
-  double get _faceTop => 0.18;
+  double get _faceTop => 0.12;
+
+  /// Scaled head size (0.82 of widget size) used for face feature positioning.
+  double _headSize(double s) => s * 0.82;
 
   double get _faceHeightFraction {
     final shape = faceShapeOptions[
@@ -513,8 +517,6 @@ class _AvatarWidgetState extends State<AvatarWidget>
     // Head sway derived from skeleton head bone's world rotation
     final headStorage = _skeleton.head.worldTransform.storage;
     final swayAngle = atan2(headStorage[1], headStorage[0]);
-    final centerX = size / 2;
-
     // Expression-driven transforms
     final browOffset = _browOffsetY(size);
     final jawDrop = _jawDrop(size);
@@ -607,26 +609,30 @@ class _AvatarWidgetState extends State<AvatarWidget>
               ),
 
               // 5. Head bone: unified sway rotation for all face features
+              // Scaled down from full widgetW to avoid oversized head
               Positioned(
-                left: 0,
-                top: 0,
-                width: widgetW,
-                height: widgetW,
+                left: widgetW * 0.09,
+                top: widgetW * -0.04,
+                width: widgetW * 0.82,
+                height: widgetW * 0.82,
                 child: Transform(
                   alignment: Alignment.center,
                   transform: Matrix4.identity()
-                    ..translateByDouble(centerX, centerX / 2, 0, 0)
+                    ..translateByDouble(
+                        widgetW * 0.82 / 2, widgetW * 0.82 / 4, 0, 0)
                     ..rotateZ(swayAngle)
-                    ..translateByDouble(-centerX, -centerX / 2, 0, 0),
+                    ..translateByDouble(
+                        -widgetW * 0.82 / 2, -widgetW * 0.82 / 4, 0, 0),
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
-                      // Face shape
+                      // Face shape (bottom-most layer inside head)
                       Positioned(
-                        left: size * 0.15,
-                        top: size * _faceTop,
+                        left: _headSize(size) * 0.15,
+                        top: _headSize(size) * _faceTop,
                         child: CustomPaint(
-                          size: Size(size * 0.70, size * _faceHeightFraction),
+                          size: Size(_headSize(size) * 0.70,
+                              _headSize(size) * _faceHeightFraction),
                           isComplex: true,
                           willChange: widget.animateEffects,
                           painter: FacePainter(
@@ -639,12 +645,38 @@ class _AvatarWidgetState extends State<AvatarWidget>
                         ),
                       ),
 
-                      // Nose
+                      // Hair front layer — rendered AFTER face but BEFORE
+                      // eyes/nose/mouth so face features are visible on top
+                      // of the hair fringe (bangs). The offset compensates
+                      // for the head bone's Positioned inset so hair paints
+                      // in the original full-widget coordinate space.
                       Positioned(
-                        left: size * 0.44,
-                        top: size * (_faceTop + _faceHeightFraction * 0.52),
+                        left: -widgetW * 0.09,
+                        top: widgetW * 0.04,
+                        width: widgetW,
+                        height: widgetW,
                         child: CustomPaint(
-                          size: Size(size * 0.12, size * 0.10),
+                          isComplex: true,
+                          willChange: widget.animateEffects,
+                          painter: HairFrontPainter(
+                            style: config.hairStyle,
+                            color: _hairColor,
+                            isRainbow: isRainbowHair(config.hairColor),
+                            faceShape: config.faceShape,
+                            swayValue: _idleSwayValue,
+                            repaint: _repaintNotifier,
+                          ),
+                        ),
+                      ),
+
+                      // Nose (renders ON TOP of hair front layer)
+                      Positioned(
+                        left: _headSize(size) * 0.44,
+                        top: _headSize(size) *
+                            (_faceTop + _faceHeightFraction * 0.52),
+                        child: CustomPaint(
+                          size: Size(
+                              _headSize(size) * 0.12, _headSize(size) * 0.10),
                           isComplex: true,
                           willChange: widget.animateEffects,
                           painter: NosePainter(
@@ -659,10 +691,12 @@ class _AvatarWidgetState extends State<AvatarWidget>
                       // Cheeks
                       if (config.cheekStyle > 0)
                         Positioned(
-                          left: size * 0.18,
-                          top: size * (_faceTop + _faceHeightFraction * 0.48),
+                          left: _headSize(size) * 0.18,
+                          top: _headSize(size) *
+                              (_faceTop + _faceHeightFraction * 0.48),
                           child: CustomPaint(
-                            size: Size(size * 0.64, size * 0.20),
+                            size: Size(
+                                _headSize(size) * 0.64, _headSize(size) * 0.20),
                             isComplex: true,
                             painter: CheekPainter(
                               style: config.cheekStyle,
@@ -673,10 +707,12 @@ class _AvatarWidgetState extends State<AvatarWidget>
 
                       // Eyes
                       Positioned(
-                        left: size * 0.26,
-                        top: size * (_faceTop + _faceHeightFraction * 0.28),
+                        left: _headSize(size) * 0.26,
+                        top: _headSize(size) *
+                            (_faceTop + _faceHeightFraction * 0.28),
                         child: CustomPaint(
-                          size: Size(size * 0.48, size * 0.16),
+                          size: Size(
+                              _headSize(size) * 0.48, _headSize(size) * 0.16),
                           isComplex: true,
                           willChange: widget.animateEffects,
                           painter: EyesPainter(
@@ -686,9 +722,10 @@ class _AvatarWidgetState extends State<AvatarWidget>
                             blinkValue: blinkAnim,
                             swayValue: swayAnim,
                             pupilDilationValue: pupilAnim,
-                            expression: widget.controller?.expression ?? AvatarExpression.neutral,
+                            expression: widget.controller?.expression ??
+                                AvatarExpression.neutral,
                             lookTarget: widget.controller?.lookTarget,
-                            avatarSize: size,
+                            avatarSize: _headSize(size),
                             repaint: _repaintNotifier,
                           ),
                         ),
@@ -697,10 +734,12 @@ class _AvatarWidgetState extends State<AvatarWidget>
                       // Eyelashes
                       if (config.eyelashStyle > 0)
                         Positioned(
-                          left: size * 0.26,
-                          top: size * (_faceTop + _faceHeightFraction * 0.22),
+                          left: _headSize(size) * 0.26,
+                          top: _headSize(size) *
+                              (_faceTop + _faceHeightFraction * 0.22),
                           child: CustomPaint(
-                            size: Size(size * 0.48, size * 0.20),
+                            size: Size(
+                                _headSize(size) * 0.48, _headSize(size) * 0.20),
                             painter: EyelashPainter(
                               style: config.eyelashStyle,
                               eyeStyle: config.eyeStyle,
@@ -710,12 +749,14 @@ class _AvatarWidgetState extends State<AvatarWidget>
 
                       // Eyebrows (expression-driven offset)
                       Positioned(
-                        left: size * 0.26,
-                        top: size * (_faceTop + _faceHeightFraction * 0.16),
+                        left: _headSize(size) * 0.26,
+                        top: _headSize(size) *
+                            (_faceTop + _faceHeightFraction * 0.16),
                         child: Transform.translate(
                           offset: Offset(0, browOffset),
                           child: CustomPaint(
-                            size: Size(size * 0.48, size * 0.10),
+                            size: Size(
+                                _headSize(size) * 0.48, _headSize(size) * 0.10),
                             painter: EyebrowPainter(
                               style: config.eyebrowStyle,
                               color: _hairColor,
@@ -726,20 +767,26 @@ class _AvatarWidgetState extends State<AvatarWidget>
 
                       // Mouth (jaw transform)
                       Positioned(
-                        left: size * 0.35,
-                        top: size * (_faceTop + _faceHeightFraction * 0.68),
+                        left: _headSize(size) * 0.35,
+                        top: _headSize(size) *
+                            (_faceTop + _faceHeightFraction * 0.68),
                         child: Transform.translate(
                           offset: Offset(0, jawDrop),
                           child: CustomPaint(
-                            size: Size(size * 0.30, size * 0.12),
+                            size: Size(
+                                _headSize(size) * 0.30, _headSize(size) * 0.12),
                             isComplex: true,
                             willChange: widget.controller != null,
                             painter: MouthPainter(
                               style: config.mouthStyle,
                               lipColor: _lipColor,
-                              expression: widget.controller?.expression ?? AvatarExpression.neutral,
-                              mouthOpenAmount: widget.controller?.mouthOpenAmount ?? 0.0,
-                              repaint: widget.controller != null ? _repaintNotifier : null,
+                              expression: widget.controller?.expression ??
+                                  AvatarExpression.neutral,
+                              mouthOpenAmount:
+                                  widget.controller?.mouthOpenAmount ?? 0.0,
+                              repaint: widget.controller != null
+                                  ? _repaintNotifier
+                                  : null,
                             ),
                           ),
                         ),
@@ -748,10 +795,11 @@ class _AvatarWidgetState extends State<AvatarWidget>
                       // Face paint
                       if (config.facePaint > 0)
                         Positioned(
-                          left: size * 0.15,
-                          top: size * _faceTop,
+                          left: _headSize(size) * 0.15,
+                          top: _headSize(size) * _faceTop,
                           child: CustomPaint(
-                            size: Size(size * 0.70, size * _faceHeightFraction),
+                            size: Size(_headSize(size) * 0.70,
+                                _headSize(size) * _faceHeightFraction),
                             isComplex: true,
                             painter: FacePaintPainter(
                               style: config.facePaint,
@@ -763,37 +811,20 @@ class _AvatarWidgetState extends State<AvatarWidget>
                       // Glasses
                       if (config.glassesStyle > 0)
                         Positioned(
-                          left: size * 0.26,
-                          top: size * (_faceTop + _faceHeightFraction * 0.28),
+                          left: _headSize(size) * 0.26,
+                          top: _headSize(size) *
+                              (_faceTop + _faceHeightFraction * 0.28),
                           child: CustomPaint(
-                            size: Size(size * 0.48, size * 0.16),
+                            size: Size(
+                                _headSize(size) * 0.48, _headSize(size) * 0.16),
                             isComplex: true,
                             painter: GlassesPainter(
                               style: config.glassesStyle,
                             ),
                           ),
                         ),
-                    ],
-                  ),
-                ),
-              ),
 
-              // 6. Hair front layer
-              Positioned(
-                left: 0,
-                top: 0,
-                width: widgetW,
-                height: widgetW,
-                child: CustomPaint(
-                  isComplex: true,
-                  willChange: widget.animateEffects,
-                  painter: HairFrontPainter(
-                    style: config.hairStyle,
-                    color: _hairColor,
-                    isRainbow: isRainbowHair(config.hairColor),
-                    faceShape: config.faceShape,
-                    swayValue: _idleSwayValue,
-                    repaint: _repaintNotifier,
+                    ],
                   ),
                 ),
               ),
@@ -882,12 +913,14 @@ class FacePainter extends CustomPainter {
   final int faceShape;
   final Animation<double> breathingValue;
   final Animation<double> swayValue;
+  final double time;
 
   FacePainter({
     required this.skinColor,
     required this.faceShape,
     required this.breathingValue,
     required this.swayValue,
+    this.time = 0.0,
     super.repaint,
   });
 
@@ -906,17 +939,27 @@ class FacePainter extends CustomPainter {
     canvas.scale(1.0, breathScale);
     canvas.translate(-center.dx, -center.dy);
 
-    // ── Chin ambient occlusion ──
-    final chinAO = Paint()
-      ..color = const Color(0xFF3A3060).withValues(alpha: 0.12)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8.0);
+    // ── Chin ambient occlusion (softer, layered) ──
     canvas.drawOval(
       Rect.fromCenter(
-        center: Offset(w * 0.5, h * 1.0),
-        width: w * 0.65,
-        height: h * 0.16,
+        center: Offset(w * 0.5, h * 1.02),
+        width: w * 0.70,
+        height: h * 0.20,
       ),
-      chinAO,
+      Paint()
+        ..color = const Color(0xFF3A3060).withValues(alpha: 0.14)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10.0),
+    );
+    // Secondary softer chin shadow for natural falloff
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(w * 0.5, h * 0.96),
+        width: w * 0.55,
+        height: h * 0.12,
+      ),
+      Paint()
+        ..color = const Color(0xFF3A3060).withValues(alpha: 0.06)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 14.0),
     );
 
     // ── Ears ──
@@ -943,6 +986,68 @@ class FacePainter extends CustomPainter {
 
     final facePath = _buildFacePath(w, h);
     canvas.drawPath(facePath, gradientPaint);
+
+    // ── Subsurface scattering simulation (Dart fallback) ──
+    canvas.save();
+    canvas.clipPath(facePath);
+    // Warm glow at cheeks (blood flow under thin skin)
+    for (final cheekX in [w * 0.22, w * 0.78]) {
+      final cheekSSS = Rect.fromCenter(
+        center: Offset(cheekX, h * 0.55),
+        width: w * 0.28,
+        height: h * 0.22,
+      );
+      canvas.drawOval(
+        cheekSSS,
+        Paint()
+          ..blendMode = BlendMode.overlay
+          ..shader = RadialGradient(
+            colors: [
+              Color.lerp(skinColor, const Color(0xFFFF8080), 0.35)!
+                  .withValues(alpha: 0.18),
+              Colors.transparent,
+            ],
+          ).createShader(cheekSSS),
+      );
+    }
+    // Warm glow at nose tip (SSS)
+    final noseTipSSS = Rect.fromCenter(
+      center: Offset(w * 0.50, h * 0.58),
+      width: w * 0.14,
+      height: h * 0.10,
+    );
+    canvas.drawOval(
+      noseTipSSS,
+      Paint()
+        ..blendMode = BlendMode.overlay
+        ..shader = RadialGradient(
+          colors: [
+            Color.lerp(skinColor, const Color(0xFFFF9090), 0.30)!
+                .withValues(alpha: 0.15),
+            Colors.transparent,
+          ],
+        ).createShader(noseTipSSS),
+    );
+    // ── Temple shadows ──
+    for (final templeX in [w * 0.08, w * 0.92]) {
+      final templeRect = Rect.fromCenter(
+        center: Offset(templeX, h * 0.28),
+        width: w * 0.22,
+        height: h * 0.28,
+      );
+      canvas.drawOval(
+        templeRect,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              Color.lerp(skinColor, const Color(0xFF5A4A7E), 0.18)!
+                  .withValues(alpha: 0.12),
+              Colors.transparent,
+            ],
+          ).createShader(templeRect),
+      );
+    }
+    canvas.restore(); // end SSS + temple clip
 
     // ── Subtle rim light (warm edge highlight on the lit side) ──
     final rimLight = Paint()
@@ -983,13 +1088,61 @@ class FacePainter extends CustomPainter {
       noseBridgeAO,
     );
 
+    // ── Philtrum (vertical indent between nose and upper lip) ──
+    canvas.save();
+    canvas.clipPath(facePath);
+    final philtrumX = w * 0.5;
+    final philtrumTop = h * 0.64;
+    final philtrumBot = h * 0.74;
+    final philtrumShadow = Paint()
+      ..color = Color.lerp(skinColor, const Color(0xFF5A4A7E), 0.15)!
+          .withValues(alpha: 0.12)
+      ..strokeWidth = w * 0.008
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(
+      Offset(philtrumX - w * 0.018, philtrumTop),
+      Offset(philtrumX - w * 0.012, philtrumBot),
+      philtrumShadow,
+    );
+    canvas.drawLine(
+      Offset(philtrumX + w * 0.018, philtrumTop),
+      Offset(philtrumX + w * 0.012, philtrumBot),
+      philtrumShadow,
+    );
+    canvas.drawLine(
+      Offset(philtrumX, philtrumTop + h * 0.01),
+      Offset(philtrumX, philtrumBot - h * 0.01),
+      Paint()
+        ..color = Color.lerp(skinColor, const Color(0xFFFFF8E0), 0.12)!
+            .withValues(alpha: 0.10)
+        ..strokeWidth = w * 0.008
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke,
+    );
+    canvas.restore();
+
     // ── Head silhouette outline ──
-    // Subtle stroke to define the head shape against dark backgrounds
     final outlinePaint = Paint()
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.5
       ..color = skinColor.withValues(alpha: 0.3);
     canvas.drawPath(facePath, outlinePaint);
+
+    // ── Skin glow shader (GPU subsurface scattering) ──
+    final skinShader = ShaderLoader.skinGlow;
+    if (skinShader != null) {
+      skinShader.setFloat(0, w);   // uSize.x
+      skinShader.setFloat(1, h);   // uSize.y
+      skinShader.setFloat(2, time); // uTime — real elapsed seconds
+      canvas.save();
+      canvas.clipPath(facePath);
+      canvas.drawRect(
+        faceRect,
+        Paint()..shader = skinShader,
+      );
+      canvas.restore();
+    }
 
     canvas.restore();
   }
@@ -1018,23 +1171,50 @@ class FacePainter extends CustomPainter {
       );
       canvas.drawOval(earRect, Paint()..shader = earGradient.createShader(earRect));
 
-      // Inner ear shadow — pinkish
+      // Inner ear shadow — pinkish (slightly larger for realism)
       final innerCx = isLeft ? -earW * 0.15 : w + earW * 0.15;
       final innerRect = Rect.fromCenter(
         center: Offset(innerCx, earY),
-        width: earW * 0.5,
-        height: earH * 0.5,
-      );
-      final innerGradient = RadialGradient(
-        colors: [
-          Color.lerp(skinColor, const Color(0xFFFF9090), 0.2)!
-              .withValues(alpha: 0.5),
-          Colors.transparent,
-        ],
+        width: earW * 0.55,
+        height: earH * 0.55,
       );
       canvas.drawOval(
         innerRect,
-        Paint()..shader = innerGradient.createShader(innerRect),
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              Color.lerp(skinColor, const Color(0xFFFF9090), 0.25)!
+                  .withValues(alpha: 0.45),
+              Colors.transparent,
+            ],
+          ).createShader(innerRect),
+      );
+
+      // ── Inner ear fold/concha detail ──
+      final foldPaint = Paint()
+        ..color = Color.lerp(skinColor, const Color(0xFF8A6A5E), 0.25)!
+            .withValues(alpha: 0.22)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = earW * 0.06
+        ..strokeCap = StrokeCap.round;
+      final foldPath = Path();
+      final foldCx = isLeft ? -earW * 0.10 : w + earW * 0.10;
+      final foldDir = isLeft ? -1.0 : 1.0;
+      foldPath.moveTo(foldCx + foldDir * earW * 0.08, earY - earH * 0.22);
+      foldPath.quadraticBezierTo(
+        foldCx + foldDir * earW * 0.20, earY,
+        foldCx + foldDir * earW * 0.06, earY + earH * 0.18,
+      );
+      canvas.drawPath(foldPath, foldPaint);
+
+      // Tragus bump
+      final tragusX = isLeft ? earW * 0.1 : w - earW * 0.1;
+      canvas.drawCircle(
+        Offset(tragusX, earY + earH * 0.02),
+        earW * 0.06,
+        Paint()
+          ..color = Color.lerp(skinColor, const Color(0xFF8A6A5E), 0.12)!
+              .withValues(alpha: 0.18),
       );
     }
   }
@@ -1086,19 +1266,24 @@ class FacePainter extends CustomPainter {
 
   @override
   bool shouldRepaint(FacePainter old) =>
-      old.skinColor != skinColor || old.faceShape != faceShape;
+      old.skinColor != skinColor ||
+      old.faceShape != faceShape ||
+      old.time != time;
 }
 
-// ═══════════════════════════════════════════════════════════════════════
-//  EYES PAINTER
-//  - Limbal ring (dark outer iris edge)
-//  - Radial fiber texture via thin lines emanating from pupil
-//  - Caustic-like light patterns on iris
-//  - Dual specular highlights (large soft + small sharp)
+// ═════════════════════════════════════════════════════════════════════
+//  EYES PAINTER — Pixar-quality eye rendering
+//  - Soft sclera gradient with subtle pink veining at edges
+//  - Multi-layered iris: limbal ring, SweepGradient fiber overlay,
+//    radial fiber lines, color depth gradient, caustic crescent
+//  - Soft-edged pupil with responsive dilation
+//  - Dual specular highlights with slight blue tint (catch light)
+//  - Eye shadow under upper eyelid for depth
+//  - Lower eyelid subtle line
 //  - Eyelid-sweep blink (skin-colored shape sweeps down, not scaleY)
 //  - Pupil dilation micro-animation
-//  - Eye tracking (pupils shift with idle sway)
-// ═══════════════════════════════════════════════════════════════════════
+//  - Eye tracking (pupils shift with idle sway or lookTarget)
+// ═════════════════════════════════════════════════════════════════════
 
 class EyesPainter extends CustomPainter {
   final int style;
@@ -1128,7 +1313,9 @@ class EyesPainter extends CustomPainter {
     super.repaint,
   });
 
-  // Mutable state set during paint() for use by sub-methods
+  // Mutable state set during paint() and read by sub-methods within the same
+  // paint call. This avoids passing trackY through every drawing method's
+  // parameter list. Safe because paint() is always single-threaded.
   double _currentTrackY = 0.0;
 
   @override
@@ -1151,25 +1338,25 @@ class EyesPainter extends CustomPainter {
     double trackX;
     double trackY = 0.0;
     if (lookTarget != null) {
-      // Normalize target relative to avatar center, clamp to ±1
       final eyeAreaLeft = avatarSize * 0.26;
       final eyeAreaTop = avatarSize * 0.28;
       final eyesCenterX = eyeAreaLeft + w * 0.5;
       final eyesCenterY = eyeAreaTop + h * 0.5;
-      final dx = ((lookTarget!.dx - eyesCenterX) / avatarSize).clamp(-1.0, 1.0);
-      final dy = ((lookTarget!.dy - eyesCenterY) / avatarSize).clamp(-1.0, 1.0);
+      final dx =
+          ((lookTarget!.dx - eyesCenterX) / avatarSize).clamp(-1.0, 1.0);
+      final dy =
+          ((lookTarget!.dy - eyesCenterY) / avatarSize).clamp(-1.0, 1.0);
       trackX = dx * eyeRadius * 0.25;
       trackY = dy * eyeRadius * 0.15;
     } else {
       trackX = (swayValue.value - 0.5) * eyeRadius * 0.15;
     }
 
-    // Pupil dilation: radius oscillates 0.28r ↔ 0.35r
-    // Surprised expression dilates more
-    final baseDilation = expression == AvatarExpression.surprised ? 0.32 : 0.28;
+    // Pupil dilation: radius oscillates 0.28r <-> 0.35r
+    final baseDilation =
+        expression == AvatarExpression.surprised ? 0.32 : 0.28;
     final pupilScale = baseDilation + pupilDilationValue.value * 0.07;
 
-    // Store trackY for use in drawing methods
     _currentTrackY = trackY;
 
     switch (style) {
@@ -1179,13 +1366,11 @@ class EyesPainter extends CustomPainter {
         _drawEyelid(canvas, leftCenter, eyeRadius, w);
         _drawEyelid(canvas, rightCenter, eyeRadius, w);
       case 1: // Star
-        final paint = Paint()..color = AppColors.starGold;
-        _drawStar(canvas, leftCenter, eyeRadius, paint);
-        _drawStar(canvas, rightCenter, eyeRadius, paint);
+        _drawStarEye(canvas, leftCenter, eyeRadius);
+        _drawStarEye(canvas, rightCenter, eyeRadius);
       case 2: // Hearts
-        final paint = Paint()..color = const Color(0xFFFF4D6A);
-        _drawHeart(canvas, leftCenter, eyeRadius, paint);
-        _drawHeart(canvas, rightCenter, eyeRadius, paint);
+        _drawHeartEye(canvas, leftCenter, eyeRadius);
+        _drawHeartEye(canvas, rightCenter, eyeRadius);
       case 3: // Happy Crescents
         _drawCrescentEyes(canvas, leftCenter, rightCenter, eyeRadius);
       case 4: // Sparkle
@@ -1207,207 +1392,351 @@ class EyesPainter extends CustomPainter {
     }
   }
 
-  /// The fully detailed round eye with iris fibers, limbal ring, etc.
-  void _drawFullEye(Canvas canvas, Offset center, double r, double trackX,
-      double pupilScale) {
-    // ── Sclera ──
-    canvas.drawCircle(center, r, Paint()..color = Colors.white);
+  // ----------------------------------------------------------------
+  //  Shared rendering helpers
+  // ----------------------------------------------------------------
 
-    // Sclera top shadow (subtle blue-gray, like eyelid casting shadow)
+  /// Sclera: soft white-to-cream radial gradient + subtle pink veining.
+  void _drawSclera(Canvas canvas, Offset center, double r) {
+    final scleraRect = Rect.fromCircle(center: center, radius: r);
+
+    // Warm white-to-cream radial gradient
+    canvas.drawCircle(
+      center,
+      r,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment.center,
+          radius: 1.0,
+          colors: [
+            Color(0xFFFFFEFC),
+            Color(0xFFFAF8F5),
+            Color(0xFFF0EDE8),
+          ],
+          stops: [0.0, 0.65, 1.0],
+        ).createShader(scleraRect),
+    );
+
+    // Subtle pink veining near left/right edges
+    final veinPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeCap = StrokeCap.round;
+    final veinRng = Random(17);
+    for (int i = 0; i < 5; i++) {
+      final side = i < 3 ? -1.0 : 1.0;
+      final baseAngle = side > 0 ? 0.0 : pi;
+      final angle = baseAngle + (veinRng.nextDouble() - 0.5) * 0.7;
+      final startR = r * (0.72 + veinRng.nextDouble() * 0.15);
+      final endR = r * (0.88 + veinRng.nextDouble() * 0.10);
+      final startPt = Offset(
+        center.dx + startR * cos(angle),
+        center.dy + startR * sin(angle),
+      );
+      final endPt = Offset(
+        center.dx + endR * cos(angle + (veinRng.nextDouble() - 0.5) * 0.3),
+        center.dy + endR * sin(angle + (veinRng.nextDouble() - 0.5) * 0.3),
+      );
+      veinPaint
+        ..color = const Color(0xFFE8A0A0)
+            .withValues(alpha: 0.12 + veinRng.nextDouble() * 0.08)
+        ..strokeWidth = r * (0.008 + veinRng.nextDouble() * 0.012);
+      canvas.drawLine(startPt, endPt, veinPaint);
+    }
+
+    // Upper eyelid shadow cast onto sclera
     canvas.drawCircle(
       center,
       r,
       Paint()
         ..shader = ui.Gradient.linear(
           Offset(center.dx, center.dy - r),
-          Offset(center.dx, center.dy - r * 0.3),
+          Offset(center.dx, center.dy - r * 0.15),
           [
-            const Color(0xFF8892B0).withValues(alpha: 0.18),
+            const Color(0xFF7080A0).withValues(alpha: 0.22),
+            const Color(0xFF8892B0).withValues(alpha: 0.06),
             Colors.transparent,
           ],
+          [0.0, 0.5, 1.0],
         ),
     );
+  }
 
-    // ── Iris ──
-    final irisCenter = center.translate(r * 0.10 + trackX, _currentTrackY);
-    final irisR = r * 0.58;
+  /// Multi-layered iris: base gradient, SweepGradient fiber overlay,
+  /// radial fiber lines, caustic crescent, limbal ring.
+  void _drawIris(Canvas canvas, Offset irisCenter, double irisR) {
     final irisRect = Rect.fromCircle(center: irisCenter, radius: irisR);
 
-    // Base iris gradient (3-stop: lighter inner, main, darker outer)
-    final irisGradient = RadialGradient(
-      center: Alignment.center,
-      radius: 1.0,
-      colors: [
-        Color.lerp(eyeColor, Colors.white, 0.35)!,
-        eyeColor,
-        Color.lerp(eyeColor, Colors.black, 0.3)!,
-      ],
-      stops: const [0.0, 0.5, 1.0],
-    );
+    // 1. Base radial gradient
     canvas.drawCircle(
       irisCenter,
       irisR,
-      Paint()..shader = irisGradient.createShader(irisRect),
+      Paint()
+        ..shader = RadialGradient(
+          center: Alignment.center,
+          radius: 1.0,
+          colors: [
+            Color.lerp(eyeColor, Colors.white, 0.45)!,
+            Color.lerp(eyeColor, Colors.white, 0.15)!,
+            eyeColor,
+            Color.lerp(eyeColor, Colors.black, 0.25)!,
+          ],
+          stops: const [0.0, 0.25, 0.6, 1.0],
+        ).createShader(irisRect),
     );
 
-    // ── Radial fiber texture ──
-    // Draw thin semi-transparent lines from pupil edge outward
-    final fiberPaint = Paint()
+    // 2. SweepGradient fiber overlay
+    canvas.save();
+    canvas.clipPath(Path()..addOval(irisRect));
+
+    const fiberCount = 36;
+    final fiberColors = <Color>[];
+    final fiberStops = <double>[];
+    final fiberRng = Random(42);
+    for (int i = 0; i < fiberCount; i++) {
+      final t = i / fiberCount;
+      final isLight = fiberRng.nextDouble() > 0.45;
+      fiberColors.add(
+        isLight
+            ? Color.lerp(eyeColor, Colors.white,
+                    0.30 + fiberRng.nextDouble() * 0.15)!
+                .withValues(alpha: 0.18)
+            : Color.lerp(eyeColor, Colors.black,
+                    0.15 + fiberRng.nextDouble() * 0.10)!
+                .withValues(alpha: 0.14),
+      );
+      fiberStops.add(t);
+    }
+    fiberColors.add(fiberColors.first);
+    fiberStops.add(1.0);
+
+    final fiberPath = Path()
+      ..addOval(Rect.fromCircle(center: irisCenter, radius: irisR * 0.98))
+      ..addOval(Rect.fromCircle(center: irisCenter, radius: irisR * 0.32))
+      ..fillType = PathFillType.evenOdd;
+    canvas.drawPath(
+      fiberPath,
+      Paint()
+        ..shader = SweepGradient(
+          center: Alignment.center,
+          colors: fiberColors,
+          stops: fiberStops,
+        ).createShader(irisRect),
+    );
+
+    // 3. Crisp radial fiber lines
+    final linePaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = irisR * 0.03;
-    final fiberRng = Random(42); // deterministic for consistency
-    for (int i = 0; i < 24; i++) {
-      final angle = (i / 24) * 2 * pi + fiberRng.nextDouble() * 0.1;
-      final innerR = irisR * 0.35;
-      final outerR = irisR * (0.75 + fiberRng.nextDouble() * 0.2);
-      final brightness = fiberRng.nextDouble();
-      fiberPaint.color = brightness > 0.5
-          ? Color.lerp(eyeColor, Colors.white, 0.25)!.withValues(alpha: 0.2)
-          : Color.lerp(eyeColor, Colors.black, 0.2)!.withValues(alpha: 0.15);
+      ..strokeWidth = irisR * 0.025;
+    for (int i = 0; i < 28; i++) {
+      final angle = (i / 28) * 2 * pi + fiberRng.nextDouble() * 0.08;
+      final innerR2 = irisR * (0.30 + fiberRng.nextDouble() * 0.08);
+      final outerR2 = irisR * (0.78 + fiberRng.nextDouble() * 0.18);
+      linePaint.color = fiberRng.nextDouble() > 0.5
+          ? Color.lerp(eyeColor, Colors.white, 0.28)!.withValues(alpha: 0.16)
+          : Color.lerp(eyeColor, Colors.black, 0.18)!.withValues(alpha: 0.12);
       canvas.drawLine(
-        Offset(
-          irisCenter.dx + innerR * cos(angle),
-          irisCenter.dy + innerR * sin(angle),
-        ),
-        Offset(
-          irisCenter.dx + outerR * cos(angle),
-          irisCenter.dy + outerR * sin(angle),
-        ),
-        fiberPaint,
+        Offset(irisCenter.dx + innerR2 * cos(angle),
+            irisCenter.dy + innerR2 * sin(angle)),
+        Offset(irisCenter.dx + outerR2 * cos(angle),
+            irisCenter.dy + outerR2 * sin(angle)),
+        linePaint,
       );
     }
 
-    // ── Caustic-like light pattern ──
-    // A crescent of lighter color on the upper-left iris area
-    canvas.save();
-    canvas.clipPath(Path()..addOval(irisRect));
+    // 4. Caustic crescent
     final causticRect = Rect.fromCenter(
-      center: irisCenter.translate(-irisR * 0.2, -irisR * 0.15),
-      width: irisR * 1.0,
-      height: irisR * 0.6,
+      center: irisCenter.translate(-irisR * 0.22, -irisR * 0.18),
+      width: irisR * 1.1,
+      height: irisR * 0.65,
     );
     canvas.drawOval(
       causticRect,
       Paint()
         ..shader = RadialGradient(
           colors: [
-            Color.lerp(eyeColor, Colors.white, 0.4)!.withValues(alpha: 0.2),
+            Color.lerp(eyeColor, Colors.white, 0.50)!.withValues(alpha: 0.25),
             Colors.transparent,
           ],
         ).createShader(causticRect),
     );
+
     canvas.restore();
 
-    // ── Limbal ring (dark outer iris edge) ──
+    // 5. Limbal ring with gradient fade
     canvas.drawCircle(
       irisCenter,
       irisR,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = irisR * 0.08
-        ..color = Color.lerp(eyeColor, Colors.black, 0.5)!
-            .withValues(alpha: 0.6),
-    );
-
-    // ── Pupil ──
-    final pupilR = r * pupilScale;
-    final pupilCenter = center.translate(r * 0.12 + trackX, _currentTrackY);
-    canvas.drawCircle(
-      pupilCenter,
-      pupilR,
-      Paint()..color = const Color(0xFF050510),
-    );
-
-    // ── Dual specular highlights ──
-    // Large soft highlight (top-left)
-    final bigHighlightCenter = center.translate(r * 0.22, -r * 0.22);
-    final bigHighlightRect = Rect.fromCenter(
-      center: bigHighlightCenter,
-      width: r * 0.42,
-      height: r * 0.32,
-    );
-    canvas.drawOval(
-      bigHighlightRect,
-      Paint()
+        ..strokeWidth = irisR * 0.10
         ..shader = RadialGradient(
           colors: [
-            Colors.white.withValues(alpha: 0.92),
-            Colors.white.withValues(alpha: 0.0),
+            Colors.transparent,
+            Color.lerp(eyeColor, const Color(0xFF0A0A1A), 0.55)!
+                .withValues(alpha: 0.65),
           ],
-        ).createShader(bigHighlightRect),
-    );
-
-    // Small sharp highlight (bottom-right)
-    canvas.drawCircle(
-      center.translate(-r * 0.12, r * 0.18),
-      r * 0.08,
-      Paint()..color = Colors.white.withValues(alpha: 0.7),
+          stops: const [0.85, 1.0],
+        ).createShader(Rect.fromCircle(center: irisCenter, radius: irisR)),
     );
   }
 
-  /// Eyelid-sweep blink: a skin-colored arc sweeps down over the eye.
+  /// Pupil with soft-edged gradient.
+  void _drawPupil(Canvas canvas, Offset pupilCenter, double pupilR) {
+    canvas.drawCircle(
+      pupilCenter,
+      pupilR,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFF020208),
+            const Color(0xFF050510),
+            const Color(0xFF050510).withValues(alpha: 0.85),
+          ],
+          stops: const [0.0, 0.75, 1.0],
+        ).createShader(Rect.fromCircle(center: pupilCenter, radius: pupilR)),
+    );
+  }
+
+  /// Dual specular highlights with slight blue tint (Pixar catch-lights).
+  void _drawHighlights(Canvas canvas, Offset center, double r) {
+    // Primary: large soft oval at upper-left
+    final bigCenter = center.translate(r * 0.24, -r * 0.24);
+    final bigRect =
+        Rect.fromCenter(center: bigCenter, width: r * 0.48, height: r * 0.36);
+    canvas.drawOval(
+      bigRect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFF0F4FF).withValues(alpha: 0.95),
+            const Color(0xFFE8EEFF).withValues(alpha: 0.40),
+            Colors.transparent,
+          ],
+          stops: const [0.0, 0.55, 1.0],
+        ).createShader(bigRect),
+    );
+
+    // Secondary: smaller dimmer spot at lower-right
+    final smallCenter = center.translate(-r * 0.14, r * 0.20);
+    final smallRect = Rect.fromCircle(center: smallCenter, radius: r * 0.10);
+    canvas.drawCircle(
+      smallCenter,
+      r * 0.10,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFE8F0FF).withValues(alpha: 0.72),
+            Colors.transparent,
+          ],
+        ).createShader(smallRect),
+    );
+  }
+
+  /// Subtle lower eyelid line for depth.
+  void _drawLowerEyelid(Canvas canvas, Offset center, double r) {
+    canvas.drawArc(
+      Rect.fromCenter(
+        center: Offset(center.dx, center.dy + r * 0.05),
+        width: r * 1.9,
+        height: r * 1.7,
+      ),
+      pi * 0.05,
+      pi * 0.9,
+      false,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * 0.04
+        ..strokeCap = StrokeCap.round
+        ..color = Color.lerp(skinColor, const Color(0xFF8878A0), 0.18)!
+            .withValues(alpha: 0.30),
+    );
+  }
+
+  // ----------------------------------------------------------------
+  //  Case 0: Round eye
+  // ----------------------------------------------------------------
+
+  void _drawFullEye(Canvas canvas, Offset center, double r, double trackX,
+      double pupilScale) {
+    _drawSclera(canvas, center, r);
+
+    final irisCenter = center.translate(r * 0.10 + trackX, _currentTrackY);
+    _drawIris(canvas, irisCenter, r * 0.58);
+
+    final pupilCenter = center.translate(r * 0.12 + trackX, _currentTrackY);
+    _drawPupil(canvas, pupilCenter, r * pupilScale);
+
+    _drawHighlights(canvas, center, r);
+    _drawLowerEyelid(canvas, center, r);
+  }
+
+  // ----------------------------------------------------------------
+  //  Eyelid blink
+  // ----------------------------------------------------------------
+
   void _drawEyelid(Canvas canvas, Offset center, double r, double totalW) {
     final blink = blinkValue.value;
     if (blink < 0.01) return;
 
-    // Eyelid sweeps from top of eye downward
     final lidTop = center.dy - r * 1.1;
     final lidBottom = center.dy - r * 1.1 + (r * 2.2) * blink;
 
     canvas.save();
-    // Clip to eye area so eyelid doesn't spill outside
-    canvas.clipPath(Path()..addOval(
-      Rect.fromCircle(center: center, radius: r * 1.05),
-    ));
+    canvas.clipPath(
+        Path()..addOval(Rect.fromCircle(center: center, radius: r * 1.05)));
 
-    // Eyelid skin
     final lidRect = Rect.fromLTWH(
-      center.dx - r * 1.1,
-      lidTop,
-      r * 2.2,
-      lidBottom - lidTop,
+        center.dx - r * 1.1, lidTop, r * 2.2, lidBottom - lidTop);
+    canvas.drawRect(
+      lidRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color.lerp(skinColor, const Color(0xFFFFF8E0), 0.05)!,
+            skinColor,
+            Color.lerp(skinColor, const Color(0xFF6A5A8E), 0.10)!,
+          ],
+        ).createShader(lidRect),
     );
-    final lidGradient = LinearGradient(
-      begin: Alignment.topCenter,
-      end: Alignment.bottomCenter,
-      colors: [
-        Color.lerp(skinColor, const Color(0xFFFFF8E0), 0.05)!,
-        skinColor,
-        Color.lerp(skinColor, const Color(0xFF6A5A8E), 0.08)!,
-      ],
-    );
-    canvas.drawRect(lidRect, Paint()..shader = lidGradient.createShader(lidRect));
 
-    // Eyelid crease shadow at the bottom edge
-    final creasePaint = Paint()
-      ..color = Color.lerp(skinColor, const Color(0xFF4A3A6E), 0.2)!
-          .withValues(alpha: 0.4)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+    // Crease shadow
     canvas.drawLine(
       Offset(center.dx - r * 0.9, lidBottom),
       Offset(center.dx + r * 0.9, lidBottom),
-      creasePaint..strokeWidth = r * 0.12,
+      Paint()
+        ..color = Color.lerp(skinColor, const Color(0xFF4A3A6E), 0.22)!
+            .withValues(alpha: 0.45)
+        ..strokeWidth = r * 0.14
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
     );
 
-    // Lash line at bottom of eyelid
-    if (blink > 0.3) {
-      final lashLine = Paint()
-        ..color = const Color(0xFF1A1A2E).withValues(alpha: 0.5 * blink)
-        ..strokeWidth = r * 0.08
-        ..strokeCap = StrokeCap.round;
+    // Lash line
+    if (blink > 0.25) {
       canvas.drawArc(
-        Rect.fromCenter(center: Offset(center.dx, lidBottom), width: r * 1.8, height: r * 0.6),
+        Rect.fromCenter(
+            center: Offset(center.dx, lidBottom),
+            width: r * 1.8,
+            height: r * 0.5),
         0,
         pi,
         false,
-        lashLine,
+        Paint()
+          ..color = const Color(0xFF1A1A2E).withValues(alpha: 0.55 * blink)
+          ..strokeWidth = r * 0.08
+          ..strokeCap = StrokeCap.round
+          ..style = PaintingStyle.stroke,
       );
     }
 
     canvas.restore();
   }
 
-  /// Almond eyelid sweep adapted to almond eye shape.
+  // ----------------------------------------------------------------
+  //  Case 5: Almond eyelid
+  // ----------------------------------------------------------------
+
   void _drawAlmondEyelid(Canvas canvas, Offset center, double r) {
     final blink = blinkValue.value;
     if (blink < 0.01) return;
@@ -1416,7 +1745,6 @@ class EyesPainter extends CustomPainter {
     final lidBottom = center.dy - r * 1.0 + (r * 2.0) * blink;
 
     canvas.save();
-    // Clip to almond eye shape
     final almondPath = Path()
       ..moveTo(center.dx - r * 1.2, center.dy)
       ..quadraticBezierTo(
@@ -1427,11 +1755,7 @@ class EyesPainter extends CustomPainter {
     canvas.clipPath(almondPath);
 
     final lidRect = Rect.fromLTWH(
-      center.dx - r * 1.3,
-      lidTop,
-      r * 2.6,
-      lidBottom - lidTop,
-    );
+        center.dx - r * 1.3, lidTop, r * 2.6, lidBottom - lidTop);
     canvas.drawRect(
       lidRect,
       Paint()
@@ -1441,86 +1765,80 @@ class EyesPainter extends CustomPainter {
           colors: [
             Color.lerp(skinColor, const Color(0xFFFFF8E0), 0.05)!,
             skinColor,
+            Color.lerp(skinColor, const Color(0xFF6A5A8E), 0.06)!,
           ],
         ).createShader(lidRect),
     );
 
+    if (blink > 0.15) {
+      canvas.drawLine(
+        Offset(center.dx - r * 1.0, lidBottom),
+        Offset(center.dx + r * 1.0, lidBottom),
+        Paint()
+          ..color = Color.lerp(skinColor, const Color(0xFF4A3A6E), 0.18)!
+              .withValues(alpha: 0.35)
+          ..strokeWidth = r * 0.10
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5)
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+
     canvas.restore();
   }
+
+  // ----------------------------------------------------------------
+  //  Case 4: Sparkle
+  // ----------------------------------------------------------------
 
   void _drawSparkleEye(Canvas canvas, Offset center, double r, double trackX,
       double pupilScale) {
     final bigR = r * 1.3;
 
-    // White sclera
-    canvas.drawCircle(center, bigR, Paint()..color = Colors.white);
+    _drawSclera(canvas, center, bigR);
 
-    // Sclera top shadow
-    canvas.drawCircle(
-      center,
-      bigR,
-      Paint()
-        ..shader = ui.Gradient.linear(
-          Offset(center.dx, center.dy - bigR),
-          Offset(center.dx, center.dy - bigR * 0.3),
-          [
-            const Color(0xFF8892B0).withValues(alpha: 0.15),
-            Colors.transparent,
-          ],
-        ),
-    );
+    final irisCenter =
+        center.translate(trackX * 0.5, _currentTrackY * 0.5);
+    _drawIris(canvas, irisCenter, bigR * 0.65);
+    _drawPupil(canvas, irisCenter, bigR * pupilScale * 0.85);
 
-    // Iris with gradient + limbal ring
-    final irisR = bigR * 0.65;
-    final irisRect = Rect.fromCircle(center: center, radius: irisR);
+    // Multiple sparkle highlights
+    final h1 = center.translate(bigR * 0.30, -bigR * 0.22);
     canvas.drawCircle(
-      center,
-      irisR,
+      h1,
+      bigR * 0.30,
       Paint()
         ..shader = RadialGradient(
           colors: [
-            Color.lerp(eyeColor, Colors.white, 0.35)!,
-            eyeColor,
-            Color.lerp(eyeColor, Colors.black, 0.3)!,
+            const Color(0xFFF8FCFF).withValues(alpha: 0.95),
+            const Color(0xFFE0ECFF).withValues(alpha: 0.3),
+            Colors.transparent,
           ],
           stops: const [0.0, 0.5, 1.0],
-        ).createShader(irisRect),
-    );
-
-    // Limbal ring
-    canvas.drawCircle(
-      center,
-      irisR,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = irisR * 0.07
-        ..color = Color.lerp(eyeColor, Colors.black, 0.45)!
-            .withValues(alpha: 0.5),
-    );
-
-    // Pupil
-    canvas.drawCircle(
-      center,
-      bigR * pupilScale * 0.85,
-      Paint()..color = const Color(0xFF050510),
-    );
-
-    // Large sparkle highlights
-    canvas.drawCircle(
-      center.translate(bigR * 0.3, -bigR * 0.2),
-      bigR * 0.28,
-      Paint()..color = Colors.white.withValues(alpha: 0.9),
+        ).createShader(Rect.fromCircle(center: h1, radius: bigR * 0.30)),
     );
     canvas.drawCircle(
-      center.translate(-bigR * 0.2, bigR * 0.25),
-      bigR * 0.14,
-      Paint()..color = Colors.white.withValues(alpha: 0.6),
+      center.translate(-bigR * 0.22, bigR * 0.26),
+      bigR * 0.16,
+      Paint()..color = const Color(0xFFF0F4FF).withValues(alpha: 0.65),
+    );
+    canvas.drawCircle(
+      center.translate(bigR * 0.08, bigR * 0.35),
+      bigR * 0.06,
+      Paint()..color = Colors.white.withValues(alpha: 0.50),
+    );
+    canvas.drawCircle(
+      center.translate(-bigR * 0.35, -bigR * 0.10),
+      bigR * 0.05,
+      Paint()..color = Colors.white.withValues(alpha: 0.40),
     );
   }
 
+  // ----------------------------------------------------------------
+  //  Case 5: Almond eye
+  // ----------------------------------------------------------------
+
   void _drawAlmondEye(Canvas canvas, Offset center, double r, double trackX,
       double pupilScale) {
-    // Almond shape
     final path = Path()
       ..moveTo(center.dx - r * 1.2, center.dy)
       ..quadraticBezierTo(
@@ -1532,142 +1850,141 @@ class EyesPainter extends CustomPainter {
     canvas.save();
     canvas.clipPath(path);
 
-    // White sclera fill
-    canvas.drawPath(path, Paint()..color = Colors.white);
-
-    // Sclera top shadow
     final scleraRect = Rect.fromCircle(center: center, radius: r * 1.2);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = const RadialGradient(
+          colors: [Color(0xFFFFFEFC), Color(0xFFF5F2EE)],
+        ).createShader(scleraRect),
+    );
+
     canvas.drawRect(
       scleraRect,
       Paint()
         ..shader = ui.Gradient.linear(
           Offset(center.dx, center.dy - r),
-          Offset(center.dx, center.dy - r * 0.2),
+          Offset(center.dx, center.dy - r * 0.15),
           [
-            const Color(0xFF8892B0).withValues(alpha: 0.15),
+            const Color(0xFF7080A0).withValues(alpha: 0.18),
             Colors.transparent,
           ],
         ),
     );
 
-    // Iris with gradient
     final irisCenter = center.translate(r * 0.10 + trackX, _currentTrackY);
-    final irisR = r * 0.50;
-    final irisRect = Rect.fromCircle(center: irisCenter, radius: irisR);
-    canvas.drawCircle(
-      irisCenter,
-      irisR,
-      Paint()
-        ..shader = RadialGradient(
-          colors: [
-            Color.lerp(eyeColor, Colors.white, 0.3)!,
-            eyeColor,
-            Color.lerp(eyeColor, Colors.black, 0.3)!,
-          ],
-          stops: const [0.0, 0.45, 1.0],
-        ).createShader(irisRect),
-    );
+    _drawIris(canvas, irisCenter, r * 0.50);
 
-    // Limbal ring
-    canvas.drawCircle(
-      irisCenter,
-      irisR,
-      Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = irisR * 0.08
-        ..color = Color.lerp(eyeColor, Colors.black, 0.45)!
-            .withValues(alpha: 0.5),
-    );
-
-    // Fiber texture (fewer for almond — 16 fibers)
-    final fiberPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = irisR * 0.03;
-    final fiberRng = Random(42);
-    for (int i = 0; i < 16; i++) {
-      final angle = (i / 16) * 2 * pi + fiberRng.nextDouble() * 0.1;
-      final innerR = irisR * 0.35;
-      final outerR = irisR * (0.7 + fiberRng.nextDouble() * 0.25);
-      fiberPaint.color = fiberRng.nextDouble() > 0.5
-          ? Color.lerp(eyeColor, Colors.white, 0.2)!.withValues(alpha: 0.15)
-          : Color.lerp(eyeColor, Colors.black, 0.15)!.withValues(alpha: 0.12);
-      canvas.drawLine(
-        Offset(
-          irisCenter.dx + innerR * cos(angle),
-          irisCenter.dy + innerR * sin(angle),
-        ),
-        Offset(
-          irisCenter.dx + outerR * cos(angle),
-          irisCenter.dy + outerR * sin(angle),
-        ),
-        fiberPaint,
-      );
-    }
-
-    // Pupil
-    canvas.drawCircle(
-      center.translate(r * 0.12 + trackX, _currentTrackY),
-      r * pupilScale,
-      Paint()..color = const Color(0xFF050510),
-    );
-
-    // Highlight
-    canvas.drawOval(
-      Rect.fromCenter(
-        center: center.translate(r * 0.22, -r * 0.18),
-        width: r * 0.32,
-        height: r * 0.22,
-      ),
-      Paint()..color = Colors.white.withValues(alpha: 0.85),
-    );
-
-    // Small highlight
-    canvas.drawCircle(
-      center.translate(-r * 0.1, r * 0.15),
-      r * 0.07,
-      Paint()..color = Colors.white.withValues(alpha: 0.5),
-    );
+    final pupilCenter = center.translate(r * 0.12 + trackX, _currentTrackY);
+    _drawPupil(canvas, pupilCenter, r * pupilScale);
+    _drawHighlights(canvas, center, r);
 
     canvas.restore();
+
+    // Subtle eyeliner along top edge
+    final linerPath = Path()
+      ..moveTo(center.dx - r * 1.2, center.dy)
+      ..quadraticBezierTo(
+          center.dx, center.dy - r * 1.0, center.dx + r * 1.2, center.dy);
+    canvas.drawPath(
+      linerPath,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * 0.06
+        ..color = const Color(0xFF2A2040).withValues(alpha: 0.35)
+        ..strokeCap = StrokeCap.round,
+    );
   }
+
+  // ----------------------------------------------------------------
+  //  Case 3: Happy Crescents
+  // ----------------------------------------------------------------
 
   void _drawCrescentEyes(Canvas canvas, Offset left, Offset right, double r) {
-    final paint = Paint()
-      ..color = const Color(0xFF1A1A2E)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = r * 0.5
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      Rect.fromCenter(center: left, width: r * 2, height: r * 1.5),
-      pi * 0.1,
-      pi * 0.8,
-      false,
-      paint,
-    );
-    canvas.drawArc(
-      Rect.fromCenter(center: right, width: r * 2, height: r * 1.5),
-      pi * 0.1,
-      pi * 0.8,
-      false,
-      paint,
-    );
+    for (final center in [left, right]) {
+      // Outer glow
+      canvas.drawArc(
+        Rect.fromCenter(center: center, width: r * 2.2, height: r * 1.7),
+        pi * 0.05,
+        pi * 0.9,
+        false,
+        Paint()
+          ..color = const Color(0xFF1A1A2E).withValues(alpha: 0.10)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.7
+          ..strokeCap = StrokeCap.round
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
+      );
+      // Gradient crescent
+      canvas.drawArc(
+        Rect.fromCenter(center: center, width: r * 2, height: r * 1.5),
+        pi * 0.1,
+        pi * 0.8,
+        false,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.45
+          ..strokeCap = StrokeCap.round
+          ..shader = ui.Gradient.linear(
+            Offset(center.dx - r, center.dy),
+            Offset(center.dx + r, center.dy),
+            const [Color(0xFF2A2040), Color(0xFF1A1A2E), Color(0xFF2A2040)],
+            [0.0, 0.5, 1.0],
+          ),
+      );
+      // Tiny highlight
+      canvas.drawArc(
+        Rect.fromCenter(center: center, width: r * 1.4, height: r * 0.9),
+        pi * 0.25,
+        pi * 0.5,
+        false,
+        Paint()
+          ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.08)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.12
+          ..strokeCap = StrokeCap.round,
+      );
+    }
   }
 
+  // ----------------------------------------------------------------
+  //  Case 6: Wink
+  // ----------------------------------------------------------------
+
   void _drawWinkEye(Canvas canvas, Offset center, double r) {
-    final paint = Paint()
-      ..color = const Color(0xFF1A1A2E)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = r * 0.4
-      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromCenter(center: center, width: r * 2.2, height: r * 1.4),
+      pi * 0.05,
+      pi * 0.9,
+      false,
+      Paint()
+        ..color = const Color(0xFF1A1A2E).withValues(alpha: 0.08)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * 0.55
+        ..strokeCap = StrokeCap.round
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5),
+    );
     canvas.drawArc(
       Rect.fromCenter(center: center, width: r * 2.0, height: r * 1.2),
       pi * 0.1,
       pi * 0.8,
       false,
-      paint,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * 0.38
+        ..strokeCap = StrokeCap.round
+        ..shader = ui.Gradient.linear(
+          Offset(center.dx - r, center.dy),
+          Offset(center.dx + r, center.dy),
+          const [Color(0xFF2A2040), Color(0xFF1A1A2E), Color(0xFF2A2040)],
+          [0.0, 0.5, 1.0],
+        ),
     );
   }
+
+  // ----------------------------------------------------------------
+  //  Case 7: Sleepy
+  // ----------------------------------------------------------------
 
   void _drawSleepyEyes(
       Canvas canvas, Offset left, Offset right, double r, double trackX) {
@@ -1676,69 +1993,124 @@ class EyesPainter extends CustomPainter {
       canvas.clipRect(Rect.fromLTWH(
           center.dx - r * 1.2, center.dy - r * 0.15, r * 2.4, r * 1.2));
 
-      canvas.drawCircle(center, r, Paint()..color = Colors.white);
+      _drawSclera(canvas, center, r);
 
-      // Iris with gradient
-      final irisCenter = center.translate(r * 0.1 + trackX, 0.05 + _currentTrackY);
-      final irisR = r * 0.55;
-      final irisRect = Rect.fromCircle(center: irisCenter, radius: irisR);
-      canvas.drawCircle(
-        irisCenter,
-        irisR,
-        Paint()
-          ..shader = RadialGradient(
-            colors: [
-              Color.lerp(eyeColor, Colors.white, 0.25)!,
-              eyeColor,
-              Color.lerp(eyeColor, Colors.black, 0.3)!,
-            ],
-            stops: const [0.0, 0.5, 1.0],
-          ).createShader(irisRect),
-      );
-
-      // Limbal ring
-      canvas.drawCircle(
-        irisCenter,
-        irisR,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = irisR * 0.07
-          ..color = Color.lerp(eyeColor, Colors.black, 0.4)!
-              .withValues(alpha: 0.4),
-      );
-
-      // Pupil
-      canvas.drawCircle(
-        center.translate(r * 0.12 + trackX, 0.05 + _currentTrackY),
+      // Iris with gradient (slight downward offset for sleepy droop)
+      final irisCenter =
+          center.translate(r * 0.1 + trackX, r * 0.05 + _currentTrackY);
+      _drawIris(canvas, irisCenter, r * 0.55);
+      _drawPupil(
+        canvas,
+        center.translate(r * 0.12 + trackX, r * 0.05 + _currentTrackY),
         r * 0.30,
-        Paint()..color = const Color(0xFF050510),
       );
-
-      // Small highlight
-      canvas.drawCircle(
-        center.translate(r * 0.2, -r * 0.05),
-        r * 0.1,
-        Paint()..color = Colors.white.withValues(alpha: 0.7),
-      );
+      _drawHighlights(canvas, center, r * 0.85);
 
       canvas.restore();
 
-      // Eyelid line — sleepy droop
-      final lidPaint = Paint()
-        ..color = Color.lerp(skinColor, const Color(0xFF4A3A6E), 0.15)!
-            .withValues(alpha: 0.6)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = r * 0.22
-        ..strokeCap = StrokeCap.round;
+      // Sleepy droop lid line with gradient
+      final droopRect = Rect.fromLTWH(
+          center.dx - r * 0.9, center.dy - r * 0.25, r * 1.8, r * 0.30);
       canvas.drawLine(
         Offset(center.dx - r * 0.9, center.dy - r * 0.1),
         Offset(center.dx + r * 0.9, center.dy - r * 0.1),
-        lidPaint,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = r * 0.22
+          ..strokeCap = StrokeCap.round
+          ..shader = LinearGradient(
+            colors: [
+              Color.lerp(skinColor, const Color(0xFF4A3A6E), 0.12)!
+                  .withValues(alpha: 0.45),
+              Color.lerp(skinColor, const Color(0xFF4A3A6E), 0.18)!
+                  .withValues(alpha: 0.65),
+              Color.lerp(skinColor, const Color(0xFF4A3A6E), 0.12)!
+                  .withValues(alpha: 0.45),
+            ],
+          ).createShader(droopRect),
       );
     }
   }
 
-  void _drawStar(Canvas canvas, Offset center, double r, Paint paint) {
+  // ----------------------------------------------------------------
+  //  Case 1: Star eyes
+  // ----------------------------------------------------------------
+
+  void _drawStarEye(Canvas canvas, Offset center, double r) {
+    final path = _starPath(center, r);
+
+    // Outer glow
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = AppColors.starGold.withValues(alpha: 0.25)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0),
+    );
+    // Gradient fill
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Color.lerp(AppColors.starGold, Colors.white, 0.40)!,
+            AppColors.starGold,
+            Color.lerp(AppColors.starGold, const Color(0xFFCC7700), 0.35)!,
+          ],
+          stops: const [0.0, 0.45, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: r)),
+    );
+    // Inner highlight
+    canvas.drawPath(
+      _starPath(center.translate(r * 0.08, -r * 0.12), r * 0.45),
+      Paint()..color = Colors.white.withValues(alpha: 0.30),
+    );
+  }
+
+  // ----------------------------------------------------------------
+  //  Case 2: Heart eyes
+  // ----------------------------------------------------------------
+
+  void _drawHeartEye(Canvas canvas, Offset center, double r) {
+    final path = _heartPath(center, r);
+
+    // Outer glow
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = const Color(0xFFFF4D6A).withValues(alpha: 0.20)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5),
+    );
+    // Gradient fill
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(0.0, -0.3),
+          colors: [
+            Color.lerp(const Color(0xFFFF4D6A), Colors.white, 0.30)!,
+            const Color(0xFFFF4D6A),
+            Color.lerp(
+                const Color(0xFFFF4D6A), const Color(0xFF9B1030), 0.40)!,
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(Rect.fromCircle(center: center, radius: r)),
+    );
+    // Shine highlight
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: center.translate(-r * 0.25, -r * 0.35),
+        width: r * 0.4,
+        height: r * 0.3,
+      ),
+      Paint()..color = Colors.white.withValues(alpha: 0.35),
+    );
+  }
+
+  // ----------------------------------------------------------------
+  //  Shape helpers
+  // ----------------------------------------------------------------
+
+  Path _starPath(Offset center, double r) {
     final path = Path();
     for (int i = 0; i < 5; i++) {
       final outerAngle = -pi / 2 + i * 2 * pi / 5;
@@ -1755,20 +2127,19 @@ class EyesPainter extends CustomPainter {
       path.lineTo(ix, iy);
     }
     path.close();
-    canvas.drawPath(path, paint);
+    return path;
   }
 
-  void _drawHeart(Canvas canvas, Offset center, double r, Paint paint) {
+  Path _heartPath(Offset center, double r) {
     final x = center.dx;
     final y = center.dy;
-    final path = Path()
+    return Path()
       ..moveTo(x, y + r * 0.5)
       ..cubicTo(
           x - r * 1.2, y - r * 0.3, x - r * 0.5, y - r * 1.0, x, y - r * 0.3)
       ..cubicTo(
           x + r * 0.5, y - r * 1.0, x + r * 1.2, y - r * 0.3, x, y + r * 0.5)
       ..close();
-    canvas.drawPath(path, paint);
   }
 
   @override
@@ -1777,7 +2148,8 @@ class EyesPainter extends CustomPainter {
       old.eyeColor != eyeColor ||
       old.skinColor != skinColor ||
       old.expression != expression ||
-      old.lookTarget != lookTarget;
+      old.lookTarget != lookTarget ||
+      old.avatarSize != avatarSize;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -1801,12 +2173,12 @@ class MouthPainter extends CustomPainter {
     super.repaint,
   });
 
+  /// Falls back to dark fill when lip color is fully transparent.
   Color get _effectiveLipFill =>
-      (lipColor.a * 255.0).round().clamp(0, 255) == 0
-          ? const Color(0xFF1A1A2E)
-          : lipColor;
+      lipColor.a < 0.004 ? const Color(0xFF1A1A2E) : lipColor;
 
-  bool get _hasLipColor => (lipColor.a * 255.0).round().clamp(0, 255) > 0;
+  /// True when the lip color has visible alpha (not fully transparent).
+  bool get _hasLipColor => lipColor.a >= 0.004;
 
   Paint _lipGradientPaint(Rect rect) {
     final base = _effectiveLipFill;
@@ -1821,6 +2193,57 @@ class MouthPainter extends CustomPainter {
         ],
         stops: const [0.0, 0.45, 1.0],
       ).createShader(rect);
+  }
+
+  /// Draw cupid's bow detail on upper lip
+  void _drawCupidsBow(Canvas canvas, double centerX, double topY, double mouthW) {
+    final bowPath = Path()
+      ..moveTo(centerX - mouthW * 0.12, topY + mouthW * 0.02)
+      ..quadraticBezierTo(centerX - mouthW * 0.04, topY - mouthW * 0.04,
+          centerX, topY + mouthW * 0.01)
+      ..quadraticBezierTo(centerX + mouthW * 0.04, topY - mouthW * 0.04,
+          centerX + mouthW * 0.12, topY + mouthW * 0.02);
+    canvas.drawPath(
+      bowPath,
+      Paint()
+        ..color = Color.lerp(_effectiveLipFill, const Color(0xFF4A2040), 0.25)!
+            .withValues(alpha: 0.35)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = mouthW * 0.015
+        ..strokeCap = StrokeCap.round,
+    );
+  }
+
+  /// Draw subtle highlight line at center of lower lip
+  void _drawLowerLipHighlight(Canvas canvas, double centerX, double lipY, double lipW) {
+    final highlightRect = Rect.fromCenter(
+      center: Offset(centerX, lipY),
+      width: lipW * 0.25,
+      height: lipW * 0.06,
+    );
+    canvas.drawOval(
+      highlightRect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.18),
+            Colors.transparent,
+          ],
+        ).createShader(highlightRect),
+    );
+  }
+
+  /// Draw lip line where lips meet when closed
+  void _drawLipLine(Canvas canvas, double centerX, double lineY, double lineW) {
+    canvas.drawLine(
+      Offset(centerX - lineW * 0.35, lineY),
+      Offset(centerX + lineW * 0.35, lineY),
+      Paint()
+        ..color = Color.lerp(_effectiveLipFill, const Color(0xFF2D1A2E), 0.35)!
+            .withValues(alpha: 0.25)
+        ..strokeWidth = lineW * 0.012
+        ..strokeCap = StrokeCap.round,
+    );
   }
 
   /// Draw individual rounded teeth inside a clipped mouth area.
@@ -1868,16 +2291,32 @@ class MouthPainter extends CustomPainter {
   void _drawTongue(Canvas canvas, Offset center, double w, double h) {
     final tongueRect = Rect.fromCenter(center: center, width: w, height: h);
 
-    // Base tongue gradient (pink edges → red center)
+    // Base tongue gradient (pink tip → deeper red at back)
     canvas.drawOval(
       tongueRect,
       Paint()
-        ..shader = const RadialGradient(
-          center: Alignment.center,
-          radius: 0.8,
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
           colors: [
-            Color(0xFFE04060), // darker center
-            Color(0xFFFF8FAB), // pink edges
+            Color(0xFFCC3050), // deeper red at back
+            Color(0xFFE04060), // mid tone
+            Color(0xFFFF8FAB), // pink at tip
+          ],
+          stops: [0.0, 0.4, 1.0],
+        ).createShader(tongueRect),
+    );
+
+    // Radial overlay for natural edges
+    canvas.drawOval(
+      tongueRect,
+      Paint()
+        ..shader = RadialGradient(
+          center: Alignment.center,
+          radius: 0.7,
+          colors: [
+            Colors.transparent,
+            const Color(0xFFCC3050).withValues(alpha: 0.15),
           ],
         ).createShader(tongueRect),
     );
@@ -1943,6 +2382,12 @@ class MouthPainter extends CustomPainter {
             ..quadraticBezierTo(w * 0.50, h * 0.50, w * 0.10, h * 0.20)
             ..close();
           canvas.drawPath(path, _lipGradientPaint(Rect.fromLTWH(0, 0, w, h)));
+          // Lip line
+          _drawLipLine(canvas, w * 0.5, h * 0.28, w);
+          // Cupid's bow
+          _drawCupidsBow(canvas, w * 0.5, h * 0.18, w * 0.6);
+          // Lower lip highlight
+          _drawLowerLipHighlight(canvas, w * 0.5, h * 0.40, w);
         } else {
           final paint = Paint()
             ..color = const Color(0xFF1A1A2E)
@@ -1978,6 +2423,8 @@ class MouthPainter extends CustomPainter {
         canvas.drawPath(mouthPath, _lipGradientPaint(Rect.fromLTWH(0, 0, w, h))
           ..style = PaintingStyle.stroke
           ..strokeWidth = w * 0.05);
+        // Cupid's bow
+        _drawCupidsBow(canvas, w * 0.5, h * 0.18, w * 0.7);
 
       case 2: // Tongue Out
         final mouthPath = Path()
@@ -2179,6 +2626,29 @@ class MouthPainter extends CustomPainter {
       canvas.restore();
     }
 
+    // Uvula hint when mouth is wide open
+    if (amount > 0.7) {
+      canvas.save();
+      canvas.clipPath(mouthPath);
+      final uvulaAlpha = ((amount - 0.7) / 0.3).clamp(0.0, 1.0);
+      final uvulaRect = Rect.fromCenter(
+        center: Offset(center.dx, center.dy + openH * 0.08),
+        width: openW * 0.06,
+        height: openH * 0.10,
+      );
+      canvas.drawOval(
+        uvulaRect,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              const Color(0xFFCC4060).withValues(alpha: 0.45 * uvulaAlpha),
+              const Color(0xFF2D1A2E),
+            ],
+          ).createShader(uvulaRect),
+      );
+      canvas.restore();
+    }
+
     // Tongue when mouth is wide enough (viseme > open)
     if (amount > 0.4) {
       final tongueAmount = ((amount - 0.4) / 0.6).clamp(0.0, 1.0);
@@ -2246,6 +2716,26 @@ class MouthPainter extends CustomPainter {
     // Dark mouth interior
     canvas.drawOval(innerRect, Paint()..color = const Color(0xFF2D1A2E));
 
+    // Uvula hint in back of throat
+    canvas.save();
+    canvas.clipPath(Path()..addOval(innerRect));
+    final uvulaRect = Rect.fromCenter(
+      center: Offset(center.dx, center.dy + h * 0.12),
+      width: w * 0.04,
+      height: h * 0.08,
+    );
+    canvas.drawOval(
+      uvulaRect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFCC4060).withValues(alpha: 0.5),
+            const Color(0xFF2D1A2E),
+          ],
+        ).createShader(uvulaRect),
+    );
+    canvas.restore();
+
     // Top teeth peeking
     canvas.save();
     canvas.clipPath(Path()..addOval(innerRect));
@@ -2291,36 +2781,49 @@ class NosePainter extends CustomPainter {
       ..color = Color.lerp(skinColor, const Color(0xFF4A3A6E), 0.22)!
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
 
-    // Breathing: nostrils flare slightly
-    final breathFlare = breathingValue.value * 0.03;
+    // Breathing: nostrils flare more visibly
+    final breathFlare = breathingValue.value * 0.05;
+    // Nostril size pulses with breathing
+    final nostrilPulse = 1.0 + breathingValue.value * 0.15;
 
     switch (style) {
       case 0: // Button
         canvas.drawCircle(Offset(w * 0.5, h * 0.5), w * 0.22, nosePaint);
-        // Nostril shadows (with breathing flare)
+        // Nostril shadows (with breathing flare + pulse)
         canvas.drawCircle(
-            Offset(w * (0.36 - breathFlare), h * 0.58), w * 0.065, shadowPaint);
+            Offset(w * (0.36 - breathFlare), h * 0.58), w * 0.065 * nostrilPulse, shadowPaint);
         canvas.drawCircle(
-            Offset(w * (0.64 + breathFlare), h * 0.58), w * 0.065, shadowPaint);
+            Offset(w * (0.64 + breathFlare), h * 0.58), w * 0.065 * nostrilPulse, shadowPaint);
         // Bridge highlight
         canvas.drawCircle(Offset(w * 0.53, h * 0.36), w * 0.09, highlightPaint);
+        // Nose bridge shadow refinement
+        _drawBridgeShadow(canvas, w, h);
+        // SSS glow at tip
+        _drawNoseTipGlow(canvas, w, h, Offset(w * 0.5, h * 0.5));
+        // Specular highlight at tip
+        _drawNoseSpecular(canvas, w, h, Offset(w * 0.52, h * 0.42));
 
       case 1: // Small
         canvas.drawCircle(Offset(w * 0.5, h * 0.5), w * 0.14, nosePaint);
-        // Tiny nostrils
         canvas.drawCircle(
-            Offset(w * (0.42 - breathFlare), h * 0.56), w * 0.035, shadowPaint);
+            Offset(w * (0.42 - breathFlare), h * 0.56), w * 0.035 * nostrilPulse, shadowPaint);
         canvas.drawCircle(
-            Offset(w * (0.58 + breathFlare), h * 0.56), w * 0.035, shadowPaint);
+            Offset(w * (0.58 + breathFlare), h * 0.56), w * 0.035 * nostrilPulse, shadowPaint);
         canvas.drawCircle(Offset(w * 0.53, h * 0.42), w * 0.05, highlightPaint);
+        _drawBridgeShadow(canvas, w, h);
+        _drawNoseTipGlow(canvas, w, h, Offset(w * 0.5, h * 0.5));
+        _drawNoseSpecular(canvas, w, h, Offset(w * 0.52, h * 0.44));
 
       case 2: // Round
         canvas.drawCircle(Offset(w * 0.5, h * 0.5), w * 0.28, nosePaint);
         canvas.drawCircle(
-            Offset(w * (0.34 - breathFlare), h * 0.58), w * 0.075, shadowPaint);
+            Offset(w * (0.34 - breathFlare), h * 0.58), w * 0.075 * nostrilPulse, shadowPaint);
         canvas.drawCircle(
-            Offset(w * (0.66 + breathFlare), h * 0.58), w * 0.075, shadowPaint);
+            Offset(w * (0.66 + breathFlare), h * 0.58), w * 0.075 * nostrilPulse, shadowPaint);
         canvas.drawCircle(Offset(w * 0.56, h * 0.34), w * 0.11, highlightPaint);
+        _drawBridgeShadow(canvas, w, h);
+        _drawNoseTipGlow(canvas, w, h, Offset(w * 0.5, h * 0.5));
+        _drawNoseSpecular(canvas, w, h, Offset(w * 0.54, h * 0.38));
 
       case 3: // Pointed
         final path = Path()
@@ -2331,10 +2834,13 @@ class NosePainter extends CustomPainter {
           ..close();
         canvas.drawPath(path, nosePaint);
         canvas.drawCircle(
-            Offset(w * (0.40 - breathFlare), h * 0.78), w * 0.05, shadowPaint);
+            Offset(w * (0.40 - breathFlare), h * 0.78), w * 0.05 * nostrilPulse, shadowPaint);
         canvas.drawCircle(
-            Offset(w * (0.60 + breathFlare), h * 0.78), w * 0.05, shadowPaint);
+            Offset(w * (0.60 + breathFlare), h * 0.78), w * 0.05 * nostrilPulse, shadowPaint);
         canvas.drawCircle(Offset(w * 0.52, h * 0.32), w * 0.06, highlightPaint);
+        _drawBridgeShadow(canvas, w, h);
+        _drawNoseTipGlow(canvas, w, h, Offset(w * 0.5, h * 0.72));
+        _drawNoseSpecular(canvas, w, h, Offset(w * 0.52, h * 0.30));
 
       case 4: // Snub
         final path = Path()
@@ -2346,11 +2852,71 @@ class NosePainter extends CustomPainter {
           ..close();
         canvas.drawPath(path, nosePaint);
         canvas.drawCircle(
-            Offset(w * (0.42 - breathFlare), h * 0.68), w * 0.05, shadowPaint);
+            Offset(w * (0.42 - breathFlare), h * 0.68), w * 0.05 * nostrilPulse, shadowPaint);
         canvas.drawCircle(
-            Offset(w * (0.58 + breathFlare), h * 0.68), w * 0.05, shadowPaint);
+            Offset(w * (0.58 + breathFlare), h * 0.68), w * 0.05 * nostrilPulse, shadowPaint);
         canvas.drawCircle(Offset(w * 0.52, h * 0.28), w * 0.06, highlightPaint);
+        _drawBridgeShadow(canvas, w, h);
+        _drawNoseTipGlow(canvas, w, h, Offset(w * 0.5, h * 0.62));
+        _drawNoseSpecular(canvas, w, h, Offset(w * 0.52, h * 0.26));
     }
+  }
+
+  /// Nose bridge shadow refinement — subtle vertical shadow along bridge
+  void _drawBridgeShadow(Canvas canvas, double w, double h) {
+    final bridgeRect = Rect.fromCenter(
+      center: Offset(w * 0.5, h * 0.30),
+      width: w * 0.08,
+      height: h * 0.35,
+    );
+    canvas.drawOval(
+      bridgeRect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Color.lerp(skinColor, const Color(0xFF5A4A7E), 0.15)!
+                .withValues(alpha: 0.08),
+            Colors.transparent,
+          ],
+        ).createShader(bridgeRect),
+    );
+  }
+
+  /// Subsurface scattering glow at nose tip (warm pink radial)
+  void _drawNoseTipGlow(Canvas canvas, double w, double h, Offset tipCenter) {
+    final glowRect = Rect.fromCenter(
+      center: tipCenter,
+      width: w * 0.20,
+      height: h * 0.16,
+    );
+    canvas.drawOval(
+      glowRect,
+      Paint()
+        ..blendMode = BlendMode.overlay
+        ..shader = RadialGradient(
+          colors: [
+            Color.lerp(skinColor, const Color(0xFFFF8888), 0.30)!
+                .withValues(alpha: 0.15),
+            Colors.transparent,
+          ],
+        ).createShader(glowRect),
+    );
+  }
+
+  /// Sharp specular highlight at nose tip for 3D feel
+  void _drawNoseSpecular(Canvas canvas, double w, double h, Offset center) {
+    final specR = w * 0.035;
+    canvas.drawCircle(
+      center,
+      specR,
+      Paint()..color = Colors.white.withValues(alpha: 0.35),
+    );
+    // Tiny sharp center
+    canvas.drawCircle(
+      center,
+      specR * 0.4,
+      Paint()..color = Colors.white.withValues(alpha: 0.55),
+    );
   }
 
   @override
@@ -2368,8 +2934,13 @@ class NosePainter extends CustomPainter {
 class CheekPainter extends CustomPainter {
   final int style;
   final Color skinColor;
+  final AvatarExpression expression;
 
-  CheekPainter({required this.style, required this.skinColor});
+  CheekPainter({
+    required this.style,
+    required this.skinColor,
+    this.expression = AvatarExpression.neutral,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2379,22 +2950,44 @@ class CheekPainter extends CustomPainter {
     final rightCheek = Offset(w * 0.82, h * 0.50);
 
     switch (style) {
-      case 1: // Rosy — gaussian-like multi-stop radial gradient
+      case 1: // Rosy — gaussian-blurred blush with expression intensity
+        final rosyMul = switch (expression) {
+          AvatarExpression.excited => 1.35,
+          AvatarExpression.happy => 1.2,
+          AvatarExpression.surprised => 1.15,
+          _ => 1.0,
+        };
         for (final center in [leftCheek, rightCheek]) {
           final rect = Rect.fromCenter(
               center: center, width: w * 0.24, height: h * 0.60);
           final gradient = RadialGradient(
             colors: [
-              const Color(0xFFFF7090).withValues(alpha: 0.50),
-              const Color(0xFFFF7090).withValues(alpha: 0.30),
-              const Color(0xFFFF7090).withValues(alpha: 0.12),
-              const Color(0xFFFF7090).withValues(alpha: 0.03),
+              const Color(0xFFFF7090).withValues(alpha: (0.50 * rosyMul).clamp(0.0, 1.0)),
+              const Color(0xFFFF7090).withValues(alpha: (0.30 * rosyMul).clamp(0.0, 1.0)),
+              const Color(0xFFFF7090).withValues(alpha: (0.12 * rosyMul).clamp(0.0, 1.0)),
+              const Color(0xFFFF7090).withValues(alpha: (0.03 * rosyMul).clamp(0.0, 1.0)),
               Colors.transparent,
             ],
             stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
           );
           canvas.drawOval(
-              rect, Paint()..shader = gradient.createShader(rect));
+            rect,
+            Paint()
+              ..shader = gradient.createShader(rect)
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.0),
+          );
+          // Dimple when smiling (happy/excited)
+          if (expression == AvatarExpression.excited ||
+              expression == AvatarExpression.happy) {
+            canvas.drawCircle(
+              center.translate(0, h * 0.08),
+              w * 0.012,
+              Paint()
+                ..color = Color.lerp(skinColor, const Color(0xFF6A5A8E), 0.15)!
+                    .withValues(alpha: 0.18)
+                ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5),
+            );
+          }
         }
 
       case 2: // Freckles — dots with random size variation
@@ -2413,22 +3006,31 @@ class CheekPainter extends CustomPainter {
           }
         }
 
-      case 3: // Blush — wide gaussian gradient
+      case 3: // Blush — wide gaussian gradient with MaskFilter
+        final blushMul = switch (expression) {
+          AvatarExpression.excited => 1.3,
+          AvatarExpression.happy => 1.15,
+          _ => 1.0,
+        };
         for (final center in [leftCheek, rightCheek]) {
           final rect = Rect.fromCenter(
               center: center, width: w * 0.30, height: h * 0.75);
           final gradient = RadialGradient(
             colors: [
-              const Color(0xFFFF6090).withValues(alpha: 0.40),
-              const Color(0xFFFF6090).withValues(alpha: 0.22),
-              const Color(0xFFFF6090).withValues(alpha: 0.08),
-              const Color(0xFFFF6090).withValues(alpha: 0.02),
+              const Color(0xFFFF6090).withValues(alpha: (0.40 * blushMul).clamp(0.0, 1.0)),
+              const Color(0xFFFF6090).withValues(alpha: (0.22 * blushMul).clamp(0.0, 1.0)),
+              const Color(0xFFFF6090).withValues(alpha: (0.08 * blushMul).clamp(0.0, 1.0)),
+              const Color(0xFFFF6090).withValues(alpha: (0.02 * blushMul).clamp(0.0, 1.0)),
               Colors.transparent,
             ],
             stops: const [0.0, 0.3, 0.55, 0.8, 1.0],
           );
           canvas.drawOval(
-              rect, Paint()..shader = gradient.createShader(rect));
+            rect,
+            Paint()
+              ..shader = gradient.createShader(rect)
+              ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0),
+          );
         }
 
       case 4: // Sparkle — 4-point stars with gold gradient
@@ -2512,7 +3114,9 @@ class CheekPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(CheekPainter old) =>
-      old.style != style || old.skinColor != skinColor;
+      old.style != style ||
+      old.skinColor != skinColor ||
+      old.expression != expression;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2522,8 +3126,13 @@ class CheekPainter extends CustomPainter {
 class EyelashPainter extends CustomPainter {
   final int style;
   final int eyeStyle;
+  final double blinkValue;
 
-  EyelashPainter({required this.style, required this.eyeStyle});
+  EyelashPainter({
+    required this.style,
+    required this.eyeStyle,
+    this.blinkValue = 0.0,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -2592,19 +3201,46 @@ class EyelashPainter extends CustomPainter {
     }
   }
 
-  /// Helper: draw a single curved lash at the given angle.
+  /// Helper: draw a single curved lash with bezier curvature and tapered thickness.
+  /// Uses cubic bezier for more natural curvature than the old quadratic.
   void _drawCurvedLash(Canvas canvas, double cx, double eyeY, double r,
       double angle, double innerMul, double outerMul, Paint paint) {
+    // Flutter offset from blink — lashes lift slightly during blink
+    final blinkLift = blinkValue * r * 0.08;
+
     final startX = cx + r * innerMul * cos(angle);
-    final startY = eyeY + r * innerMul * sin(angle);
-    final endX = cx + r * outerMul * cos(angle - 0.08);
-    final endY = eyeY + r * outerMul * sin(angle - 0.08);
-    final ctrlX = cx + r * (innerMul + outerMul) * 0.5 * cos(angle + 0.12);
-    final ctrlY = eyeY + r * (innerMul + outerMul) * 0.5 * sin(angle + 0.12);
+    final startY = eyeY + r * innerMul * sin(angle) - blinkLift * 0.3;
+    final endX = cx + r * outerMul * cos(angle - 0.12);
+    final endY = eyeY + r * outerMul * sin(angle - 0.12) - blinkLift;
+
+    // Two control points for cubic bezier (more natural curve)
+    final mid = (innerMul + outerMul) * 0.5;
+    final ctrl1X = cx + r * (innerMul + 0.15) * cos(angle + 0.15);
+    final ctrl1Y = eyeY + r * (innerMul + 0.15) * sin(angle + 0.15) - blinkLift * 0.4;
+    final ctrl2X = cx + r * mid * cos(angle + 0.06);
+    final ctrl2Y = eyeY + r * mid * sin(angle + 0.06) - blinkLift * 0.7;
+
     final path = Path()
       ..moveTo(startX, startY)
-      ..quadraticBezierTo(ctrlX, ctrlY, endX, endY);
+      ..cubicTo(ctrl1X, ctrl1Y, ctrl2X, ctrl2Y, endX, endY);
+
+    // Draw with original paint (base thickness)
     canvas.drawPath(path, paint);
+
+    // Overlay thinner tip stroke for natural taper
+    final tipPaint = Paint()
+      ..color = paint.color.withValues(alpha: 0.6)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = (paint.strokeWidth) * 0.5
+      ..strokeCap = StrokeCap.round;
+    final tipPath = Path()
+      ..moveTo(ctrl2X, ctrl2Y)
+      ..quadraticBezierTo(
+        (ctrl2X + endX) * 0.5 + r * 0.02 * cos(angle + pi / 2),
+        (ctrl2Y + endY) * 0.5 + r * 0.02 * sin(angle + pi / 2),
+        endX, endY,
+      );
+    canvas.drawPath(tipPath, tipPaint);
   }
 
   void _drawTinyStar(Canvas canvas, Offset center, double r, Paint paint) {
@@ -2625,7 +3261,9 @@ class EyelashPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(EyelashPainter old) =>
-      old.style != style || old.eyeStyle != eyeStyle;
+      old.style != style ||
+      old.eyeStyle != eyeStyle ||
+      old.blinkValue != blinkValue;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -2664,30 +3302,40 @@ class EyebrowPainter extends CustomPainter {
     }
 
     switch (style) {
-      case 0: // Natural
+      case 0: // Natural — with hair strokes
         final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.035;
         _drawBrow(canvas, leftStart, leftEnd, -h * 0.25, p);
         _drawBrow(canvas, rightStart, rightEnd, -h * 0.25, p);
+        _drawBrowHairStrokes(canvas, leftStart, leftEnd, -h * 0.25, browColor, 12, w * 0.008);
+        _drawBrowHairStrokes(canvas, rightStart, rightEnd, -h * 0.25, browColor, 12, w * 0.008);
 
-      case 1: // Thin
+      case 1: // Thin — with delicate strokes
         final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.022;
         _drawBrow(canvas, leftStart, leftEnd, -h * 0.20, p);
         _drawBrow(canvas, rightStart, rightEnd, -h * 0.20, p);
+        _drawBrowHairStrokes(canvas, leftStart, leftEnd, -h * 0.20, browColor, 8, w * 0.005);
+        _drawBrowHairStrokes(canvas, rightStart, rightEnd, -h * 0.20, browColor, 8, w * 0.005);
 
-      case 2: // Thick
+      case 2: // Thick — with dense strokes
         final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.055;
         _drawBrow(canvas, leftStart, leftEnd, -h * 0.25, p);
         _drawBrow(canvas, rightStart, rightEnd, -h * 0.25, p);
+        _drawBrowHairStrokes(canvas, leftStart, leftEnd, -h * 0.25, browColor, 18, w * 0.012);
+        _drawBrowHairStrokes(canvas, rightStart, rightEnd, -h * 0.25, browColor, 18, w * 0.012);
 
-      case 3: // Arched
+      case 3: // Arched — with strokes following high arch
         final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.035;
         _drawBrow(canvas, leftStart, leftEnd, -h * 0.50, p);
         _drawBrow(canvas, rightStart, rightEnd, -h * 0.50, p);
+        _drawBrowHairStrokes(canvas, leftStart, leftEnd, -h * 0.50, browColor, 14, w * 0.008);
+        _drawBrowHairStrokes(canvas, rightStart, rightEnd, -h * 0.50, browColor, 14, w * 0.008);
 
-      case 4: // Straight
+      case 4: // Straight — with strokes
         final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.035;
         canvas.drawLine(leftStart, leftEnd, p);
         canvas.drawLine(rightStart, rightEnd, p);
+        _drawBrowHairStrokes(canvas, leftStart, leftEnd, -h * 0.02, browColor, 10, w * 0.007);
+        _drawBrowHairStrokes(canvas, rightStart, rightEnd, -h * 0.02, browColor, 10, w * 0.007);
 
       case 5: // Bushy
         final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.05;
@@ -2725,7 +3373,110 @@ class EyebrowPainter extends CustomPainter {
     canvas.drawPath(path, paint);
   }
 
+  /// Draw individual hair strokes along the brow path for natural look.
+  /// [strandCount] determines density, [baseThickness] the inner-end width.
+  void _drawBrowHairStrokes(Canvas canvas, Offset start, Offset end,
+      double archHeight, Color browColor, int strandCount, double baseThickness) {
+    final rng = Random(42 + style * 7);
+    final mid = Offset((start.dx + end.dx) / 2, start.dy + archHeight);
+    final browLen = (end - start).distance;
+
+    for (int i = 0; i < strandCount; i++) {
+      final t = i / (strandCount - 1); // 0..1 along brow
+
+      // Position on brow curve (quadratic bezier interpolation)
+      final bx = (1 - t) * (1 - t) * start.dx +
+          2 * (1 - t) * t * mid.dx +
+          t * t * end.dx;
+      final by = (1 - t) * (1 - t) * start.dy +
+          2 * (1 - t) * t * mid.dy +
+          t * t * end.dy;
+
+      // Tangent for stroke direction
+      final tx = 2 * (1 - t) * (mid.dx - start.dx) + 2 * t * (end.dx - mid.dx);
+      final ty = 2 * (1 - t) * (mid.dy - start.dy) + 2 * t * (end.dy - mid.dy);
+      final tLen = sqrt(tx * tx + ty * ty);
+      if (tLen < 0.001) continue;
+      // Normal direction (perpendicular to tangent, pointing upward)
+      final nx = -ty / tLen;
+      final ny = tx / tLen;
+
+      // Strand extends from brow center outward (upward) with slight randomness
+      final strandLen = browLen * (0.06 + rng.nextDouble() * 0.04);
+      final strandAngle = rng.nextDouble() * 0.3 - 0.15; // slight randomness
+      final strandEndX = bx + (nx * cos(strandAngle) - ny * sin(strandAngle)) * strandLen;
+      final strandEndY = by + (nx * sin(strandAngle) + ny * cos(strandAngle)) * strandLen;
+
+      // Thickness: thicker at inner end (t=0), thinner at outer (t=1)
+      final thickness = baseThickness * (1.0 - t * 0.5);
+      final alpha = 0.2 + rng.nextDouble() * 0.15;
+
+      canvas.drawLine(
+        Offset(bx, by),
+        Offset(strandEndX, strandEndY),
+        Paint()
+          ..color = browColor.withValues(alpha: alpha)
+          ..strokeWidth = thickness
+          ..strokeCap = StrokeCap.round,
+      );
+    }
+  }
+
   @override
   bool shouldRepaint(EyebrowPainter old) =>
       old.style != style || old.color != color;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  FRECKLES PAINTER
+//  - Scattered small dots across cheeks and nose bridge
+//  - Slightly darker skin tone with natural variation
+//  - Deterministic randomized positions (seeded)
+// ═══════════════════════════════════════════════════════════════════════
+
+class FrecklesPainter extends CustomPainter {
+  final Color skinColor;
+  final int seed;
+
+  const FrecklesPainter({
+    required this.skinColor,
+    this.seed = 42,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final rng = Random(seed);
+
+    // Left cheek cluster
+    _drawFreckleCluster(canvas, rng, Offset(w * 0.20, h * 0.55), w * 0.18, h * 0.35, 9, w);
+    // Right cheek cluster
+    _drawFreckleCluster(canvas, rng, Offset(w * 0.80, h * 0.55), w * 0.18, h * 0.35, 9, w);
+    // Nose bridge scatter (sparser, smaller)
+    _drawFreckleCluster(canvas, rng, Offset(w * 0.50, h * 0.35), w * 0.10, h * 0.25, 5, w * 0.7);
+  }
+
+  void _drawFreckleCluster(Canvas canvas, Random rng, Offset center,
+      double spreadW, double spreadH, int count, double sizeRef) {
+    for (int i = 0; i < count; i++) {
+      final dx = (rng.nextDouble() - 0.5) * spreadW;
+      final dy = (rng.nextDouble() - 0.5) * spreadH;
+      final radius = sizeRef * 0.006 + rng.nextDouble() * sizeRef * 0.010;
+      final darkness = 0.20 + rng.nextDouble() * 0.18;
+      final alpha = 0.35 + rng.nextDouble() * 0.25;
+
+      canvas.drawCircle(
+        center.translate(dx, dy),
+        radius,
+        Paint()
+          ..color = Color.lerp(skinColor, Colors.brown, darkness)!
+              .withValues(alpha: alpha),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(FrecklesPainter old) =>
+      old.skinColor != skinColor || old.seed != seed;
 }

@@ -19,6 +19,11 @@ import 'mini_games/letter_drop_game.dart';
 import 'mini_games/rhyme_time_game.dart';
 import 'mini_games/star_catcher_game.dart';
 import 'mini_games/paint_splash_game.dart';
+import 'mini_games/word_rocket_game.dart';
+import 'mini_games/sight_word_safari_game.dart';
+import 'mini_games/word_ninja_game.dart';
+import 'mini_games/spelling_bee_game.dart';
+import 'mini_games/word_train_game.dart';
 import '../services/adaptive_difficulty_service.dart';
 
 class MiniGamesScreen extends StatefulWidget {
@@ -230,6 +235,56 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
                             difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('paint_splash'),
                           ),
                         ),
+                        _buildGameBtn(
+                          context, 'Word Rocket',
+                          const _RocketIconPainter(), AppColors.electricBlue, 10,
+                          WordRocketGame(
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            highScoreService: widget.highScoreService,
+                            playerName: widget.playerName,
+                          ),
+                        ),
+                        _buildGameBtn(
+                          context, 'Word Safari',
+                          const _SafariIconPainter(), AppColors.emerald, 11,
+                          SightWordSafariGame(
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            highScoreService: widget.highScoreService,
+                            playerName: widget.playerName,
+                          ),
+                        ),
+                        _buildGameBtn(
+                          context, 'Word Ninja',
+                          const _NinjaIconPainter(), AppColors.magenta, 12,
+                          WordNinjaGame(
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            highScoreService: widget.highScoreService,
+                            playerName: widget.playerName,
+                          ),
+                        ),
+                        _buildGameBtn(
+                          context, 'Spelling Bee',
+                          const _BeeIconPainter(), AppColors.starGold, 13,
+                          SpellingBeeGame(
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            highScoreService: widget.highScoreService,
+                            playerName: widget.playerName,
+                          ),
+                        ),
+                        _buildGameBtn(
+                          context, 'Word Train',
+                          const _TrainIconPainter(), AppColors.electricBlue, 14,
+                          WordTrainGame(
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            highScoreService: widget.highScoreService,
+                            playerName: widget.playerName,
+                          ),
+                        ),
                       ],
                     ),
                   ),
@@ -291,6 +346,8 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
     'unicorn_flight', 'lightning_speller', 'word_bubbles',
     'memory_match', 'falling_letters', 'cat_letter_toss',
     'letter_drop', 'rhyme_time', 'star_catcher', 'paint_splash',
+    'word_rocket', 'sight_word_safari', 'word_ninja',
+    'spelling_bee', 'word_train',
   ];
 
   Widget _buildGameBtn(BuildContext context, String label,
@@ -1334,6 +1391,488 @@ class _PaintSplashIconPainter extends CustomPainter {
       textDirection: TextDirection.ltr,
     )..layout();
     tp.paint(canvas, Offset(cx - 8 - tp.width / 2, cy - 4 - tp.height / 2));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ── Rocket icon painter (compact, fits 88x88 circle) ──────────────────────
+
+class _RocketIconPainter extends CustomPainter {
+  const _RocketIconPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+
+    // Rocket body
+    final bodyPaint = Paint()
+      ..color = const Color(0xFFE0E0FF)
+      ..style = PaintingStyle.fill;
+    final body = Path()
+      ..moveTo(cx, cy - 22)
+      ..quadraticBezierTo(cx + 10, cy - 8, cx + 8, cy + 12)
+      ..lineTo(cx - 8, cy + 12)
+      ..quadraticBezierTo(cx - 10, cy - 8, cx, cy - 22);
+    canvas.drawPath(body, bodyPaint);
+
+    // Window
+    canvas.drawCircle(
+      Offset(cx, cy - 6),
+      4,
+      Paint()..color = AppColors.electricBlue.withValues(alpha: 0.8),
+    );
+    canvas.drawCircle(
+      Offset(cx - 1.5, cy - 7.5),
+      1.5,
+      Paint()..color = Colors.white.withValues(alpha: 0.5),
+    );
+
+    // Fins
+    final finPaint = Paint()..color = const Color(0xFFFF4757);
+    final leftFin = Path()
+      ..moveTo(cx - 8, cy + 6)
+      ..lineTo(cx - 16, cy + 16)
+      ..lineTo(cx - 5, cy + 12)
+      ..close();
+    final rightFin = Path()
+      ..moveTo(cx + 8, cy + 6)
+      ..lineTo(cx + 16, cy + 16)
+      ..lineTo(cx + 5, cy + 12)
+      ..close();
+    canvas.drawPath(leftFin, finPaint);
+    canvas.drawPath(rightFin, finPaint);
+
+    // Nose cone
+    canvas.drawCircle(
+      Offset(cx, cy - 20),
+      2.5,
+      Paint()..color = AppColors.starGold,
+    );
+
+    // Flame
+    final flamePaint = Paint()
+      ..color = const Color(0xFFFFD700).withValues(alpha: 0.7)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+    final flame = Path()
+      ..moveTo(cx - 5, cy + 12)
+      ..quadraticBezierTo(cx, cy + 26, cx + 5, cy + 12);
+    canvas.drawPath(flame, flamePaint);
+
+    // Stars around
+    _drawSparkle(canvas, Offset(cx - 18, cy - 14), 2, AppColors.electricBlue);
+    _drawSparkle(canvas, Offset(cx + 16, cy - 16), 2.5, AppColors.starGold);
+  }
+
+  void _drawSparkle(Canvas canvas, Offset c, double r, Color color) {
+    final p = Paint()
+      ..color = color.withValues(alpha: 0.7)
+      ..strokeWidth = 1
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(c.dx - r, c.dy), Offset(c.dx + r, c.dy), p);
+    canvas.drawLine(Offset(c.dx, c.dy - r), Offset(c.dx, c.dy + r), p);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ── Safari icon painter (compact, fits 88x88 circle) ──────────────────────
+
+class _SafariIconPainter extends CustomPainter {
+  const _SafariIconPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+
+    // Tree trunk
+    canvas.drawLine(
+      Offset(cx - 14, cy + 8),
+      Offset(cx - 14, cy - 4),
+      Paint()
+        ..color = const Color(0xFF8B6914)
+        ..strokeWidth = 3
+        ..strokeCap = StrokeCap.round,
+    );
+    // Foliage
+    canvas.drawCircle(
+      Offset(cx - 14, cy - 10),
+      10,
+      Paint()..color = const Color(0xFF10B981).withValues(alpha: 0.6),
+    );
+    canvas.drawCircle(
+      Offset(cx - 8, cy - 14),
+      7,
+      Paint()..color = const Color(0xFF059669).withValues(alpha: 0.5),
+    );
+
+    // Elephant body
+    final elephantPaint = Paint()
+      ..color = const Color(0xFF8E8E8E)
+      ..style = PaintingStyle.fill;
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(cx + 6, cy + 4), width: 24, height: 18),
+      elephantPaint,
+    );
+    // Head
+    canvas.drawCircle(Offset(cx + 16, cy - 2), 8, elephantPaint);
+    // Trunk
+    final trunk = Path()
+      ..moveTo(cx + 22, cy)
+      ..quadraticBezierTo(cx + 28, cy + 6, cx + 24, cy + 14);
+    canvas.drawPath(
+      trunk,
+      Paint()
+        ..color = const Color(0xFF8E8E8E)
+        ..strokeWidth = 2.5
+        ..strokeCap = StrokeCap.round
+        ..style = PaintingStyle.stroke,
+    );
+    // Eye
+    canvas.drawCircle(
+      Offset(cx + 18, cy - 3),
+      1.5,
+      Paint()..color = const Color(0xFF2A2A2A),
+    );
+    // Legs
+    final legPaint = Paint()
+      ..color = const Color(0xFF7A7A7A)
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(cx, cy + 12), Offset(cx, cy + 20), legPaint);
+    canvas.drawLine(Offset(cx + 6, cy + 12), Offset(cx + 6, cy + 20), legPaint);
+    canvas.drawLine(Offset(cx + 10, cy + 12), Offset(cx + 10, cy + 20), legPaint);
+
+    // Word card
+    final cardRect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: Offset(cx + 6, cy - 18), width: 26, height: 14),
+      const Radius.circular(4),
+    );
+    canvas.drawRRect(cardRect, Paint()..color = Colors.white.withValues(alpha: 0.9));
+    canvas.drawRRect(
+      cardRect,
+      Paint()
+        ..color = AppColors.emerald.withValues(alpha: 0.6)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    final tp = TextPainter(
+      text: TextSpan(
+        text: 'the',
+        style: AppFonts.fredoka(
+          fontSize: 7,
+          fontWeight: FontWeight.w700,
+          color: const Color(0xFF2A2A4A),
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(cx + 6 - tp.width / 2, cy - 18 - tp.height / 2));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ── Ninja icon painter (compact, fits 88x88 circle) ──────────────────────
+
+class _NinjaIconPainter extends CustomPainter {
+  const _NinjaIconPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+
+    // Slash lines
+    final slashPaint = Paint()
+      ..color = AppColors.magenta.withValues(alpha: 0.4)
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(cx - 20, cy + 10), Offset(cx + 20, cy - 14), slashPaint);
+    canvas.drawLine(Offset(cx - 16, cy - 8), Offset(cx + 18, cy + 12), slashPaint);
+
+    // Word pills
+    _drawWordPill(canvas, Offset(cx - 8, cy - 10), 'go', AppColors.magenta, true);
+    _drawWordPill(canvas, Offset(cx + 8, cy + 8), 'it', AppColors.surface, false);
+
+    // Ink splat
+    canvas.drawCircle(
+      Offset(cx + 14, cy - 4),
+      6,
+      Paint()
+        ..color = AppColors.magenta.withValues(alpha: 0.3)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
+    );
+
+    // Sparkle
+    _drawSparkle(canvas, Offset(cx - 16, cy - 18), 2, AppColors.starGold);
+  }
+
+  void _drawWordPill(Canvas canvas, Offset center, String text, Color bg, bool glow) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: text,
+        style: AppFonts.fredoka(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: Colors.white,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+
+    final w = tp.width + 14;
+    final h = tp.height + 8;
+    final rect = RRect.fromRectAndRadius(
+      Rect.fromCenter(center: center, width: w, height: h),
+      const Radius.circular(8),
+    );
+    canvas.drawRRect(rect, Paint()..color = bg.withValues(alpha: 0.8));
+    if (glow) {
+      canvas.drawRRect(
+        rect,
+        Paint()
+          ..color = bg.withValues(alpha: 0.2)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 6),
+      );
+    }
+    tp.paint(canvas, Offset(center.dx - tp.width / 2, center.dy - tp.height / 2));
+  }
+
+  void _drawSparkle(Canvas canvas, Offset c, double r, Color color) {
+    final p = Paint()
+      ..color = color.withValues(alpha: 0.7)
+      ..strokeWidth = 1
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(c.dx - r, c.dy), Offset(c.dx + r, c.dy), p);
+    canvas.drawLine(Offset(c.dx, c.dy - r), Offset(c.dx, c.dy + r), p);
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ── Bee icon painter (compact, fits 88x88 circle) ─────────────────────────
+
+class _BeeIconPainter extends CustomPainter {
+  const _BeeIconPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+
+    // Honeycomb hexagons background
+    _drawHex(canvas, Offset(cx - 10, cy - 10), 10, const Color(0xFFFFD700).withValues(alpha: 0.15));
+    _drawHex(canvas, Offset(cx + 8, cy - 6), 10, const Color(0xFFFFD700).withValues(alpha: 0.1));
+    _drawHex(canvas, Offset(cx - 2, cy + 8), 10, const Color(0xFFFFD700).withValues(alpha: 0.12));
+
+    // Hex borders
+    _drawHexBorder(canvas, Offset(cx - 10, cy - 10), 10, AppColors.starGold.withValues(alpha: 0.4));
+    _drawHexBorder(canvas, Offset(cx + 8, cy - 6), 10, AppColors.starGold.withValues(alpha: 0.3));
+    _drawHexBorder(canvas, Offset(cx - 2, cy + 8), 10, AppColors.starGold.withValues(alpha: 0.35));
+
+    // Letters in hexes
+    _drawHexLetter(canvas, Offset(cx - 10, cy - 10), 'c', AppColors.starGold);
+    _drawHexLetter(canvas, Offset(cx + 8, cy - 6), 'a', AppColors.starGold);
+    _drawHexLetter(canvas, Offset(cx - 2, cy + 8), 't', AppColors.starGold);
+
+    // Bee
+    final bx = cx + 16.0;
+    final by = cy - 16.0;
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(bx, by), width: 10, height: 7),
+      Paint()..color = const Color(0xFFFFD700).withValues(alpha: 0.8),
+    );
+    canvas.drawLine(
+      Offset(bx - 1, by - 3),
+      Offset(bx - 1, by + 3),
+      Paint()
+        ..color = const Color(0xFF2A1A00).withValues(alpha: 0.5)
+        ..strokeWidth = 1,
+    );
+    canvas.drawLine(
+      Offset(bx + 2, by - 2),
+      Offset(bx + 2, by + 2),
+      Paint()
+        ..color = const Color(0xFF2A1A00).withValues(alpha: 0.5)
+        ..strokeWidth = 1,
+    );
+    // Wings
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(bx - 2, by - 5), width: 6, height: 4),
+      Paint()..color = Colors.white.withValues(alpha: 0.5),
+    );
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(bx + 2, by - 5), width: 6, height: 4),
+      Paint()..color = Colors.white.withValues(alpha: 0.5),
+    );
+  }
+
+  void _drawHex(Canvas canvas, Offset center, double r, Color color) {
+    final path = Path();
+    for (int i = 0; i < 6; i++) {
+      final angle = (i * 60 - 30) * pi / 180;
+      final x = center.dx + r * cos(angle);
+      final y = center.dy + r * sin(angle);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+    canvas.drawPath(path, Paint()..color = color);
+  }
+
+  void _drawHexBorder(Canvas canvas, Offset center, double r, Color color) {
+    final path = Path();
+    for (int i = 0; i < 6; i++) {
+      final angle = (i * 60 - 30) * pi / 180;
+      final x = center.dx + r * cos(angle);
+      final y = center.dy + r * sin(angle);
+      if (i == 0) {
+        path.moveTo(x, y);
+      } else {
+        path.lineTo(x, y);
+      }
+    }
+    path.close();
+    canvas.drawPath(
+      path,
+      Paint()
+        ..color = color
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+  }
+
+  void _drawHexLetter(Canvas canvas, Offset center, String letter, Color color) {
+    final tp = TextPainter(
+      text: TextSpan(
+        text: letter,
+        style: AppFonts.fredoka(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: color,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(center.dx - tp.width / 2, center.dy - tp.height / 2));
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ── Train icon painter (compact, fits 88x88 circle) ──────────────────────
+
+class _TrainIconPainter extends CustomPainter {
+  const _TrainIconPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+
+    // Track
+    canvas.drawLine(
+      Offset(cx - 28, cy + 14),
+      Offset(cx + 28, cy + 14),
+      Paint()
+        ..color = const Color(0xFF4A3520).withValues(alpha: 0.6)
+        ..strokeWidth = 2
+        ..strokeCap = StrokeCap.round,
+    );
+
+    // Engine body
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(cx - 22, cy - 4, 22, 16),
+        const Radius.circular(4),
+      ),
+      Paint()..color = const Color(0xFFCC3333),
+    );
+    // Cabin
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(cx - 8, cy - 12, 10, 8),
+        const Radius.circular(3),
+      ),
+      Paint()..color = const Color(0xFFDD4444),
+    );
+    // Chimney
+    canvas.drawRect(
+      Rect.fromLTWH(cx - 18, cy - 10, 5, 6),
+      Paint()..color = const Color(0xFF2A2A2A),
+    );
+    // Smoke puff
+    canvas.drawCircle(
+      Offset(cx - 16, cy - 16),
+      4,
+      Paint()..color = Colors.white.withValues(alpha: 0.3),
+    );
+    canvas.drawCircle(
+      Offset(cx - 12, cy - 20),
+      3,
+      Paint()..color = Colors.white.withValues(alpha: 0.2),
+    );
+
+    // Wheels
+    canvas.drawCircle(Offset(cx - 16, cy + 12), 4, Paint()..color = const Color(0xFF2A2A2A));
+    canvas.drawCircle(Offset(cx - 6, cy + 12), 4, Paint()..color = const Color(0xFF2A2A2A));
+
+    // Car with letter
+    final carX = cx + 4.0;
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(carX, cy - 2, 20, 14),
+        const Radius.circular(3),
+      ),
+      Paint()..color = AppColors.surface,
+    );
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(carX, cy - 2, 20, 14),
+        const Radius.circular(3),
+      ),
+      Paint()
+        ..color = AppColors.electricBlue.withValues(alpha: 0.5)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1,
+    );
+    // Letter in car
+    final tp = TextPainter(
+      text: TextSpan(
+        text: 'A',
+        style: AppFonts.fredoka(
+          fontSize: 9,
+          fontWeight: FontWeight.w700,
+          color: AppColors.electricBlue,
+        ),
+      ),
+      textDirection: TextDirection.ltr,
+    )..layout();
+    tp.paint(canvas, Offset(carX + 10 - tp.width / 2, cy + 5 - tp.height / 2));
+
+    // Car wheels
+    canvas.drawCircle(Offset(carX + 5, cy + 12), 3, Paint()..color = const Color(0xFF2A2A2A));
+    canvas.drawCircle(Offset(carX + 15, cy + 12), 3, Paint()..color = const Color(0xFF2A2A2A));
+
+    // Coupling
+    canvas.drawLine(
+      Offset(cx, cy + 5),
+      Offset(carX, cy + 5),
+      Paint()
+        ..color = const Color(0xFF666666)
+        ..strokeWidth = 1.5,
+    );
   }
 
   @override

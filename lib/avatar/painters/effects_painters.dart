@@ -2,7 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
-import '../theme/app_theme.dart';
+import '../../theme/app_theme.dart';
 
 /// Effects painters — face paint uses BlendMode for painted-on-skin feel,
 /// glasses have environment reflections, sparkles have drift and rotation.
@@ -507,12 +507,12 @@ class FacePaintPainter extends CustomPainter {
 
   // ── 9: Dots across nose bridge ──
   void _drawDots(Canvas canvas, double w, double h) {
-    final colors = [
-      const Color(0xFFFF4D6A),
+    const colors = [
+      Color(0xFFFF4D6A),
       AppColors.starGold,
-      const Color(0xFF4A90D9),
-      const Color(0xFF00E68A),
-      const Color(0xFFB794F6),
+      Color(0xFF4A90D9),
+      Color(0xFF00E68A),
+      Color(0xFFB794F6),
     ];
     for (int i = 0; i < 5; i++) {
       final pos = Offset(w * (0.30 + i * 0.10), h * 0.42);
@@ -863,26 +863,31 @@ class SparklePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final rng = Random(42);
-    final goldColors = [
+    const goldColors = [
       AppColors.starGold,
       Colors.white,
-      const Color(0xFFFFF0B0),
+      Color(0xFFFFF0B0),
       AppColors.starGold,
       Colors.white,
-      const Color(0xFFFFE070),
+      Color(0xFFFFE070),
       AppColors.starGold,
       Colors.white,
-      const Color(0xFFFFF5CC),
+      Color(0xFFFFF5CC),
       AppColors.starGold,
       Colors.white,
-      const Color(0xFFFFD700),
+      Color(0xFFFFD700),
     ];
-    final rainbowColors = [
+    const rainbowColors = [
       Colors.red, Colors.orange, Colors.yellow, Colors.green,
       Colors.blue, Colors.purple, Colors.red, Colors.orange,
       Colors.yellow, Colors.green, Colors.blue, Colors.purple,
     ];
     final colors = rainbow ? rainbowColors : goldColors;
+
+    // Reusable Paint objects to reduce per-frame allocations
+    final glowPaint = Paint()
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4);
+    final sparklePaint = Paint();
 
     for (int i = 0; i < _sparkleCount; i++) {
       // Base position (deterministic from seed)
@@ -912,13 +917,8 @@ class SparklePainter extends CustomPainter {
       final color = colors[i % colors.length];
 
       // Glow halo
-      canvas.drawCircle(
-        Offset(x, y),
-        r * 2.5,
-        Paint()
-          ..color = color.withValues(alpha: alpha * 0.10)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
-      );
+      glowPaint.color = color.withValues(alpha: alpha * 0.10);
+      canvas.drawCircle(Offset(x, y), r * 2.5, glowPaint);
 
       // Rotated 4-pointed star sparkle
       canvas.save();
@@ -951,11 +951,9 @@ class SparklePainter extends CustomPainter {
         ..cubicTo(-r * 0.15, -r * 0.12, -r * 0.15, -r * 0.12, -r * 0.85, 0)
         ..close();
 
-      canvas.drawPath(
-        sparklePath,
-        Paint()
-          ..shader = sparkleGrad.createShader(Rect.fromCircle(center: Offset.zero, radius: r)),
-      );
+      sparklePaint.shader = sparkleGrad.createShader(
+          Rect.fromCircle(center: Offset.zero, radius: r));
+      canvas.drawPath(sparklePath, sparklePaint);
 
       canvas.restore();
     }
@@ -1031,26 +1029,31 @@ class CelebrationBurstPainter extends CustomPainter {
     final maxRadius = size.width * 0.55;
     final rng = Random(7);
 
+    // Reusable Paint to reduce per-frame allocations
+    final glowPaint = Paint()
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3);
+
+    // Pre-compute shared values outside the loop
+    final distT = Curves.easeOutCubic.transform(progress);
+    final scaleT = progress < 0.3
+        ? Curves.easeOut.transform(progress / 0.3)
+        : 1.0;
+    final alpha = progress < 0.3
+        ? 1.0
+        : (1.0 - ((progress - 0.3) / 0.7)).clamp(0.0, 1.0);
+
+    if (alpha < 0.02) return;
+
     for (int i = 0; i < _particleCount; i++) {
       // Deterministic angle with slight jitter
       final angle = (i / _particleCount) * 2 * pi + rng.nextDouble() * 0.4;
 
       // Particles fly outward: ease-out distance
-      final distT = Curves.easeOutCubic.transform(progress);
       final dist = maxRadius * (0.15 + distT * 0.85) * (0.8 + rng.nextDouble() * 0.4);
       final x = center.dx + dist * cos(angle);
       final y = center.dy + dist * sin(angle);
 
-      // Scale up then fade out
-      final scaleT = progress < 0.3
-          ? Curves.easeOut.transform(progress / 0.3)
-          : 1.0;
-      final alpha = progress < 0.3
-          ? 1.0
-          : (1.0 - ((progress - 0.3) / 0.7)).clamp(0.0, 1.0);
       final baseR = size.width * 0.035 * scaleT * (0.7 + rng.nextDouble() * 0.6);
-
-      if (alpha < 0.02) continue;
 
       // Alternate between stars and hearts
       final isStar = i % 3 != 0;
@@ -1059,13 +1062,8 @@ class CelebrationBurstPainter extends CustomPainter {
           : Color.lerp(const Color(0xFFFF7090), const Color(0xFFFF4D6A), rng.nextDouble())!;
 
       // Glow
-      canvas.drawCircle(
-        Offset(x, y),
-        baseR * 2.0,
-        Paint()
-          ..color = color.withValues(alpha: alpha * 0.12)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-      );
+      glowPaint.color = color.withValues(alpha: alpha * 0.12);
+      canvas.drawCircle(Offset(x, y), baseR * 2.0, glowPaint);
 
       if (isStar) {
         _drawMiniStar(canvas, Offset(x, y), baseR, color, alpha,
@@ -1229,6 +1227,12 @@ class LevelUpAuraPainter extends CustomPainter {
     // Rising sparkle particles
     final rng = Random(13);
     const particleCount = 8;
+
+    // Reusable Paint objects to reduce per-frame allocations
+    final particleGlowPaint = Paint()
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2);
+    final particleDotPaint = Paint();
+
     for (int i = 0; i < particleCount; i++) {
       final baseX = centerX + (rng.nextDouble() - 0.5) * pillarWidth * 0.8;
       final baseY = h * (0.3 + rng.nextDouble() * 0.5);
@@ -1246,20 +1250,12 @@ class LevelUpAuraPainter extends CustomPainter {
       final color = isWhite ? Colors.white : AppColors.starGold;
 
       // Glow
-      canvas.drawCircle(
-        Offset(x, y),
-        r * 2.5,
-        Paint()
-          ..color = color.withValues(alpha: pAlpha * 0.15)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2),
-      );
+      particleGlowPaint.color = color.withValues(alpha: pAlpha * 0.15);
+      canvas.drawCircle(Offset(x, y), r * 2.5, particleGlowPaint);
 
       // Sparkle dot
-      canvas.drawCircle(
-        Offset(x, y),
-        r,
-        Paint()..color = color.withValues(alpha: pAlpha * 0.7),
-      );
+      particleDotPaint.color = color.withValues(alpha: pAlpha * 0.7);
+      canvas.drawCircle(Offset(x, y), r, particleDotPaint);
     }
   }
 

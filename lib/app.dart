@@ -16,7 +16,7 @@ import 'services/adaptive_music_service.dart';
 import 'services/avatar_personality_service.dart';
 import 'services/stats_service.dart';
 import 'services/adaptive_difficulty_service.dart';
-import 'widgets/avatar_shader_loader.dart';
+import 'avatar/shader_loader.dart';
 import 'widgets/floating_hearts_bg.dart';
 
 class ReadingSproutApp extends StatefulWidget {
@@ -239,6 +239,7 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
       return ProfilePickerScreen(
         settingsService: _settingsService,
         audioService: _audioService,
+        profileService: _profileService,
         onProfileSelected: _onProfileSelected,
         onNewProfile: _onNewProfile,
       );

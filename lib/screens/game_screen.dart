@@ -26,7 +26,7 @@ import '../widgets/letter_tile.dart';
 import '../widgets/letter_tracing_canvas.dart';
 import '../data/letter_paths.dart';
 import '../utils/haptics.dart';
-import '../widgets/avatar_widget.dart';
+import '../avatar/avatar_widget.dart';
 import '../widgets/celebration_overlay.dart';
 import '../widgets/zone_background.dart';
 
