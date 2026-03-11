@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../data/dolch_words.dart';
 import '../../data/sticker_definitions.dart';
 import '../../models/player_profile.dart';
@@ -121,6 +120,7 @@ class _StarCatcherGameState extends State<StarCatcherGame>
   // Game state
   bool _gameStarted = false;
   bool _gameOver = false;
+  bool _introPlayed = false;
   int _score = 0;
   int _combo = 0;
   int _bestCombo = 0;
@@ -612,9 +612,12 @@ class _StarCatcherGameState extends State<StarCatcherGame>
   }
 
   Widget _buildStartScreen() {
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted && !_gameStarted) _playIntro();
-    });
+    if (!_introPlayed) {
+      _introPlayed = true;
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted && !_gameStarted) _playIntro();
+      });
+    }
 
     return Stack(
       children: [
@@ -745,11 +748,13 @@ class _StarCatcherGameState extends State<StarCatcherGame>
         _buildSpaceBackground(),
 
         // Constellation lines
-        CustomPaint(
-          size: _screenSize,
-          painter: _ConstellationPainter(
-            lines: _constellationLines,
-            screenSize: _screenSize,
+        RepaintBoundary(
+          child: CustomPaint(
+            size: _screenSize,
+            painter: _ConstellationPainter(
+              lines: _constellationLines,
+              screenSize: _screenSize,
+            ),
           ),
         ),
 
@@ -767,12 +772,14 @@ class _StarCatcherGameState extends State<StarCatcherGame>
         ),
 
         // Particles overlay
-        IgnorePointer(
-          child: CustomPaint(
-            size: _screenSize,
-            painter: _SparklesPainter(
-              particles: _particles,
-              shootingStars: _shootingStars,
+        RepaintBoundary(
+          child: IgnorePointer(
+            child: CustomPaint(
+              size: _screenSize,
+              painter: _SparklesPainter(
+                particles: _particles,
+                shootingStars: _shootingStars,
+              ),
             ),
           ),
         ),

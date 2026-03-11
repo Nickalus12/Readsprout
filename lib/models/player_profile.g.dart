@@ -96,13 +96,15 @@ class AvatarConfigAdapter extends TypeAdapter<AvatarConfig> {
       noseStyle: (fields[16] as int?) ?? 0,
       glassesStyle: (fields[17] as int?) ?? 0,
       facePaint: (fields[18] as int?) ?? 0,
+      shirtColor: (fields[19] as int?) ?? 0,
+      shirtStyle: (fields[20] as int?) ?? 0,
     );
   }
 
   @override
   void write(BinaryWriter writer, AvatarConfig obj) {
     writer
-      ..writeByte(19) // number of fields
+      ..writeByte(21) // number of fields
       ..writeByte(0)
       ..write(obj.faceShape)
       ..writeByte(1)
@@ -140,7 +142,11 @@ class AvatarConfigAdapter extends TypeAdapter<AvatarConfig> {
       ..writeByte(17)
       ..write(obj.glassesStyle)
       ..writeByte(18)
-      ..write(obj.facePaint);
+      ..write(obj.facePaint)
+      ..writeByte(19)
+      ..write(obj.shirtColor)
+      ..writeByte(20)
+      ..write(obj.shirtStyle);
   }
 
   @override

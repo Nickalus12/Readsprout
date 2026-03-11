@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/progress.dart';
 import '../data/dolch_words.dart';
@@ -85,11 +86,16 @@ class ProgressService {
 
   Future<void> _flushSave() async {
     if (!_dirty) return;
-    _dirty = false;
-    final encoded = jsonEncode(
-      _progress.map((key, value) => MapEntry(key.toString(), value.toJson())),
-    );
-    await _prefs.setString(_key, encoded);
+    try {
+      final encoded = jsonEncode(
+        _progress.map((key, value) => MapEntry(key.toString(), value.toJson())),
+      );
+      await _prefs.setString(_key, encoded);
+      _dirty = false;
+    } catch (e) {
+      // Leave _dirty=true so the next flush retries
+      debugPrint('ProgressService save failed: $e');
+    }
   }
 
   LevelProgress getLevel(int level) {

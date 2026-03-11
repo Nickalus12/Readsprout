@@ -4,7 +4,6 @@ import 'package:confetti/confetti.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../data/dolch_words.dart';
 import '../models/progress.dart';
@@ -15,10 +14,14 @@ import '../models/player_profile.dart';
 import '../services/profile_service.dart';
 import '../services/progress_service.dart';
 import '../services/stats_service.dart';
+import '../services/streak_service.dart';
+import '../services/avatar_personality_service.dart';
+import '../services/review_service.dart';
 import '../data/sticker_definitions.dart';
 import '../widgets/animated_glow_border.dart';
 import '../widgets/letter_tile.dart';
 import '../utils/haptics.dart';
+import '../widgets/avatar_widget.dart';
 import '../widgets/celebration_overlay.dart';
 import '../widgets/zone_background.dart';
 
@@ -29,7 +32,11 @@ class GameScreen extends StatefulWidget {
   final AudioService audioService;
   final ProfileService? profileService;
   final StatsService? statsService;
+  final StreakService? streakService;
+  final AvatarPersonalityService? personalityService;
+  final ReviewService? reviewService;
   final String playerName;
+  final String profileId;
 
   const GameScreen({
     super.key,
@@ -38,8 +45,12 @@ class GameScreen extends StatefulWidget {
     required this.audioService,
     this.profileService,
     this.statsService,
+    this.streakService,
+    this.personalityService,
+    this.reviewService,
     this.tier = 1,
     this.playerName = '',
+    this.profileId = '',
   });
 
   @override
@@ -76,6 +87,27 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   /// Whether the current champion word was "not passed" (2+ mistakes).
   bool _championWordFailed = false;
 
+  // ── In-level streak (all tiers) ────────────────────────────────
+  /// Consecutive correct words within this level session.
+  int _inLevelStreak = 0;
+
+  // ── Progressive hints state ────────────────────────────────────
+  /// Total wrong taps on the current word (resets per word).
+  int _totalWrongTapsThisWord = 0;
+
+  /// Whether the correct letter is being revealed (3rd wrong tap hint).
+  bool _hintRevealing = false;
+
+  // ── Zone encouragement state ─────────────────────────────────
+  /// Whether a zone streak message is being displayed.
+  bool _showStreakMessage = false;
+  String _streakMessageText = '';
+  String _zoneEncouragement = '';
+
+  // ── Zone info cache ────────────────────────────────────────────
+  late final int _zoneIndex;
+  late final String _zoneKey;
+
   // ── Animation controllers ────────────────────────────────────────
 
   late AnimationController _shakeController;
@@ -95,6 +127,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   // Focus node for keyboard input
   final FocusNode _focusNode = FocusNode();
 
+  // Avatar expression controller for gameplay reactions
+  final AvatarController _avatarController = AvatarController();
+
   // ── Convenience getters ──────────────────────────────────────────
 
   Word get _currentWord => _words[_currentWordIndex];
@@ -113,15 +148,32 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     return GlowState.idle;
   }
 
-  @override
   late final Stopwatch _sessionTimer;
 
+  @override
   void initState() {
     super.initState();
     _sessionTimer = Stopwatch()..start();
 
-    // Load words for this level, shuffle for variety
-    _words = List.from(DolchWords.wordsForLevel(widget.level))..shuffle();
+    // Cache zone info
+    _zoneIndex = zoneIndexForLevel(widget.level);
+    final zone = DolchWords.zoneForLevel(widget.level);
+    _zoneKey = PhraseTemplates.zoneKey(zone.name);
+
+    // Load words for this level, ordered by spaced repetition priority
+    final levelWords = List<Word>.from(DolchWords.wordsForLevel(widget.level));
+    if (widget.reviewService != null) {
+      final wordTexts = levelWords.map((w) => w.text.toLowerCase()).toList();
+      final ordered = widget.reviewService!.orderWordsForPractice(wordTexts);
+      levelWords.sort((a, b) {
+        final ai = ordered.indexOf(a.text.toLowerCase());
+        final bi = ordered.indexOf(b.text.toLowerCase());
+        return ai.compareTo(bi);
+      });
+    } else {
+      levelWords.shuffle();
+    }
+    _words = levelWords;
     _initRevealedLetters();
 
     // Shake animation for wrong input
@@ -165,6 +217,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _goldenConfettiController =
         ConfettiController(duration: const Duration(milliseconds: 800));
 
+    // Wire amplitude-based lip sync to avatar
+    _avatarController.bindAmplitude(widget.audioService.mouthAmplitude);
+
+    // Notify personality service of session start
+    if (widget.profileId.isNotEmpty) {
+      widget.personalityService?.onSessionStart(widget.profileId);
+    }
+
     // Announce the first word after a brief delay
     Future.delayed(const Duration(milliseconds: 600), _announceCurrentWord);
   }
@@ -176,6 +236,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _nudgeKey = null;
     _championWordFailed = false;
     _mistakesThisWord = 0;
+    _totalWrongTapsThisWord = 0;
+    _hintRevealing = false;
 
     if ((_isExplorer || _isAdventurer) && _targetText.isNotEmpty) {
       // Explorer & Adventurer: pre-reveal first letter, start typing at index 1
@@ -192,6 +254,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   Future<void> _announceCurrentWord() async {
+    if (!mounted) return;
     widget.statsService?.recordWordHeard(_currentWord.text);
     setState(() => _isPlayingAudio = true);
     final ok = await widget.audioService.playWord(_currentWord.text);
@@ -242,22 +305,64 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // Track the wrong tap with what was expected
     final expected = _targetText[_currentLetterIndex];
     widget.statsService?.recordWrongTap(tappedKey, expected);
+    // Notify personality service of incorrect attempt
+    if (widget.profileId.isNotEmpty) {
+      widget.personalityService?.onWordIncorrect(widget.profileId);
+    }
     setState(() {
       _shaking = true;
       _mistakesThisWord++;
       _wrongCountAtPosition++;
+      _totalWrongTapsThisWord++;
     });
     _shakeController.forward();
     widget.audioService.playError();
     Haptics.wrong();
 
+    // ── Progressive hints (all tiers) ────────────────────────────
+    // 1st wrong tap → avatar shows "thinking"
+    // 2nd wrong tap → highlight correct next letter with subtle glow
+    // 3rd wrong tap → briefly reveal the answer letter with bounce, then hide
+
+    if (_totalWrongTapsThisWord == 1) {
+      // 1st wrong: avatar thinks
+      _avatarController.setExpression(AvatarExpression.thinking, duration: const Duration(seconds: 1));
+    } else if (_totalWrongTapsThisWord == 2) {
+      // 2nd wrong: avatar still thinking + highlight correct key on keyboard
+      _avatarController.setExpression(AvatarExpression.thinking, duration: const Duration(seconds: 2));
+      setState(() => _nudgeKey = expected);
+      _nudgeController.forward(from: 0);
+    } else if (_totalWrongTapsThisWord >= 3) {
+      // 3rd+ wrong: briefly reveal the correct letter tile, then hide
+      _avatarController.setExpression(AvatarExpression.surprised, duration: const Duration(milliseconds: 1500));
+      setState(() {
+        _hintRevealing = true;
+        _nudgeKey = expected;
+      });
+      _nudgeController.forward(from: 0);
+      // Auto-hide the hint after a brief moment
+      Future.delayed(const Duration(milliseconds: 1200), () {
+        if (mounted) {
+          setState(() => _hintRevealing = false);
+        }
+      });
+    }
+
     // Tier 2 nudge: after 2 consecutive wrong guesses at same position,
-    // briefly pulse the correct key.
-    if (_isAdventurer && _wrongCountAtPosition >= 2) {
-      final expected = _targetText[_currentLetterIndex];
+    // briefly pulse the correct key (redundant with progressive hints
+    // but kept for tier-specific behavior compatibility).
+    if (_isAdventurer && _wrongCountAtPosition >= 2 && _totalWrongTapsThisWord < 2) {
       setState(() => _nudgeKey = expected);
       _nudgeController.forward(from: 0);
     }
+  }
+
+  /// Play a zone-themed level-complete phrase.
+  void _playZoneLevelComplete() {
+    Future.delayed(const Duration(milliseconds: 500), () {
+      if (!mounted) return;
+      widget.audioService.playLevelComplete(widget.playerName);
+    });
   }
 
   /// Update ProfileService with word completion data, stickers, etc.
@@ -268,9 +373,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // Increment total words ever completed
     final newTotal = ps.totalWordsEverCompleted + 1;
     ps.setTotalWordsEverCompleted(newTotal);
-
-    // Record play session for streak
-    ps.recordPlaySession();
 
     // Track words played today for chest unlock
     final todayCount = ps.wordsPlayedToday;
@@ -344,6 +446,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       _mistakesThisWord,
     );
 
+    // Record spaced repetition review
+    widget.reviewService?.recordWordReview(
+      _words[_currentWordIndex].text.toLowerCase(),
+      _mistakesThisWord,
+    );
+
     // Track perfect words
     if (_mistakesThisWord == 0) _perfectWords++;
 
@@ -374,8 +482,37 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // Update profile: word count, play session, stickers
     _updateProfile();
 
-    // Play success chime
+    // Play success chime + avatar reaction
     widget.audioService.playSuccess();
+    _avatarController.setExpression(AvatarExpression.excited, duration: const Duration(seconds: 2));
+
+    // Notify personality service of correct word
+    if (widget.profileId.isNotEmpty) {
+      widget.personalityService?.onWordCorrect(widget.profileId);
+    }
+
+    // ── In-level streak tracking ───────────────────────────────
+    if (_mistakesThisWord == 0) {
+      _inLevelStreak++;
+    } else {
+      _inLevelStreak = 0;
+    }
+
+    // Show zone-themed streak message at milestones (3, 5, 7, 10+)
+    if (_inLevelStreak >= 3 &&
+        (_inLevelStreak == 3 || _inLevelStreak == 5 ||
+         _inLevelStreak == 7 || _inLevelStreak >= 10)) {
+      _streakMessageText = PhraseTemplates.randomZoneStreakMessage(_zoneKey);
+      _showStreakMessage = true;
+      Future.delayed(const Duration(milliseconds: 1800), () {
+        if (mounted) setState(() => _showStreakMessage = false);
+      });
+    }
+
+    // Zone-themed encouragement text for celebration overlay
+    _zoneEncouragement = PhraseTemplates.randomZoneEncouragement(
+      _zoneKey, widget.playerName,
+    );
 
     // Tier-aware confetti
     if (_isChampion && _mistakesThisWord == 0) {
@@ -384,25 +521,50 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     }
     _confettiController.play();
 
+    // Zone-aware avatar expression on word complete
+    widget.audioService.playSuccess();
+    if (_zoneIndex >= 3) {
+      _avatarController.setExpression(AvatarExpression.excited, duration: const Duration(seconds: 2));
+    } else if (_zoneIndex == 2) {
+      _avatarController.setExpression(AvatarExpression.surprised, duration: const Duration(milliseconds: 600));
+      Future.delayed(const Duration(milliseconds: 600), () {
+        if (mounted) _avatarController.setExpression(AvatarExpression.excited, duration: const Duration(milliseconds: 1400));
+      });
+    } else {
+      _avatarController.setExpression(
+        _inLevelStreak >= 3 ? AvatarExpression.excited : AvatarExpression.happy,
+        duration: const Duration(seconds: 2),
+      );
+    }
+
+    // Streak milestone pop
+    if (_inLevelStreak == 3 || _inLevelStreak == 5) {
+      _streakPopController.forward(from: 0);
+    }
+
     Haptics.success();
 
     setState(() => _showingCelebration = true);
 
     // Celebrate — give the child time to enjoy it
     await Future.delayed(const Duration(milliseconds: 2500));
+    if (!mounted) return;
 
     if (_isLastWord || wasTierComplete) {
       // Level/tier complete!
       _levelConfettiController.play();
       widget.audioService.playLevelCompleteEffect();
-      Future.delayed(const Duration(milliseconds: 500), () {
-        widget.audioService.playLevelComplete(widget.playerName);
-      });
+      _avatarController.setExpression(AvatarExpression.excited, duration: const Duration(seconds: 4));
+      _playZoneLevelComplete();
+
+      // Record daily streak
+      widget.streakService?.recordPractice();
+
       setState(() {
         _showingCelebration = false;
         _levelComplete = true;
         _levelCompletePhrase =
-            PhraseTemplates.randomLevelComplete(widget.playerName);
+            PhraseTemplates.randomZoneLevelComplete(_zoneKey, widget.playerName);
       });
     } else {
       // Next word
@@ -421,6 +583,14 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   void dispose() {
     _sessionTimer.stop();
     widget.statsService?.recordPlayTime(_sessionTimer.elapsed.inSeconds);
+    // Notify personality service of session end
+    if (widget.profileId.isNotEmpty) {
+      widget.personalityService?.onSessionEnd(
+        widget.profileId,
+        _sessionTimer.elapsed,
+      );
+    }
+    _avatarController.dispose();
     _shakeController.dispose();
     _nudgeController.dispose();
     _streakPopController.dispose();
@@ -524,11 +694,66 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     child: _buildStreakBadge(),
                   ),
 
+                // ── Zone streak message (e.g. "Forest Fire!") ────
+                if (_showStreakMessage && _streakMessageText.isNotEmpty)
+                  Positioned(
+                    top: MediaQuery.of(context).padding.top + 50,
+                    left: 0,
+                    right: 0,
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 20, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppColors.starGold.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: AppColors.starGold.withValues(alpha: 0.4),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.starGold.withValues(alpha: 0.2),
+                              blurRadius: 12,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.local_fire_department_rounded,
+                                size: 22, color: AppColors.starGold),
+                            const SizedBox(width: 8),
+                            Text(
+                              '$_streakMessageText $_inLevelStreak',
+                              style: AppFonts.fredoka(
+                                fontSize: 18,
+                                fontWeight: FontWeight.w700,
+                                color: AppColors.starGold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
+                          .animate()
+                          .scaleXY(
+                            begin: 0.5, end: 1.0,
+                            duration: 400.ms,
+                            curve: Curves.elasticOut,
+                          )
+                          .fadeIn(duration: 200.ms)
+                          .then(delay: 1200.ms)
+                          .fadeOut(duration: 300.ms),
+                    ),
+                  ),
+
                 // ── Celebration overlay ───────────────────
                 if (_showingCelebration)
                   CelebrationOverlay(
                     word: _currentWord.text,
                     playerName: widget.playerName,
+                    zoneIndex: _zoneIndex,
+                    inLevelStreak: _inLevelStreak,
+                    zoneEncouragement: _zoneEncouragement,
                   ),
 
                 // ── Standard confetti ─────────────────────
@@ -645,6 +870,17 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               ],
             ),
           ),
+          // Small avatar with reactions
+          if (widget.profileService != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: AvatarWidget(
+                config: widget.profileService!.avatar,
+                size: 36,
+                showBackground: false,
+                controller: _avatarController,
+              ),
+            ),
           // Word counter
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -815,15 +1051,26 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         children: List.generate(_targetText.length, (i) {
           // Explorer/Adventurer: first letter is pre-revealed
           final isPreRevealed = (_isExplorer || _isAdventurer) && i == 0;
-          return LetterTile(
+          // During hint reveal (3rd wrong tap), briefly show the correct letter
+          final hintReveal = _hintRevealing && i == _currentLetterIndex;
+          Widget tile = LetterTile(
             letter: _targetText[i],
-            isRevealed: _revealedLetters[i],
+            isRevealed: _revealedLetters[i] || hintReveal,
             isActive: i == _currentLetterIndex && !_showingCelebration,
             isError: _shaking && i == _currentLetterIndex,
-            revealedColor: isPreRevealed && !(_currentLetterIndex > i && i > 0)
-                ? AppColors.silver
-                : null,
+            revealedColor: hintReveal
+                ? AppColors.electricBlue
+                : isPreRevealed && !(_currentLetterIndex > i && i > 0)
+                    ? AppColors.silver
+                    : null,
           );
+          // Bounce animation on hint reveal
+          if (hintReveal) {
+            tile = tile
+                .animate(key: const ValueKey('hint_bounce'))
+                .scaleXY(begin: 1.3, end: 1.0, duration: 400.ms, curve: Curves.elasticOut);
+          }
+          return tile;
         }),
       ).animate().fadeIn(duration: 300.ms).slideY(begin: 0.15, end: 0, duration: 300.ms),
     );
@@ -1215,20 +1462,36 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         Navigator.pushReplacement(
                           context,
                           PageRouteBuilder(
+                            transitionDuration: const Duration(milliseconds: 600),
                             pageBuilder: (_, __, ___) => GameScreen(
                               level: widget.level + 1,
                               tier: widget.tier,
                               progressService: widget.progressService,
                               audioService: widget.audioService,
+                              profileService: widget.profileService,
+                              statsService: widget.statsService,
+                              streakService: widget.streakService,
+                              personalityService: widget.personalityService,
                               playerName: widget.playerName,
+                              profileId: widget.profileId,
                             ),
                             transitionsBuilder: (_, animation, __, child) {
-                              return FadeTransition(
-                                opacity: CurvedAnimation(
+                              // Smooth slide + fade for level transition
+                              return SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: const Offset(1.0, 0.0),
+                                  end: Offset.zero,
+                                ).animate(CurvedAnimation(
                                   parent: animation,
-                                  curve: Curves.easeInOut,
+                                  curve: Curves.easeOutCubic,
+                                )),
+                                child: FadeTransition(
+                                  opacity: CurvedAnimation(
+                                    parent: animation,
+                                    curve: Curves.easeIn,
+                                  ),
+                                  child: child,
                                 ),
-                                child: child,
                               );
                             },
                           ),

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/floating_hearts_bg.dart';

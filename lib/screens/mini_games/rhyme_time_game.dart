@@ -3,7 +3,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/rhyme_words.dart';
 import '../../data/sticker_definitions.dart';
@@ -109,6 +108,7 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
   // Game state
   bool _gameStarted = false;
   bool _gameOver = false;
+  bool _introPlayed = false;
   int _score = 0;
   int _lives = _maxLives;
   int _combo = 0;
@@ -589,10 +589,13 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
   // ── Start screen ──────────────────────────────────────────────────────────
 
   Widget _buildStartScreen() {
-    // Auto-play intro voice after a short delay
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted && !_gameStarted) _playIntro();
-    });
+    // Auto-play intro voice once (guard prevents re-fire on rebuilds)
+    if (!_introPlayed) {
+      _introPlayed = true;
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted && !_gameStarted) _playIntro();
+      });
+    }
 
     return Stack(
       children: [
@@ -871,12 +874,14 @@ class _RhymeTimeGameState extends State<RhymeTimeGame>
               .map((b) => _buildBubbleWidget(b)),
 
           // Particles overlay
-          IgnorePointer(
-            child: CustomPaint(
-              size: _screenSize,
-              painter: _ParticlePainter(
-                particles: _particles,
-                floatingNotes: _floatingNotes,
+          RepaintBoundary(
+            child: IgnorePointer(
+              child: CustomPaint(
+                size: _screenSize,
+                painter: _ParticlePainter(
+                  particles: _particles,
+                  floatingNotes: _floatingNotes,
+                ),
               ),
             ),
           ),

@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../services/audio_service.dart';
 import '../services/player_settings_service.dart';
 import '../theme/app_theme.dart';
@@ -29,6 +28,7 @@ class ProfilePickerScreen extends StatefulWidget {
 
 class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
   bool _showingNameInput = false;
+  bool _selecting = false;
   final _nameController = TextEditingController();
   final _nameFocus = FocusNode();
   bool _hasText = false;
@@ -55,6 +55,8 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen> {
   }
 
   void _onProfileTap(PlayerEntry profile) {
+    if (_selecting) return; // Prevent double-tap navigation
+    _selecting = true;
     // Play the child's name, then sign them in after a short delay
     if (profile.name.isNotEmpty) {
       widget.audioService.playWord(profile.name.toLowerCase());

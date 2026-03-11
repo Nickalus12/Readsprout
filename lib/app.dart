@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
@@ -7,12 +6,15 @@ import 'screens/name_setup_screen.dart';
 import 'screens/profile_picker_screen.dart';
 import 'services/progress_service.dart';
 import 'services/audio_service.dart';
+import 'services/deepgram_tts_service.dart';
 import 'services/player_settings_service.dart';
 import 'services/profile_service.dart';
 import 'services/review_service.dart';
 import 'services/streak_service.dart';
 import 'services/high_score_service.dart';
+import 'services/avatar_personality_service.dart';
 import 'services/stats_service.dart';
+import 'widgets/avatar_shader_loader.dart';
 import 'widgets/floating_hearts_bg.dart';
 
 class ReadingSproutApp extends StatefulWidget {
@@ -32,6 +34,8 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
   late final StreakService _streakService;
   late final HighScoreService _highScoreService;
   late final StatsService _statsService;
+  late final DeepgramTtsService _deepgramTtsService;
+  late final AvatarPersonalityService _personalityService;
   bool _initialized = false;
 
   @override
@@ -49,6 +53,8 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
     _streakService = StreakService();
     _highScoreService = HighScoreService();
     _statsService = StatsService();
+    _deepgramTtsService = DeepgramTtsService();
+    _personalityService = AvatarPersonalityService();
 
     // Get SharedPreferences once, share across all services
     final prefs = await SharedPreferences.getInstance();
@@ -79,7 +85,19 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
       _statsService.init(prefs).catchError((e) {
         debugPrint('StatsService init failed: $e');
       }),
+      _deepgramTtsService.init(prefs).catchError((e) {
+        debugPrint('DeepgramTtsService init failed: $e');
+      }),
+      _personalityService.init().catchError((e) {
+        debugPrint('AvatarPersonalityService init failed: $e');
+      }),
+      ShaderLoader.init().catchError((e) {
+        debugPrint('ShaderLoader init failed: $e');
+      }),
     ]);
+
+    // Connect Deepgram TTS to AudioService for runtime phrase playback
+    _audioService.setDeepgramTts(_deepgramTtsService);
 
     // Scope services to active profile
     _applyProfileScope();
@@ -95,11 +113,15 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
     _highScoreService.switchProfile(profileId);
     _reviewService.switchProfile(profileId);
     _statsService.switchProfile(profileId);
+    _profileService.switchProfile(profileId);
+    _audioService.setActiveProfile(profileId.isEmpty ? null : profileId);
   }
 
   void _onNameSubmitted(String name) async {
     await _settingsService.setPlayerName(name);
     setState(() {});
+    // Generate personalized phrases in background (if Deepgram is configured)
+    _generatePhrasesInBackground(name);
   }
 
   void _onChangeName() {
@@ -129,6 +151,26 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
     await _settingsService.addProfile(name);
     _applyProfileScope();
     setState(() {});
+    // Generate personalized phrases in background (if Deepgram is configured)
+    _generatePhrasesInBackground(name);
+  }
+
+  /// Generate personalized TTS phrases for a player in the background.
+  /// Runs silently — does not block the UI or show errors to the child.
+  void _generatePhrasesInBackground(String name) {
+    final profileId = _settingsService.activeProfileId;
+    if (profileId == null || profileId.isEmpty) return;
+    if (!_deepgramTtsService.isReady) return;
+    if (!_deepgramTtsService.canGenerate(profileId)) return;
+
+    debugPrint('Generating personalized phrases for "$name" (profile: $profileId)...');
+    _deepgramTtsService
+        .generatePhrasesForName(profileId: profileId, name: name)
+        .then((result) {
+      debugPrint('Phrase generation: ${result.generated} new, ${result.skipped} skipped, ${result.failed} failed');
+    }).catchError((e) {
+      debugPrint('Phrase generation error: $e');
+    });
   }
 
   void _onSignOut() async {
@@ -196,7 +238,10 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
       streakService: _streakService,
       highScoreService: _highScoreService,
       statsService: _statsService,
+      personalityService: _personalityService,
+      reviewService: _reviewService,
       playerName: _settingsService.playerName,
+      profileId: _settingsService.activeProfileId ?? '',
       onChangeName: _onChangeName,
       onSignOut: _onSignOut,
     );

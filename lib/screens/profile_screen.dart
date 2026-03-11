@@ -1,12 +1,12 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../models/player_profile.dart';
 import '../services/audio_service.dart';
 import '../services/profile_service.dart';
 import '../services/progress_service.dart';
+import '../services/streak_service.dart';
 import '../theme/app_theme.dart';
 import '../widgets/avatar_widget.dart';
 import '../widgets/daily_treasure.dart';
@@ -21,6 +21,7 @@ class ProfileScreen extends StatefulWidget {
   final ProfileService profileService;
   final ProgressService progressService;
   final AudioService audioService;
+  final StreakService streakService;
   final String playerName;
   final VoidCallback? onSignOut;
 
@@ -29,6 +30,7 @@ class ProfileScreen extends StatefulWidget {
     required this.profileService,
     required this.progressService,
     required this.audioService,
+    required this.streakService,
     required this.playerName,
     this.onSignOut,
   });
@@ -41,6 +43,7 @@ class _ProfileScreenState extends State<ProfileScreen>
     with SingleTickerProviderStateMixin {
   late AvatarConfig _avatar;
   late AnimationController _avatarGlowController;
+  final AvatarController _avatarController = AvatarController();
 
   @override
   void initState() {
@@ -50,17 +53,37 @@ class _ProfileScreenState extends State<ProfileScreen>
       vsync: this,
       duration: const Duration(milliseconds: 2000),
     )..repeat(reverse: true);
+
+    // Wire amplitude-based lip sync to avatar
+    _avatarController.bindAmplitude(widget.audioService.mouthAmplitude);
+
+    // Greet the child when profile opens
+    Future.delayed(const Duration(milliseconds: 600), _greetChild);
+  }
+
+  void _greetChild() {
+    if (!mounted) return;
+    widget.audioService.playWelcome(widget.playerName);
+  }
+
+  void _onAvatarTap() {
+    _avatarController.setExpression(
+      AvatarExpression.excited,
+      duration: const Duration(milliseconds: 1200),
+    );
+    widget.audioService.playSuccess();
   }
 
   @override
   void dispose() {
+    _avatarController.dispose();
     _avatarGlowController.dispose();
     super.dispose();
   }
 
   int get _wordCount => widget.profileService.totalWordsEverCompleted;
   int get _masteredCount => widget.progressService.totalStars;
-  int get _streak => widget.profileService.currentStreak;
+  int get _streak => widget.streakService.currentStreak;
 
   void _openAvatarEditor() async {
     final result = await Navigator.push<AvatarConfig>(
@@ -246,9 +269,10 @@ class _ProfileScreenState extends State<ProfileScreen>
         Row(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Avatar — tap opens editor, with animated glow
+            // Avatar — tap for reaction, long-press opens editor
             GestureDetector(
-              onTap: _openAvatarEditor,
+              onTap: _onAvatarTap,
+              onLongPress: _openAvatarEditor,
               child: AnimatedBuilder(
                 animation: _avatarGlowController,
                 builder: (context, child) {
@@ -275,7 +299,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                           ],
                         ),
                         padding: EdgeInsets.all(2 * sf),
-                        child: AvatarWidget(config: _avatar, size: 90 * sf),
+                        child: AvatarWidget(config: _avatar, size: 90 * sf, controller: _avatarController),
                       ),
                       // Edit badge — small pencil icon
                       Positioned(
@@ -314,55 +338,59 @@ class _ProfileScreenState extends State<ProfileScreen>
             SizedBox(width: 16 * sf),
 
             // Name + stats stacked
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (widget.playerName.isNotEmpty)
-                  GestureDetector(
-                    onTap: () => widget.audioService.playWelcome(widget.playerName),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          widget.playerName,
-                          style: AppFonts.fredoka(
-                            fontSize: 28 * sf,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                            shadows: [
-                              Shadow(
-                                color: AppColors.magenta.withValues(alpha: 0.5),
-                                blurRadius: 16 * sf,
+            Flexible(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (widget.playerName.isNotEmpty)
+                    GestureDetector(
+                      onTap: () => widget.audioService.playWelcome(widget.playerName),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Flexible(
+                            child: Text(
+                              widget.playerName,
+                              overflow: TextOverflow.ellipsis,
+                              maxLines: 1,
+                              style: AppFonts.fredoka(
+                                fontSize: 28 * sf,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                shadows: [
+                                  Shadow(
+                                    color: AppColors.magenta.withValues(alpha: 0.5),
+                                    blurRadius: 16 * sf,
+                                  ),
+                                ],
                               ),
-                            ],
+                            ),
                           ),
-                        ),
-                        SizedBox(width: 6 * sf),
-                        Icon(
-                          Icons.volume_up_rounded,
-                          color: AppColors.secondaryText.withValues(alpha: 0.4),
-                          size: 16 * sf,
-                        ),
-                      ],
+                          SizedBox(width: 6 * sf),
+                          Icon(
+                            Icons.volume_up_rounded,
+                            color: AppColors.secondaryText.withValues(alpha: 0.4),
+                            size: 16 * sf,
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
 
                 SizedBox(height: 10 * sf),
 
                 // Inline stats chips with labels
-                Row(
-                  mainAxisSize: MainAxisSize.min,
+                Wrap(
+                  spacing: 8 * sf,
+                  runSpacing: 6 * sf,
                   children: [
                     _StatChip(Icons.local_florist_rounded, AppColors.emerald, '$_wordCount',
                       label: 'Words', sf: sf,
                       onTap: () => widget.audioService.playWord('words'),
                     ),
-                    SizedBox(width: 8 * sf),
                     _StatChip(Icons.star_rounded, AppColors.starGold, '$_masteredCount',
                       label: 'Stars', sf: sf,
                       onTap: () => widget.audioService.playWord('stars'),
                     ),
-                    SizedBox(width: 8 * sf),
                     _StatChip(Icons.local_fire_department_rounded, AppColors.flameOrange, '$_streak',
                       label: 'Streak', sf: sf,
                       animate: _streak > 0,
@@ -372,6 +400,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 ),
               ],
             ),
+          ),
           ],
         ).animate().fadeIn(duration: 500.ms).slideY(begin: 0.1, end: 0, duration: 400.ms),
       ],
@@ -491,16 +520,18 @@ class _FireflyBackgroundState extends State<_FireflyBackground>
 
   @override
   Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: _controller,
-      builder: (context, _) {
-        return CustomPaint(
-          painter: _FireflyPainter(
-            fireflies: _fireflies,
-            time: _controller.value,
-          ),
-        );
-      },
+    return RepaintBoundary(
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          return CustomPaint(
+            painter: _FireflyPainter(
+              fireflies: _fireflies,
+              time: _controller.value,
+            ),
+          );
+        },
+      ),
     );
   }
 }

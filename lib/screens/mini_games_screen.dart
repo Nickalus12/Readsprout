@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../theme/app_theme.dart';
 import '../services/progress_service.dart';
@@ -9,6 +8,7 @@ import '../services/audio_service.dart';
 import '../services/high_score_service.dart';
 import '../services/profile_service.dart';
 import '../services/stats_service.dart';
+import '../services/avatar_personality_service.dart';
 import 'mini_games/unicorn_flight_game.dart';
 import 'mini_games/lightning_speller_game.dart';
 import 'mini_games/word_bubbles_game.dart';
@@ -27,6 +27,8 @@ class MiniGamesScreen extends StatefulWidget {
   final String playerName;
   final ProfileService? profileService;
   final StatsService? statsService;
+  final AvatarPersonalityService? personalityService;
+  final String profileId;
 
   const MiniGamesScreen({
     super.key,
@@ -36,6 +38,8 @@ class MiniGamesScreen extends StatefulWidget {
     required this.playerName,
     this.profileService,
     this.statsService,
+    this.personalityService,
+    this.profileId = '',
   });
 
   @override
@@ -54,6 +58,7 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
 
   Future<void> _loadHintsPref() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _hintsEnabled = prefs.getBool(_hintsPrefKey) ?? true;
     });
@@ -61,6 +66,7 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
 
   Future<void> _toggleHints() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       _hintsEnabled = !_hintsEnabled;
     });
@@ -268,13 +274,30 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
     );
   }
 
+  static const _gameIds = [
+    'unicorn_flight', 'lightning_speller', 'word_bubbles',
+    'memory_match', 'falling_letters', 'cat_letter_toss',
+    'letter_drop', 'rhyme_time', 'star_catcher', 'paint_splash',
+  ];
+
   Widget _buildGameBtn(BuildContext context, String label,
       CustomPainter painter, Color glow, int index, Widget game) {
     return _GameButton(
       label: label,
       painter: painter,
       glowColor: glow,
-      onTap: () => Navigator.push(context, _smoothRoute(game)),
+      onTap: () async {
+        await Navigator.push(context, _smoothRoute(game));
+        if (!mounted) return;
+        // Record mini game played with personality service
+        if (widget.profileId.isNotEmpty) {
+          widget.personalityService?.onMiniGamePlayed(widget.profileId, index);
+        }
+        // Record mini game play in stats
+        if (index < _gameIds.length) {
+          widget.statsService?.recordMiniGamePlayed(_gameIds[index], 0);
+        }
+      },
     )
         .animate()
         .fadeIn(delay: (index * 80).ms, duration: 400.ms)

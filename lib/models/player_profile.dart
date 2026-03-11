@@ -135,6 +135,12 @@ class AvatarConfig extends HiveObject {
   @HiveField(18)
   final int facePaint; // 0-9
 
+  @HiveField(19)
+  final int shirtColor; // 0-7
+
+  @HiveField(20)
+  final int shirtStyle; // 0-2
+
   AvatarConfig({
     required this.faceShape,
     required this.skinTone,
@@ -155,6 +161,8 @@ class AvatarConfig extends HiveObject {
     this.noseStyle = 0,
     this.glassesStyle = 0,
     this.facePaint = 0,
+    this.shirtColor = 0,
+    this.shirtStyle = 0,
   });
 
   /// Default avatar for first-time users.
@@ -189,6 +197,8 @@ class AvatarConfig extends HiveObject {
     int? noseStyle,
     int? glassesStyle,
     int? facePaint,
+    int? shirtColor,
+    int? shirtStyle,
   }) {
     return AvatarConfig(
       faceShape: faceShape ?? this.faceShape,
@@ -210,6 +220,8 @@ class AvatarConfig extends HiveObject {
       noseStyle: noseStyle ?? this.noseStyle,
       glassesStyle: glassesStyle ?? this.glassesStyle,
       facePaint: facePaint ?? this.facePaint,
+      shirtColor: shirtColor ?? this.shirtColor,
+      shirtStyle: shirtStyle ?? this.shirtStyle,
     );
   }
 }

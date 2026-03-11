@@ -20,6 +20,7 @@ dependencies:
   hive: ^2.2.3                   # Local key-value database (cross-platform, no native deps)
   hive_flutter: ^1.1.0           # Platform-agnostic Hive initialization
   forge2d: ^0.14.2               # 2D physics engine
+  sensors_plus: ^5.0.0            # Accelerometer/gyroscope for avatar head tilt
 
 dev_dependencies:
   flutter_test:
@@ -30,6 +31,9 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
+  shaders:
+    - shaders/hair_shimmer.frag
+    - shaders/skin_glow.frag
   assets:
     - assets/images/
     - assets/audio/words/

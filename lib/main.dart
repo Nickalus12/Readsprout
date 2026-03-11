@@ -2,12 +2,12 @@ import 'dart:io' show Platform;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:hive_flutter/hive_flutter.dart';
 import 'package:window_manager/window_manager.dart';
 
 import 'app.dart';
 import 'models/player_profile.dart';
+import 'services/avatar_personality_service.dart';
 import 'services/profile_service.dart';
 
 void main() async {
@@ -23,6 +23,7 @@ void main() async {
   Hive.registerAdapter(PlayerProfileAdapter());
   Hive.registerAdapter(AvatarConfigAdapter());
   Hive.registerAdapter(StickerRecordAdapter());
+  Hive.registerAdapter(AvatarPersonalityAdapter());
 
   // Open Hive boxes (each is an independent file on disk)
   await Hive.openBox('profile');

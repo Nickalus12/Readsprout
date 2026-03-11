@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../models/word.dart';
@@ -34,7 +33,7 @@ class _WordEditorScreenState extends State<WordEditorScreen> {
       _customWords =
           list.map((e) => Word.fromJson(e as Map<String, dynamic>)).toList();
     }
-    setState(() => _loading = false);
+    if (mounted) setState(() => _loading = false);
   }
 
   Future<void> _save() async {

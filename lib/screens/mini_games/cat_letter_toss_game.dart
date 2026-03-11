@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/dolch_words.dart';
 import '../../data/sticker_definitions.dart';
@@ -261,7 +260,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
       for (final s in _stars) {
         s.twinklePhase += dt * s.twinkleSpeed;
       }
-      setState(() {});
+      if (mounted) setState(() {});
       return;
     }
 
@@ -366,7 +365,7 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
     // Feedback timer
     if (_feedbackTimer > 0) _feedbackTimer -= dt;
 
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   // ── Toss logic ─────────────────────────────────────────────────────────
@@ -616,50 +615,58 @@ class _CatLetterTossGameState extends State<CatLetterTossGame>
           child: Stack(
             children: [
               // Star background
-              IgnorePointer(
-                child: CustomPaint(
-                  size: size,
-                  painter: _StarFieldPainter(
-                    stars: _stars,
-                    totalTime: _totalTime,
+              RepaintBoundary(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    size: size,
+                    painter: _StarFieldPainter(
+                      stars: _stars,
+                      totalTime: _totalTime,
+                    ),
                   ),
                 ),
               ),
 
               // Cat
-              IgnorePointer(
-                child: CustomPaint(
-                  size: size,
-                  painter: _CatPainter(
-                    catX: _catX,
-                    pawAngle: _catPawAngle,
-                    tailPhase: _catTailPhase,
-                    earTwitch: _catEarTwitch,
-                    glowPhase: _catGlowPhase,
+              RepaintBoundary(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    size: size,
+                    painter: _CatPainter(
+                      catX: _catX,
+                      pawAngle: _catPawAngle,
+                      tailPhase: _catTailPhase,
+                      earTwitch: _catEarTwitch,
+                      glowPhase: _catGlowPhase,
+                    ),
                   ),
                 ),
               ),
 
               // Tossed letters
-              IgnorePointer(
-                child: CustomPaint(
-                  size: size,
-                  painter: _LettersPainter(
-                    letters: _letters,
-                    sparkles: _sparkles,
-                    hintsEnabled: widget.hintsEnabled,
+              RepaintBoundary(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    size: size,
+                    painter: _LettersPainter(
+                      letters: _letters,
+                      sparkles: _sparkles,
+                      hintsEnabled: widget.hintsEnabled,
+                    ),
                   ),
                 ),
               ),
 
               // Basket
-              IgnorePointer(
-                child: CustomPaint(
-                  size: size,
-                  painter: _BasketPainter(
-                    basketX: _basketX,
-                    basketWidth: _basketWidth,
-                    basketHeight: _basketHeight,
+              RepaintBoundary(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    size: size,
+                    painter: _BasketPainter(
+                      basketX: _basketX,
+                      basketWidth: _basketWidth,
+                      basketHeight: _basketHeight,
+                    ),
                   ),
                 ),
               ),

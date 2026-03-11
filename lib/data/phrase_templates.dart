@@ -45,6 +45,129 @@ class PhraseTemplates {
     'Let\'s go, {name}!',
   ];
 
+  // ── All personalized categories (for TTS generation) ─────────────────
+
+  static const Map<String, List<String>> allCategories = {
+    'word_complete': wordComplete,
+    'level_complete': levelComplete,
+    'welcome': welcome,
+  };
+
+  // ── Zone-themed encouragement (text-only, shown on screen) ──────────
+  //
+  // Keys match zone names lowercased with underscores.
+  // These are displayed during gameplay and at level completion to make
+  // each zone feel distinct. No pre-generated audio — text only, or
+  // generated on-the-fly via DeepgramTtsService when available.
+
+  static const Map<String, List<String>> zoneEncouragement = {
+    'whispering_woods': [
+      'The trees are cheering for you, {name}!',
+      'The forest whispers your name, {name}!',
+      'Every leaf dances for you, {name}!',
+      'The fireflies light up for you!',
+      'The woodland creatures are proud!',
+    ],
+    'shimmer_shore': [
+      'The waves splash with joy, {name}!',
+      'You shine brighter than the sea, {name}!',
+      'The dolphins are cheering!',
+      'Ride the waves, {name}!',
+      'The ocean sings your name!',
+    ],
+    'crystal_peaks': [
+      'Your words echo through the crystals, {name}!',
+      'The mountain glows for you, {name}!',
+      'Sparkle like a snowflake!',
+      'The crystals shimmer with pride!',
+      'You reached new heights, {name}!',
+    ],
+    'skyward_kingdom': [
+      'The clouds carry your voice, {name}!',
+      'You soar higher than the birds, {name}!',
+      'The castle bells ring for you!',
+      'The sky is yours, {name}!',
+      'Thunder and lightning, {name}!',
+    ],
+    'celestial_crown': [
+      'The stars shine for you, {name}!',
+      'You are a constellation, {name}!',
+      'The galaxy celebrates you!',
+      'Cosmic power, {name}!',
+      'You light up the universe!',
+    ],
+  };
+
+  // ── Zone-themed streak messages (text-only, shown as brief indicators) ─
+
+  static const Map<String, List<String>> zoneStreakMessages = {
+    'whispering_woods': ['Forest Fire!', 'Wild Run!', 'Nature Power!'],
+    'shimmer_shore': ['Tidal Wave!', 'Making Waves!', 'Splash Streak!'],
+    'crystal_peaks': ['Crystal Clear!', 'Peak Power!', 'Ice Storm!'],
+    'skyward_kingdom': ['Sky High!', 'Cloud Burst!', 'Royal Streak!'],
+    'celestial_crown': ['Supernova!', 'Star Streak!', 'Cosmic Blaze!'],
+  };
+
+  // ── Zone-themed level complete messages (text-only) ────────────────
+
+  static const Map<String, List<String>> zoneLevelComplete = {
+    'whispering_woods': [
+      'The forest bows to you, {name}!',
+      'You conquered the woods, {name}!',
+      'The trees remember your name!',
+    ],
+    'shimmer_shore': [
+      'You sailed across the shore, {name}!',
+      'The ocean applauds you, {name}!',
+      'A wave of victory for {name}!',
+    ],
+    'crystal_peaks': [
+      'You reached the summit, {name}!',
+      'The crystals glow in your honor!',
+      'Mountain master, {name}!',
+    ],
+    'skyward_kingdom': [
+      'The kingdom celebrates, {name}!',
+      'You rule the skies, {name}!',
+      'A royal victory for {name}!',
+    ],
+    'celestial_crown': [
+      'You earned the crown, {name}!',
+      'The stars bow to you, {name}!',
+      'Cosmic champion, {name}!',
+    ],
+  };
+
+  /// Get a zone-themed level complete phrase.
+  /// Falls back to generic level complete if zone key not found.
+  static String randomZoneLevelComplete(String zoneKey, String name) {
+    final phrases = zoneLevelComplete[zoneKey];
+    if (phrases == null || phrases.isEmpty) return randomLevelComplete(name);
+    final template = phrases[_rng.nextInt(phrases.length)];
+    return template.replaceAll('{name}', name);
+  }
+
+  /// Get a random zone-themed encouragement phrase.
+  /// Falls back to generic if zone key not found.
+  static String randomZoneEncouragement(String zoneKey, String name) {
+    final phrases = zoneEncouragement[zoneKey];
+    if (phrases == null || phrases.isEmpty) return randomWordComplete(name);
+    final template = phrases[_rng.nextInt(phrases.length)];
+    return template.replaceAll('{name}', name);
+  }
+
+  /// Get a zone-themed streak message.
+  static String randomZoneStreakMessage(String zoneKey) {
+    final messages = zoneStreakMessages[zoneKey];
+    if (messages == null || messages.isEmpty) return 'Streak!';
+    return messages[_rng.nextInt(messages.length)];
+  }
+
+  /// Convert a zone name to the key used in the maps above.
+  static String zoneKey(String zoneName) {
+    return zoneName.toLowerCase().replaceAll(' ', '_');
+  }
+
   // ── Generic fallback praises (no name, used if name not set) ──────────
 
   static const genericPraises = [

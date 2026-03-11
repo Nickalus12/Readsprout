@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../models/player_profile.dart';
 import '../theme/app_theme.dart';
 import 'bookworm_companion.dart';

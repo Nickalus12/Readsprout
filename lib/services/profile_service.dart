@@ -7,13 +7,19 @@ import '../models/player_profile.dart';
 /// Hive-backed persistence for profile data, stickers, and daily rewards.
 ///
 /// Uses three separate Hive boxes:
-/// - `profile` — name, avatar, streak, unlocked items, lifetime stats
+/// - `profile` — name, avatar, unlocked items, lifetime stats
 /// - `stickers` — earned sticker records
 /// - `dailyRewards` — chest state, last open date
 class ProfileService {
   late Box _profileBox;
   late Box<StickerRecord> _stickerBox;
   late Box _dailyBox;
+
+  /// Active profile ID for key namespacing. Empty string = legacy/default.
+  String _profileId = '';
+
+  /// Prefix for profile-scoped keys.
+  String get _p => _profileId.isEmpty ? '' : '${_profileId}_';
 
   /// Initialize by opening all Hive boxes.
   /// Hive.initFlutter() and adapter registration must happen before this.
@@ -23,31 +29,65 @@ class ProfileService {
     _dailyBox = Hive.box('dailyRewards');
   }
 
+  /// Switch to a different profile. All subsequent reads/writes are scoped.
+  void switchProfile(String profileId) {
+    _profileId = profileId;
+  }
+
+  // ── Helpers ───────────────────────────────────────────────────────
+
+  /// Read a value from a Hive box with profile-scoped key, falling back
+  /// to the legacy flat key for backward compatibility.
+  T _get<T>(Box box, String key, {required T defaultValue}) {
+    if (_p.isNotEmpty) {
+      final scoped = box.get('$_p$key');
+      if (scoped != null) return scoped as T;
+      // Fallback: legacy flat key (pre-multi-profile data)
+      final legacy = box.get(key);
+      if (legacy != null) return legacy as T;
+      return defaultValue;
+    }
+    return box.get(key, defaultValue: defaultValue) as T;
+  }
+
+  /// Read a nullable value with profile scoping + legacy fallback.
+  T? _getOrNull<T>(Box box, String key) {
+    if (_p.isNotEmpty) {
+      final scoped = box.get('$_p$key');
+      if (scoped is T) return scoped;
+      final legacy = box.get(key);
+      if (legacy is T) return legacy;
+      return null;
+    }
+    return box.get(key) as T?;
+  }
+
   // ── Profile ────────────────────────────────────────────────────────
 
-  String get name => _profileBox.get('name', defaultValue: '') as String;
+  String get name => _get<String>(_profileBox, 'name', defaultValue: '');
 
-  Future<void> setName(String name) => _profileBox.put('name', name);
+  Future<void> setName(String name) => _profileBox.put('${_p}name', name);
 
   bool get setupComplete =>
-      _profileBox.get('setupComplete', defaultValue: false) as bool;
+      _get<bool>(_profileBox, 'setupComplete', defaultValue: false);
 
-  Future<void> markSetupComplete() => _profileBox.put('setupComplete', true);
+  Future<void> markSetupComplete() =>
+      _profileBox.put('${_p}setupComplete', true);
 
   AvatarConfig get avatar {
-    final stored = _profileBox.get('avatar');
-    if (stored is AvatarConfig) return stored;
+    final stored = _getOrNull<AvatarConfig>(_profileBox, 'avatar');
+    if (stored != null) return stored;
     return AvatarConfig.defaultAvatar();
   }
 
   Future<void> setAvatar(AvatarConfig config) =>
-      _profileBox.put('avatar', config);
+      _profileBox.put('${_p}avatar', config);
 
   int get totalWordsEverCompleted =>
-      _profileBox.get('totalWordsEverCompleted', defaultValue: 0) as int;
+      _get<int>(_profileBox, 'totalWordsEverCompleted', defaultValue: 0);
 
   Future<void> setTotalWordsEverCompleted(int count) =>
-      _profileBox.put('totalWordsEverCompleted', count);
+      _profileBox.put('${_p}totalWordsEverCompleted', count);
 
   ReadingLevel get readingLevel =>
       ReadingLevel.forWordCount(totalWordsEverCompleted);
@@ -55,73 +95,27 @@ class ProfileService {
   // ── Words Played Today ────────────────────────────────────────────
 
   int get wordsPlayedToday {
-    final lastDate = _profileBox.get('wordsPlayedDate') as DateTime?;
+    final lastDate = _getOrNull<DateTime>(_profileBox, 'wordsPlayedDate');
     if (lastDate == null) return 0;
     final now = DateTime.now();
     if (lastDate.year == now.year &&
         lastDate.month == now.month &&
         lastDate.day == now.day) {
-      return _profileBox.get('wordsPlayedToday', defaultValue: 0) as int;
+      return _get<int>(_profileBox, 'wordsPlayedToday', defaultValue: 0);
     }
     return 0; // Different day, reset
   }
 
   Future<void> setWordsPlayedToday(int count) async {
-    await _profileBox.put('wordsPlayedToday', count);
-    await _profileBox.put('wordsPlayedDate', DateTime.now());
-  }
-
-  // ── Streaks ────────────────────────────────────────────────────────
-
-  int get currentStreak =>
-      _profileBox.get('currentStreak', defaultValue: 0) as int;
-
-  int get bestStreak =>
-      _profileBox.get('bestStreak', defaultValue: 0) as int;
-
-  DateTime? get lastPlayDate =>
-      _profileBox.get('lastPlayDate') as DateTime?;
-
-  /// Record a play session for streak tracking.
-  /// Call this when the child completes a word or level.
-  Future<void> recordPlaySession() async {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final lastPlay = lastPlayDate;
-
-    if (lastPlay != null) {
-      final lastDay =
-          DateTime(lastPlay.year, lastPlay.month, lastPlay.day);
-      final diff = today.difference(lastDay).inDays;
-
-      if (diff == 0) return; // Already played today
-      if (diff == 1) {
-        // Consecutive day
-        final newStreak = currentStreak + 1;
-        await _profileBox.put('currentStreak', newStreak);
-        if (newStreak > bestStreak) {
-          await _profileBox.put('bestStreak', newStreak);
-        }
-      } else {
-        // Streak broken
-        await _profileBox.put('currentStreak', 1);
-      }
-    } else {
-      // First ever play
-      await _profileBox.put('currentStreak', 1);
-      if (bestStreak < 1) {
-        await _profileBox.put('bestStreak', 1);
-      }
-    }
-
-    await _profileBox.put('lastPlayDate', today);
+    await _profileBox.put('${_p}wordsPlayedToday', count);
+    await _profileBox.put('${_p}wordsPlayedDate', DateTime.now());
   }
 
   // ── Unlocked Items ─────────────────────────────────────────────────
 
   List<String> get unlockedItems {
-    final raw = _profileBox.get('unlockedItems');
-    if (raw is List) return List<String>.from(raw);
+    final raw = _getOrNull<List>(_profileBox, 'unlockedItems');
+    if (raw != null) return List<String>.from(raw);
     return <String>[];
   }
 
@@ -129,7 +123,7 @@ class ProfileService {
     final items = unlockedItems;
     if (!items.contains(itemId)) {
       items.add(itemId);
-      await _profileBox.put('unlockedItems', items);
+      await _profileBox.put('${_p}unlockedItems', items);
     }
   }
 
@@ -137,28 +131,40 @@ class ProfileService {
 
   // ── Stickers ───────────────────────────────────────────────────────
 
-  List<StickerRecord> get allStickers => _stickerBox.values.toList();
+  /// Profile-scoped sticker key.
+  String _stickerKey(String stickerId) => '$_p$stickerId';
 
-  bool hasSticker(String id) => _stickerBox.containsKey(id);
+  List<StickerRecord> get allStickers {
+    if (_profileId.isEmpty) return _stickerBox.values.toList();
+    // Filter stickers for the active profile
+    return _stickerBox.keys
+        .where((k) => (k as String).startsWith(_p))
+        .map((k) => _stickerBox.get(k))
+        .whereType<StickerRecord>()
+        .toList();
+  }
+
+  bool hasSticker(String id) => _stickerBox.containsKey(_stickerKey(id));
 
   Future<void> awardSticker(StickerRecord sticker) async {
-    if (!_stickerBox.containsKey(sticker.stickerId)) {
-      await _stickerBox.put(sticker.stickerId, sticker);
+    final key = _stickerKey(sticker.stickerId);
+    if (!_stickerBox.containsKey(key)) {
+      await _stickerBox.put(key, sticker);
     }
   }
 
   /// Mark a sticker as no longer "new" (after the user views it).
   Future<void> markStickerSeen(String stickerId) async {
-    final sticker = _stickerBox.get(stickerId);
+    final key = _stickerKey(stickerId);
+    final sticker = _stickerBox.get(key);
     if (sticker != null && sticker.isNew) {
       final updated = sticker.copyWith(isNew: false);
-      await _stickerBox.put(stickerId, updated);
+      await _stickerBox.put(key, updated);
     }
   }
 
   /// Number of stickers that haven't been viewed yet.
-  int get newStickerCount =>
-      _stickerBox.values.where((s) => s.isNew).length;
+  int get newStickerCount => allStickers.where((s) => s.isNew).length;
 
   // ── Activity Chest ─────────────────────────────────────────────────
   // Tiered daily chests: 1st at 10 words, 2nd at 25, 3rd at 50.
@@ -172,17 +178,17 @@ class ProfileService {
 
   /// Total chests the player has ever opened (lifetime).
   int get chestsOpenedTotal =>
-      _dailyBox.get('chestsOpenedTotal', defaultValue: 0) as int;
+      _get<int>(_dailyBox, 'chestsOpenedTotal', defaultValue: 0);
 
   /// Number of chests already claimed today out of what was earned.
   int get _chestsClaimedToday {
-    final lastDate = _dailyBox.get('chestsClaimedDate') as DateTime?;
+    final lastDate = _getOrNull<DateTime>(_dailyBox, 'chestsClaimedDate');
     if (lastDate == null) return 0;
     final now = DateTime.now();
     if (lastDate.year == now.year &&
         lastDate.month == now.month &&
         lastDate.day == now.day) {
-      return _dailyBox.get('chestsClaimedToday', defaultValue: 0) as int;
+      return _get<int>(_dailyBox, 'chestsClaimedToday', defaultValue: 0);
     }
     return 0; // New day, reset claimed count
   }
@@ -240,12 +246,12 @@ class ProfileService {
   /// Mark one chest as opened. Returns the new total.
   Future<int> markChestOpened() async {
     final newTotal = chestsOpenedTotal + 1;
-    await _dailyBox.put('chestsOpenedTotal', newTotal);
+    await _dailyBox.put('${_p}chestsOpenedTotal', newTotal);
 
     // Track claims for today
     final newClaimed = _chestsClaimedToday + 1;
-    await _dailyBox.put('chestsClaimedToday', newClaimed);
-    await _dailyBox.put('chestsClaimedDate', DateTime.now());
+    await _dailyBox.put('${_p}chestsClaimedToday', newClaimed);
+    await _dailyBox.put('${_p}chestsClaimedDate', DateTime.now());
 
     return newTotal;
   }
@@ -255,17 +261,17 @@ class ProfileService {
 
   /// The ID of the last reward received from a chest.
   String? get lastChestRewardId =>
-      _dailyBox.get('lastChestRewardId') as String?;
+      _getOrNull<String>(_dailyBox, 'lastChestRewardId');
 
   Future<void> setLastChestRewardId(String rewardId) =>
-      _dailyBox.put('lastChestRewardId', rewardId);
+      _dailyBox.put('${_p}lastChestRewardId', rewardId);
 
   /// Legacy string-based reward (for backward compat).
   String? get lastChestReward =>
-      _dailyBox.get('lastReward') as String?;
+      _getOrNull<String>(_dailyBox, 'lastReward');
 
   Future<void> setLastChestReward(String reward) =>
-      _dailyBox.put('lastReward', reward);
+      _dailyBox.put('${_p}lastReward', reward);
 
   // ── Migration from SharedPreferences ───────────────────────────────
 

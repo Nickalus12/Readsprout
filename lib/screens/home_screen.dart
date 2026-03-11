@@ -2,7 +2,6 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../services/profile_service.dart';
 import '../services/progress_service.dart';
@@ -10,6 +9,8 @@ import '../services/audio_service.dart';
 import '../services/streak_service.dart';
 import '../services/high_score_service.dart';
 import '../services/stats_service.dart';
+import '../services/avatar_personality_service.dart';
+import '../services/review_service.dart';
 import '../widgets/floating_hearts_bg.dart';
 import '../widgets/streak_badge.dart';
 import 'level_select_screen.dart';
@@ -24,7 +25,10 @@ class HomeScreen extends StatefulWidget {
   final StreakService streakService;
   final HighScoreService highScoreService;
   final StatsService? statsService;
+  final AvatarPersonalityService? personalityService;
+  final ReviewService? reviewService;
   final String playerName;
+  final String profileId;
   final VoidCallback? onChangeName;
   final VoidCallback? onSignOut;
 
@@ -36,7 +40,10 @@ class HomeScreen extends StatefulWidget {
     required this.streakService,
     required this.highScoreService,
     this.statsService,
+    this.personalityService,
+    this.reviewService,
     this.playerName = '',
+    this.profileId = '',
     this.onChangeName,
     this.onSignOut,
   });
@@ -245,9 +252,8 @@ class _HomeScreenState extends State<HomeScreen>
 
                     // ── Hero: Player name (tappable letters) ──
                     if (hasName)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        mainAxisSize: MainAxisSize.min,
+                      Wrap(
+                        alignment: WrapAlignment.center,
                         children: [
                           for (int i = 0; i < widget.playerName.length; i++)
                             _TappableNameLetter(
@@ -346,7 +352,11 @@ class _HomeScreenState extends State<HomeScreen>
                           audioService: widget.audioService,
                           profileService: widget.profileService,
                           statsService: widget.statsService,
+                          streakService: widget.streakService,
+                          personalityService: widget.personalityService,
+                          reviewService: widget.reviewService,
                           playerName: widget.playerName,
+                          profileId: widget.profileId,
                         )),
                       ),
                       child: Container(
@@ -460,6 +470,7 @@ class _HomeScreenState extends State<HomeScreen>
                                 profileService: widget.profileService!,
                                 progressService: widget.progressService,
                                 audioService: widget.audioService,
+                                streakService: widget.streakService,
                                 playerName: widget.playerName,
                                 onSignOut: widget.onSignOut,
                               )),
@@ -488,6 +499,8 @@ class _HomeScreenState extends State<HomeScreen>
                               playerName: widget.playerName,
                               profileService: widget.profileService,
                               statsService: widget.statsService,
+                              personalityService: widget.personalityService,
+                              profileId: widget.profileId,
                             )),
                           ),
                         ),
@@ -918,6 +931,7 @@ class _StarSim extends ChangeNotifier {
   double time = 0;
   Duration _lastElapsed = Duration.zero;
   Size size = Size.zero;
+  bool _disposed = false;
 
   static const _flashDuration = 0.55;
   static const _flashMaxRadius = 60.0;
@@ -927,6 +941,12 @@ class _StarSim extends ChangeNotifier {
     for (int i = 0; i < 15; i++) {
       stars.add(_StarParticle(rng));
     }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 
   Offset starScreenPos(_StarParticle star) {
@@ -961,6 +981,7 @@ class _StarSim extends ChangeNotifier {
 
       // Respawn after delay
       Future.delayed(const Duration(seconds: 2), () {
+        if (_disposed) return;
         stars.add(_StarParticle(Random()));
       });
     }

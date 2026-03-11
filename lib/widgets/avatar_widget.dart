@@ -1,727 +1,1127 @@
+import 'dart:async';
 import 'dart:math';
+import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
-import '../models/player_profile.dart';
 import '../data/avatar_options.dart';
+import '../models/player_profile.dart';
+import 'avatar_gyroscope.dart';
 import '../theme/app_theme.dart';
+import 'avatar_accessory_painters.dart';
+import 'avatar_animation_system.dart';
+import 'avatar_body_painters.dart' hide shirtColorOptions;
+import 'avatar_effects_painters.dart';
+import 'avatar_hair_painters.dart' show HairBackPainter, HairFrontPainter;
+import 'avatar_skeleton.dart';
 
-/// Reusable avatar rendering widget.
+/// Avatar rendering engine — Pixar-quality character rendering in code.
 ///
-/// Renders the player's avatar at any size using [AvatarConfig] to drive
-/// every customizable feature. All drawing is proportional to [size].
+/// Features:
+/// - 3D skin shading (warm highlight → cool jaw shadow, ambient occlusion)
+/// - Alive eyes (limbal ring, radial iris fibers, caustic patterns, dual
+///   specular highlights, eyelid-sweep blink, pupil dilation, eye tracking)
+/// - Gradient lips with individual teeth, tongue center-line gradient
+/// - Nostril breathing micro-animation
+/// - Gaussian-falloff cheek blush
+/// - Curved bezier eyelashes, gradient eyebrows
+/// - 5 AnimationControllers (breathing, blink, idle sway, pupil dilation, twinkle)
 ///
-/// Layer order (bottom to top):
+/// Layer order (bottom → top):
 ///   1. Background circle
-///   2. Golden glow ring
-///   3. Back hair layer (long/flowing styles behind the face)
-///   4. Face shape (skin)
-///   5. Nose
-///   6. Cheeks (blush, freckles, hearts, stars)
-///   7. Eyes (sclera, iris, pupil, highlights) + eye color
-///   8. Eyelashes
-///   9. Eyebrows
-///  10. Mouth + lip color
-///  11. Face paint / stickers
-///  12. Front hair layer
-///  13. Glasses
-///  14. Accessories (hats, bows, crowns, horns, etc.)
-///  15. Sparkle effects
-class AvatarWidget extends StatelessWidget {
+///   2. Golden glow aura (GoldenGlowPainter)
+///   3. Hair back layer (HairBackPainter)
+///   4. Face (3D skin gradient, ears, chin shadow, nose-bridge AO)
+///   5. Nose (with breathing nostril micro-anim)
+///   6. Cheeks (gaussian radial blush)
+///   7. Eyes (full iris detail, eyelid-sweep blink, pupil tracking)
+///   8. Eyelashes (curved strokes)
+///   9. Eyebrows (gradient fill)
+///  10. Mouth (gradient lips, individual teeth, tongue center-line)
+///  11. Face paint (FacePaintPainter)
+///  12. Hair front layer (HairFrontPainter)
+///  13. Glasses (GlassesPainter)
+///  14. Accessories (accessoryPainter dispatcher)
+///  15. Sparkle effects (SparklePainter)
+// ═══════════════════════════════════════════════════════════════════════
+//  AVATAR EXPRESSION SYSTEM
+// ═══════════════════════════════════════════════════════════════════════
+
+/// Expression states the avatar can show.
+enum AvatarExpression {
+  neutral,
+  excited,    // wide eyes, big smile — word correct / level complete
+  thinking,   // slightly squinted, pursed lips — wrong letter
+  talking,    // mouth opens/closes rhythmically — during audio playback
+  happy,      // gentle smile, slightly wider eyes — option selected in editor
+  surprised,  // wide eyes, round 'O' mouth — unexpected events
+}
+
+/// External controller for driving avatar expressions from game/audio events.
+///
+/// Usage:
+/// ```dart
+/// final controller = AvatarController();
+/// AvatarWidget(config: config, controller: controller);
+/// controller.simulateTalking(duration: Duration(seconds: 2));
+/// controller.setExpression(AvatarExpression.excited);
+/// controller.setLookTarget(Offset(100, 200)); // eyes follow a point
+/// ```
+class AvatarController extends ChangeNotifier {
+  AvatarExpression _expression = AvatarExpression.neutral;
+  double _mouthOpenAmount = 0.0;
+  Offset? _lookTarget;
+  Timer? _expressionTimer;
+  Timer? _talkingTimer;
+  Timer? _talkCycleTimer;
+  final _rng = Random();
+
+  AvatarExpression get expression => _expression;
+  double get mouthOpenAmount => _mouthOpenAmount;
+  bool get isTalking => _expression == AvatarExpression.talking;
+
+  /// Target point for eye tracking. Null = idle sway (default behavior).
+  Offset? get lookTarget => _lookTarget;
+
+  /// Set mouth openness directly (0.0 = closed, 1.0 = wide open).
+  /// Use this for real-time lip sync when phoneme data is available.
+  void setMouthOpenness(double value) {
+    _mouthOpenAmount = value.clamp(0.0, 1.0);
+    if (_expression != AvatarExpression.talking) {
+      _expression = AvatarExpression.talking;
+    }
+    notifyListeners();
+  }
+
+  /// Shift pupil position toward a target point (null = center/idle sway).
+  /// Coordinates are in the avatar widget's local space.
+  void setLookTarget(Offset? target) {
+    _lookTarget = target;
+    notifyListeners();
+  }
+
+  /// Set an expression that auto-resets to neutral after [duration].
+  void setExpression(AvatarExpression expr, {Duration duration = const Duration(seconds: 2)}) {
+    _expressionTimer?.cancel();
+    _expression = expr;
+    notifyListeners();
+
+    if (expr != AvatarExpression.neutral) {
+      _expressionTimer = Timer(duration, () {
+        _expression = AvatarExpression.neutral;
+        _mouthOpenAmount = 0.0;
+        notifyListeners();
+      });
+    }
+  }
+
+  /// Simulate talking with organic mouth movement for [duration].
+  ///
+  /// Uses randomized amplitude (0.3–0.9) and frequency (6–12 Hz) with
+  /// perlin-like layering for natural feel. Ramps up over 100ms at start,
+  /// ramps down over 100ms at end.
+  void simulateTalking({Duration duration = const Duration(seconds: 2)}) {
+    _expressionTimer?.cancel();
+    _talkingTimer?.cancel();
+    _talkCycleTimer?.cancel();
+
+    _expression = AvatarExpression.talking;
+    _mouthOpenAmount = 0.0;
+    notifyListeners();
+
+    final startMs = DateTime.now().millisecondsSinceEpoch;
+    final durationMs = duration.inMilliseconds;
+    const rampMs = 100.0; // ease in/out duration
+
+    // Randomized per-session parameters for organic feel
+    final baseFreq = 6.0 + _rng.nextDouble() * 6.0;   // 6–12 Hz
+    final ampBase = 0.3 + _rng.nextDouble() * 0.3;     // 0.3–0.6 base
+    final ampRange = 0.15 + _rng.nextDouble() * 0.15;  // variation range
+
+    _talkCycleTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      final elapsed = DateTime.now().millisecondsSinceEpoch - startMs;
+      final t = elapsed / 1000.0; // seconds
+
+      // Ramp envelope: ease in at start, ease out at end
+      double envelope = 1.0;
+      if (elapsed < rampMs) {
+        envelope = elapsed / rampMs;
+      } else if (elapsed > durationMs - rampMs) {
+        envelope = ((durationMs - elapsed) / rampMs).clamp(0.0, 1.0);
+      }
+
+      // Multi-layer oscillation for organic mouth movement
+      final layer1 = sin(t * baseFreq * 2 * pi) * 0.5 + 0.5;
+      final layer2 = sin(t * baseFreq * 1.3 * 2 * pi + 0.7) * 0.3 + 0.5;
+      final layer3 = sin(t * baseFreq * 0.5 * 2 * pi + 2.1) * 0.2 + 0.5;
+
+      // Combine layers with randomized amplitude
+      final amplitude = ampBase + sin(t * 1.7) * ampRange;
+      final raw = (layer1 * 0.5 + layer2 * 0.3 + layer3 * 0.2) * amplitude;
+
+      _mouthOpenAmount = (raw * envelope).clamp(0.0, 1.0);
+      notifyListeners();
+    });
+
+    _talkingTimer = Timer(duration, () {
+      stopTalking();
+    });
+  }
+
+  /// Stop any active talking animation and return to idle mouth.
+  void stopTalking() {
+    _talkCycleTimer?.cancel();
+    _talkCycleTimer = null;
+    _talkingTimer?.cancel();
+    _talkingTimer = null;
+    _mouthOpenAmount = 0.0;
+    _expression = AvatarExpression.neutral;
+    notifyListeners();
+  }
+
+  // ── Amplitude-based lip sync binding ─────────────────────────────────
+
+  ValueNotifier<double>? _boundAmplitude;
+
+  /// Bind to an amplitude [ValueNotifier] for real-time lip sync.
+  ///
+  /// While bound, the mouth openness tracks the notifier value directly.
+  /// Call [unbindAmplitude] or [dispose] to disconnect.
+  ///
+  /// Typically called once during screen init:
+  /// ```dart
+  /// avatarController.bindAmplitude(audioService.mouthAmplitude);
+  /// ```
+  void bindAmplitude(ValueNotifier<double> amplitude) {
+    unbindAmplitude();
+    _boundAmplitude = amplitude;
+    amplitude.addListener(_onAmplitudeChanged);
+  }
+
+  /// Disconnect from the amplitude notifier.
+  void unbindAmplitude() {
+    _boundAmplitude?.removeListener(_onAmplitudeChanged);
+    _boundAmplitude = null;
+  }
+
+  void _onAmplitudeChanged() {
+    final value = _boundAmplitude?.value ?? 0.0;
+    if (value > 0.01) {
+      // Audio is playing — drive mouth from amplitude
+      _mouthOpenAmount = value.clamp(0.0, 1.0);
+      if (_expression != AvatarExpression.talking) {
+        _expression = AvatarExpression.talking;
+      }
+    } else if (_expression == AvatarExpression.talking) {
+      // Audio stopped — return to neutral
+      _mouthOpenAmount = 0.0;
+      _expression = AvatarExpression.neutral;
+    }
+    notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    unbindAmplitude();
+    _expressionTimer?.cancel();
+    _talkingTimer?.cancel();
+    _talkCycleTimer?.cancel();
+    super.dispose();
+  }
+}
+
+class AvatarWidget extends StatefulWidget {
   final AvatarConfig config;
   final double size;
   final bool showBackground;
+
+  /// When false, the tick loop is stopped and the avatar renders in its
+  /// resting pose. Use this for editor preview thumbnails.
   final bool animateEffects;
+
+  /// Optional controller for driving expressions from external events.
+  final AvatarController? controller;
+
+  /// Aspect ratio of the widget (width / height). Default ~3:4 for bust view.
+  final double aspectRatio;
+
+  /// Energy level for procedural idle animation (0.0 = sleepy, 1.0 = hyper).
+  /// Driven by AvatarPersonalityService mood/energy.
+  final double energyLevel;
 
   const AvatarWidget({
     super.key,
     required this.config,
     this.size = 80,
     this.showBackground = true,
-    this.animateEffects = false,
+    this.animateEffects = true,
+    this.controller,
+    this.aspectRatio = 0.75,
+    this.energyLevel = 0.5,
   });
 
   @override
-  Widget build(BuildContext context) {
-    final bgColor = AppColors.avatarBgColors[config.bgColor.clamp(0, 7)];
+  State<AvatarWidget> createState() => _AvatarWidgetState();
+}
 
-    Widget avatar = SizedBox(
-      width: size,
-      height: size,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          // 1. Background circle
-          if (showBackground)
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  color: bgColor,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
+class _AvatarWidgetState extends State<AvatarWidget>
+    with SingleTickerProviderStateMixin {
+  // ── Skeleton & animation system ─────────────────────────────────────
+  late final AvatarSkeleton _skeleton;
+  late final AnimationMixer _mixer;
+  late final AvatarTouchHandler _touchHandler;
+  late final GyroscopeAdapter _gyro;
 
-          // 2. Golden glow ring
-          if (config.hasGoldenGlow)
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: AppColors.starGold.withValues(alpha: 0.7),
-                    width: size * 0.04,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.starGold.withValues(alpha: 0.4),
-                      blurRadius: size * 0.15,
-                      spreadRadius: size * 0.02,
-                    ),
-                  ],
-                ),
-              ),
-            ),
+  // ── Single game-loop ticker ─────────────────────────────────────────
+  late final AnimationController _tickCtrl;
+  double _totalTime = 0.0;
+  double _lastTickTime = 0.0;
 
-          // 3. Back hair layer
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _BackHairPainter(
-                style: config.hairStyle,
-                color: _hairColor,
-                isRainbow: isRainbowHair(config.hairColor),
-                faceShape: config.faceShape,
-              ),
-            ),
-          ),
+  // ── Legacy animation values (derived from time each frame) ──────────
+  double _breathingValue = 0.0;
+  double _blinkValue = 0.0;
+  double _idleSwayValue = 0.5;
+  double _pupilDilationValue = 0.0;
+  double _twinkleValue = 0.0;
 
-          // 4. Face shape
-          Positioned(
-            left: size * 0.15,
-            top: size * _faceTop,
-            child: CustomPaint(
-              size: Size(size * 0.70, size * _faceHeightFraction),
-              painter: _FacePainter(
-                skinColor: _skinColor,
-                faceShape: config.faceShape,
-              ),
-            ),
-          ),
+  // ── Blink state machine ─────────────────────────────────────────────
+  Timer? _blinkTimer;
+  bool _isBlinking = false;
+  double _blinkPhase = 0.0;
+  final _rng = Random();
 
-          // 5. Nose
-          Positioned(
-            left: size * 0.44,
-            top: size * (_faceTop + _faceHeightFraction * 0.52),
-            child: CustomPaint(
-              size: Size(size * 0.12, size * 0.10),
-              painter: _NosePainter(
-                style: config.noseStyle,
-                skinColor: _skinColor,
-              ),
-            ),
-          ),
+  // ── Repaint notifier ────────────────────────────────────────────────
+  final _repaintNotifier = _TickNotifier();
 
-          // 6. Cheeks
-          if (config.cheekStyle > 0)
-            Positioned(
-              left: size * 0.18,
-              top: size * (_faceTop + _faceHeightFraction * 0.48),
-              child: CustomPaint(
-                size: Size(size * 0.64, size * 0.20),
-                painter: _CheekPainter(
-                  style: config.cheekStyle,
-                  skinColor: _skinColor,
-                ),
-              ),
-            ),
+  @override
+  void initState() {
+    super.initState();
 
-          // 7. Eyes + eye color
-          Positioned(
-            left: size * 0.26,
-            top: size * (_faceTop + _faceHeightFraction * 0.28),
-            child: CustomPaint(
-              size: Size(size * 0.48, size * 0.16),
-              painter: _EyesPainter(
-                style: config.eyeStyle,
-                eyeColor: _eyeColor,
-              ),
-            ),
-          ),
+    _skeleton = AvatarSkeleton();
+    _mixer = AnimationMixer(ProceduralIdleSystem(energyLevel: widget.energyLevel));
+    _touchHandler = AvatarTouchHandler();
+    _gyro = GyroscopeAdapter();
 
-          // 8. Eyelashes
-          if (config.eyelashStyle > 0)
-            Positioned(
-              left: size * 0.26,
-              top: size * (_faceTop + _faceHeightFraction * 0.22),
-              child: CustomPaint(
-                size: Size(size * 0.48, size * 0.20),
-                painter: _EyelashPainter(
-                  style: config.eyelashStyle,
-                  eyeStyle: config.eyeStyle,
-                ),
-              ),
-            ),
-
-          // 9. Eyebrows
-          Positioned(
-            left: size * 0.26,
-            top: size * (_faceTop + _faceHeightFraction * 0.16),
-            child: CustomPaint(
-              size: Size(size * 0.48, size * 0.10),
-              painter: _EyebrowPainter(
-                style: config.eyebrowStyle,
-                color: _hairColor,
-              ),
-            ),
-          ),
-
-          // 10. Mouth + lip color
-          Positioned(
-            left: size * 0.35,
-            top: size * (_faceTop + _faceHeightFraction * 0.68),
-            child: CustomPaint(
-              size: Size(size * 0.30, size * 0.12),
-              painter: _MouthPainter(
-                style: config.mouthStyle,
-                lipColor: _lipColor,
-              ),
-            ),
-          ),
-
-          // 11. Face paint
-          if (config.facePaint > 0)
-            Positioned(
-              left: size * 0.15,
-              top: size * _faceTop,
-              child: CustomPaint(
-                size: Size(size * 0.70, size * _faceHeightFraction),
-                painter: _FacePaintPainter(style: config.facePaint),
-              ),
-            ),
-
-          // 12. Front hair layer
-          Positioned.fill(
-            child: CustomPaint(
-              painter: _FrontHairPainter(
-                style: config.hairStyle,
-                color: _hairColor,
-                isRainbow: isRainbowHair(config.hairColor),
-                faceShape: config.faceShape,
-              ),
-            ),
-          ),
-
-          // 13. Glasses
-          if (config.glassesStyle > 0)
-            Positioned(
-              left: size * 0.20,
-              top: size * (_faceTop + _faceHeightFraction * 0.24),
-              child: CustomPaint(
-                size: Size(size * 0.60, size * 0.20),
-                painter: _GlassesPainter(style: config.glassesStyle),
-              ),
-            ),
-
-          // 14. Accessories
-          if (config.accessory > 0) _buildAccessory(),
-
-          // 15. Sparkle effects
-          if (config.hasSparkle || config.hasRainbowSparkle)
-            Positioned.fill(
-              child: CustomPaint(
-                painter: _SparklePainter(
-                  rainbow: config.hasRainbowSparkle,
-                ),
-              ),
-            ),
-        ],
-      ),
+    // Single game-loop controller — runs indefinitely
+    _tickCtrl = AnimationController(
+      vsync: this,
+      duration: const Duration(hours: 1),
     );
+    _tickCtrl.addListener(_onTick);
 
-    return avatar;
+    widget.controller?.addListener(_onControllerUpdate);
+
+    if (widget.animateEffects) {
+      _startLoop();
+    } else {
+      // Compute one frame at rest pose
+      _skeleton.update(0.016);
+    }
+  }
+
+  void _onControllerUpdate() {
+    if (mounted) setState(() {});
+  }
+
+  void _startLoop() {
+    _tickCtrl.repeat();
+    _gyro.start();
+    _scheduleNextBlink();
+  }
+
+  void _stopLoop() {
+    _tickCtrl.stop();
+    _gyro.stop();
+    _blinkTimer?.cancel();
+    _blinkTimer = null;
+  }
+
+  void _scheduleNextBlink() {
+    _blinkTimer?.cancel();
+    final delayMs = 2000 + _rng.nextInt(4000);
+    _blinkTimer = Timer(Duration(milliseconds: delayMs), () {
+      if (!mounted || !widget.animateEffects) return;
+      _isBlinking = true;
+      _blinkPhase = 0.0;
+    });
+  }
+
+  // ── Game loop — called every frame (~60fps) ─────────────────────────
+
+  void _onTick() {
+    if (!mounted) return;
+
+    final now = _tickCtrl.value * 3600.0; // hours → seconds
+    final dt = _lastTickTime == 0.0
+        ? 0.016
+        : (now - _lastTickTime).clamp(0.001, 0.05);
+    _lastTickTime = now;
+    _totalTime += dt;
+
+    // 1. Advance the animation mixer (procedural idle + authored clips)
+    final pose = _mixer.update(dt, _totalTime);
+
+    // 2. Apply BonePose to skeleton animation offsets (proper channel)
+    _skeleton.clearPose();
+    _skeleton.applyPose(pose);
+
+    // 3. Touch handler decay → apply to skeleton springs (physics channel)
+    final touchPose = _touchHandler.update(dt);
+    for (final entry in touchPose.transforms.entries) {
+      final bone = _skeleton.bones[entry.key];
+      if (bone == null) continue;
+      final t = entry.value;
+      bone.spring.applyForce(Offset(t.dx * 50, t.dy * 50));
+    }
+
+    // 4. Gyroscope head tilt → springs (physics channel)
+    _gyro.update(dt);
+    if (_gyro.isActive) {
+      _skeleton.head.spring.applyForce(
+        Offset(_gyro.headTiltX * 2.0, _gyro.headTiltY * 1.5),
+      );
+    }
+
+    // 5. Step skeleton physics (springs + forward kinematics)
+    _skeleton.update(dt);
+
+    // 6. Derive legacy animation values from time for painters
+    _breathingValue = sin(_totalTime * 2.094) * 0.5 + 0.5; // ~3s cycle
+    _idleSwayValue = sin(_totalTime * 0.785) * 0.5 + 0.5;  // ~4s cycle
+    _pupilDilationValue = sin(_totalTime * 0.628) * 0.5 + 0.5; // ~5s cycle
+    _twinkleValue = (_totalTime / 3.0) % 1.0; // 3s loop
+
+    // 7. Blink state machine
+    if (_isBlinking) {
+      _blinkPhase += dt / 0.15; // 150ms for each half
+      if (_blinkPhase >= 2.0) {
+        _isBlinking = false;
+        _blinkPhase = 0.0;
+        _blinkValue = 0.0;
+        _scheduleNextBlink();
+      } else if (_blinkPhase >= 1.0) {
+        _blinkValue = 2.0 - _blinkPhase;
+      } else {
+        _blinkValue = _blinkPhase;
+      }
+    }
+
+    // 8. Trigger repaint
+    _repaintNotifier.notify();
+    setState(() {});
+  }
+
+  @override
+  void didUpdateWidget(AvatarWidget oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.animateEffects != oldWidget.animateEffects) {
+      widget.animateEffects ? _startLoop() : _stopLoop();
+    }
+    if (oldWidget.controller != widget.controller) {
+      oldWidget.controller?.removeListener(_onControllerUpdate);
+      widget.controller?.addListener(_onControllerUpdate);
+    }
+    if (widget.energyLevel != oldWidget.energyLevel) {
+      _mixer.idle.energyLevel = widget.energyLevel;
+    }
+  }
+
+  @override
+  void dispose() {
+    widget.controller?.removeListener(_onControllerUpdate);
+    _blinkTimer?.cancel();
+    _tickCtrl.removeListener(_onTick);
+    _tickCtrl.dispose();
+    _gyro.dispose();
+    _repaintNotifier.dispose();
+    super.dispose();
   }
 
   // ── Color helpers ──────────────────────────────────────────────────
 
   Color get _hairColor {
-    final idx = config.hairColor.clamp(0, hairColorOptions.length - 1);
+    final idx = widget.config.hairColor.clamp(0, hairColorOptions.length - 1);
     return hairColorOptions[idx].color;
   }
 
-  Color get _skinColor => skinColorForIndex(config.skinTone);
+  Color get _skinColor => skinColorForIndex(widget.config.skinTone);
 
   Color get _eyeColor {
-    final idx = config.eyeColor.clamp(0, eyeColorOptions.length - 1);
+    final idx = widget.config.eyeColor.clamp(0, eyeColorOptions.length - 1);
     return eyeColorOptions[idx].color;
   }
 
   Color get _lipColor {
-    final idx = config.lipColor.clamp(0, lipColorOptions.length - 1);
+    final idx = widget.config.lipColor.clamp(0, lipColorOptions.length - 1);
     return lipColorOptions[idx].color;
   }
 
-  // ── Face geometry ─────────────────────────────────────────────────
+  // ── Face geometry ──────────────────────────────────────────────────
 
   double get _faceTop => 0.18;
 
   double get _faceHeightFraction {
-    final shape =
-        faceShapeOptions[config.faceShape.clamp(0, faceShapeOptions.length - 1)];
+    final shape = faceShapeOptions[
+        widget.config.faceShape.clamp(0, faceShapeOptions.length - 1)];
     return 0.70 * shape.heightRatio;
   }
 
-  // ── Accessory builder ─────────────────────────────────────────────
+  // ── Bone/transform hierarchy helpers ─────────────────────────────
 
-  Widget _buildAccessory() {
-    switch (config.accessory) {
-      case 1: // Glasses (legacy)
-        return Positioned(
-          left: size * 0.20,
-          top: size * (_faceTop + _faceHeightFraction * 0.24),
-          child: CustomPaint(
-            size: Size(size * 0.60, size * 0.20),
-            painter: _GlassesPainter(style: 1),
+  /// Eyebrow vertical offset based on expression.
+  /// Surprised/excited: brows UP, thinking: brows DOWN.
+  double _browOffsetY(double size) {
+    final expr = widget.controller?.expression ?? AvatarExpression.neutral;
+    return switch (expr) {
+      AvatarExpression.surprised => -size * 0.02,
+      AvatarExpression.excited => -size * 0.015,
+      AvatarExpression.thinking => size * 0.01,
+      _ => 0.0,
+    };
+  }
+
+  /// Jaw drop driven by mouth openness — pulls mouth and lower cheeks down.
+  double _jawDrop(double size) {
+    final openness = widget.controller?.mouthOpenAmount ?? 0.0;
+    return openness * size * 0.03;
+  }
+
+  // ── Touch handling ────────────────────────────────────────────────
+
+  void _onPanStart(DragStartDetails d) {
+    _touchHandler.onTouch(d.localPosition, Offset.zero, widget.size);
+  }
+
+  void _onPanUpdate(DragUpdateDetails d) {
+    _touchHandler.onTouch(d.localPosition, d.delta, widget.size);
+    final norm = Offset(
+      d.localPosition.dx / widget.size,
+      d.localPosition.dy / widget.size,
+    );
+    final force = Offset(d.delta.dx / widget.size, d.delta.dy / widget.size) * 3.0;
+    _skeleton.applyTouchForce(norm, force);
+  }
+
+  void _onPanEnd(DragEndDetails d) {
+    _touchHandler.onTouchEnd();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final size = widget.size;
+    final config = widget.config;
+    final bgColor = AppColors.avatarBgColors[config.bgColor.clamp(0, 7)];
+
+    // Head sway derived from skeleton head bone's world rotation
+    final headStorage = _skeleton.head.worldTransform.storage;
+    final swayAngle = atan2(headStorage[1], headStorage[0]);
+    final centerX = size / 2;
+
+    // Expression-driven transforms
+    final browOffset = _browOffsetY(size);
+    final jawDrop = _jawDrop(size);
+
+    // Widget dimensions — bust view (~3:4 aspect ratio)
+    final widgetW = size;
+    final widgetH = size / widget.aspectRatio;
+
+    // Constant-value animation wrappers for painters
+    final breathingAnim = _ConstantAnimation(_breathingValue);
+    final swayAnim = _ConstantAnimation(_idleSwayValue);
+    final blinkAnim = _ConstantAnimation(_blinkValue);
+    final pupilAnim = _ConstantAnimation(_pupilDilationValue);
+
+    return RepaintBoundary(
+      child: GestureDetector(
+        onPanStart: widget.animateEffects ? _onPanStart : null,
+        onPanUpdate: widget.animateEffects ? _onPanUpdate : null,
+        onPanEnd: widget.animateEffects ? _onPanEnd : null,
+        child: SizedBox(
+          width: widgetW,
+          height: widgetH,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // 1. Background (rounded rect for bust view)
+              if (widget.showBackground)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: bgColor,
+                      borderRadius: BorderRadius.circular(widgetW * 0.5),
+                    ),
+                  ),
+                ),
+
+              // 2. Golden glow aura
+              if (config.hasGoldenGlow)
+                Positioned.fill(
+                  child: CustomPaint(
+                    willChange: widget.animateEffects,
+                    painter: GoldenGlowPainter(
+                      intensity: 1.0,
+                      time: _twinkleValue,
+                    ),
+                  ),
+                ),
+
+              // 3. Body painters (neck, torso, shoulders, arms, hands)
+              // Skip in compact mode — thumbnails and small avatars don't need body
+              if (size >= 48)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  width: widgetW,
+                  height: widgetH,
+                  child: CustomPaint(
+                    isComplex: true,
+                    willChange: widget.animateEffects,
+                    painter: BodyPainter(
+                      skinColor: _skinColor,
+                      shirtColor: shirtColorOptions[
+                          (config.bgColor + 2).clamp(0, shirtColorOptions.length - 1)].color,
+                      collarStyle: 0,
+                      headTilt: swayAngle,
+                      breathingValue: _breathingValue,
+                      swayValue: _idleSwayValue,
+                    ),
+                  ),
+                ),
+
+              // 4. Hair back layer
+              Positioned(
+                left: 0,
+                top: 0,
+                width: widgetW,
+                height: widgetW,
+                child: CustomPaint(
+                  isComplex: true,
+                  willChange: widget.animateEffects,
+                  painter: HairBackPainter(
+                    style: config.hairStyle,
+                    color: _hairColor,
+                    isRainbow: isRainbowHair(config.hairColor),
+                    faceShape: config.faceShape,
+                    swayValue: _idleSwayValue,
+                    repaint: _repaintNotifier,
+                  ),
+                ),
+              ),
+
+              // 5. Head bone: unified sway rotation for all face features
+              Positioned(
+                left: 0,
+                top: 0,
+                width: widgetW,
+                height: widgetW,
+                child: Transform(
+                  alignment: Alignment.center,
+                  transform: Matrix4.identity()
+                    ..translateByDouble(centerX, centerX / 2, 0, 0)
+                    ..rotateZ(swayAngle)
+                    ..translateByDouble(-centerX, -centerX / 2, 0, 0),
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      // Face shape
+                      Positioned(
+                        left: size * 0.15,
+                        top: size * _faceTop,
+                        child: CustomPaint(
+                          size: Size(size * 0.70, size * _faceHeightFraction),
+                          isComplex: true,
+                          willChange: widget.animateEffects,
+                          painter: FacePainter(
+                            skinColor: _skinColor,
+                            faceShape: config.faceShape,
+                            breathingValue: breathingAnim,
+                            swayValue: swayAnim,
+                            repaint: _repaintNotifier,
+                          ),
+                        ),
+                      ),
+
+                      // Nose
+                      Positioned(
+                        left: size * 0.44,
+                        top: size * (_faceTop + _faceHeightFraction * 0.52),
+                        child: CustomPaint(
+                          size: Size(size * 0.12, size * 0.10),
+                          isComplex: true,
+                          willChange: widget.animateEffects,
+                          painter: NosePainter(
+                            style: config.noseStyle,
+                            skinColor: _skinColor,
+                            breathingValue: breathingAnim,
+                            repaint: _repaintNotifier,
+                          ),
+                        ),
+                      ),
+
+                      // Cheeks
+                      if (config.cheekStyle > 0)
+                        Positioned(
+                          left: size * 0.18,
+                          top: size * (_faceTop + _faceHeightFraction * 0.48),
+                          child: CustomPaint(
+                            size: Size(size * 0.64, size * 0.20),
+                            isComplex: true,
+                            painter: CheekPainter(
+                              style: config.cheekStyle,
+                              skinColor: _skinColor,
+                            ),
+                          ),
+                        ),
+
+                      // Eyes
+                      Positioned(
+                        left: size * 0.26,
+                        top: size * (_faceTop + _faceHeightFraction * 0.28),
+                        child: CustomPaint(
+                          size: Size(size * 0.48, size * 0.16),
+                          isComplex: true,
+                          willChange: widget.animateEffects,
+                          painter: EyesPainter(
+                            style: config.eyeStyle,
+                            eyeColor: _eyeColor,
+                            skinColor: _skinColor,
+                            blinkValue: blinkAnim,
+                            swayValue: swayAnim,
+                            pupilDilationValue: pupilAnim,
+                            expression: widget.controller?.expression ?? AvatarExpression.neutral,
+                            lookTarget: widget.controller?.lookTarget,
+                            avatarSize: size,
+                            repaint: _repaintNotifier,
+                          ),
+                        ),
+                      ),
+
+                      // Eyelashes
+                      if (config.eyelashStyle > 0)
+                        Positioned(
+                          left: size * 0.26,
+                          top: size * (_faceTop + _faceHeightFraction * 0.22),
+                          child: CustomPaint(
+                            size: Size(size * 0.48, size * 0.20),
+                            painter: EyelashPainter(
+                              style: config.eyelashStyle,
+                              eyeStyle: config.eyeStyle,
+                            ),
+                          ),
+                        ),
+
+                      // Eyebrows (expression-driven offset)
+                      Positioned(
+                        left: size * 0.26,
+                        top: size * (_faceTop + _faceHeightFraction * 0.16),
+                        child: Transform.translate(
+                          offset: Offset(0, browOffset),
+                          child: CustomPaint(
+                            size: Size(size * 0.48, size * 0.10),
+                            painter: EyebrowPainter(
+                              style: config.eyebrowStyle,
+                              color: _hairColor,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Mouth (jaw transform)
+                      Positioned(
+                        left: size * 0.35,
+                        top: size * (_faceTop + _faceHeightFraction * 0.68),
+                        child: Transform.translate(
+                          offset: Offset(0, jawDrop),
+                          child: CustomPaint(
+                            size: Size(size * 0.30, size * 0.12),
+                            isComplex: true,
+                            willChange: widget.controller != null,
+                            painter: MouthPainter(
+                              style: config.mouthStyle,
+                              lipColor: _lipColor,
+                              expression: widget.controller?.expression ?? AvatarExpression.neutral,
+                              mouthOpenAmount: widget.controller?.mouthOpenAmount ?? 0.0,
+                              repaint: widget.controller != null ? _repaintNotifier : null,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Face paint
+                      if (config.facePaint > 0)
+                        Positioned(
+                          left: size * 0.15,
+                          top: size * _faceTop,
+                          child: CustomPaint(
+                            size: Size(size * 0.70, size * _faceHeightFraction),
+                            isComplex: true,
+                            painter: FacePaintPainter(
+                              style: config.facePaint,
+                              skinColor: _skinColor,
+                            ),
+                          ),
+                        ),
+
+                      // Glasses
+                      if (config.glassesStyle > 0)
+                        Positioned(
+                          left: size * 0.26,
+                          top: size * (_faceTop + _faceHeightFraction * 0.28),
+                          child: CustomPaint(
+                            size: Size(size * 0.48, size * 0.16),
+                            isComplex: true,
+                            painter: GlassesPainter(
+                              style: config.glassesStyle,
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // 6. Hair front layer
+              Positioned(
+                left: 0,
+                top: 0,
+                width: widgetW,
+                height: widgetW,
+                child: CustomPaint(
+                  isComplex: true,
+                  willChange: widget.animateEffects,
+                  painter: HairFrontPainter(
+                    style: config.hairStyle,
+                    color: _hairColor,
+                    isRainbow: isRainbowHair(config.hairColor),
+                    faceShape: config.faceShape,
+                    swayValue: _idleSwayValue,
+                    repaint: _repaintNotifier,
+                  ),
+                ),
+              ),
+
+              // 7. Accessories
+              if (config.accessory > 1)
+                Positioned(
+                  left: 0,
+                  top: 0,
+                  width: widgetW,
+                  height: widgetW,
+                  child: CustomPaint(
+                    isComplex: true,
+                    willChange: widget.animateEffects,
+                    painter: accessoryPainter(
+                      config.accessory,
+                      swayValue: _idleSwayValue,
+                      twinklePhase: _twinkleValue,
+                    ),
+                  ),
+                ),
+
+              // 8. Sparkle effects
+              if (config.hasRainbowSparkle || config.hasGoldenGlow)
+                Positioned.fill(
+                  child: CustomPaint(
+                    isComplex: true,
+                    willChange: widget.animateEffects,
+                    painter: SparklePainter(
+                      rainbow: config.hasRainbowSparkle,
+                      time: _twinkleValue,
+                    ),
+                  ),
+                ),
+            ],
           ),
-        );
-      case 2: // Crown
-        return Positioned(
-          left: size * 0.25,
-          top: size * 0.02,
-          child: CustomPaint(
-            size: Size(size * 0.50, size * 0.20),
-            painter: _CrownPainter(color: AppColors.starGold),
-          ),
-        );
-      case 3: // Flower
-        return Positioned(
-          right: size * 0.05,
-          top: size * 0.12,
-          child: CustomPaint(
-            size: Size(size * 0.22, size * 0.22),
-            painter: _FlowerPainter(),
-          ),
-        );
-      case 4: // Bow
-        return Positioned(
-          left: size * 0.30,
-          top: size * 0.08,
-          child: CustomPaint(
-            size: Size(size * 0.24, size * 0.16),
-            painter: _BowPainter(),
-          ),
-        );
-      case 5: // Cap
-        return Positioned(
-          left: size * 0.10,
-          top: size * 0.04,
-          child: CustomPaint(
-            size: Size(size * 0.70, size * 0.28),
-            painter: _CapPainter(),
-          ),
-        );
-      case 6: // Wizard Hat
-        return Positioned(
-          left: size * 0.18,
-          top: -size * 0.15,
-          child: CustomPaint(
-            size: Size(size * 0.64, size * 0.45),
-            painter: _WizardHatPainter(),
-          ),
-        );
-      case 7: // Wings
-        return Positioned(
-          left: -size * 0.15,
-          top: size * 0.25,
-          child: CustomPaint(
-            size: Size(size * 1.30, size * 0.55),
-            painter: _WingsPainter(),
-          ),
-        );
-      case 8: // Royal Crown
-        return Positioned(
-          left: size * 0.20,
-          top: -size * 0.02,
-          child: CustomPaint(
-            size: Size(size * 0.60, size * 0.25),
-            painter: _CrownPainter(
-              color: AppColors.starGold,
-              jewels: true,
-            ),
-          ),
-        );
-      case 9: // Tiara
-        return Positioned(
-          left: size * 0.22,
-          top: size * 0.04,
-          child: CustomPaint(
-            size: Size(size * 0.56, size * 0.18),
-            painter: _TiaraPainter(),
-          ),
-        );
-      case 10: // Bunny Ears
-        return Positioned(
-          left: size * 0.20,
-          top: -size * 0.25,
-          child: CustomPaint(
-            size: Size(size * 0.60, size * 0.40),
-            painter: _BunnyEarsPainter(),
-          ),
-        );
-      case 11: // Cat Ears
-        return Positioned(
-          left: size * 0.12,
-          top: -size * 0.08,
-          child: CustomPaint(
-            size: Size(size * 0.76, size * 0.30),
-            painter: _CatEarsPainter(),
-          ),
-        );
-      case 12: // Unicorn Horn
-        return Positioned(
-          left: size * 0.35,
-          top: -size * 0.20,
-          child: CustomPaint(
-            size: Size(size * 0.30, size * 0.35),
-            painter: _UnicornHornPainter(),
-          ),
-        );
-      case 13: // Star Headband
-        return Positioned(
-          left: size * 0.12,
-          top: size * 0.06,
-          child: CustomPaint(
-            size: Size(size * 0.76, size * 0.16),
-            painter: _StarHeadbandPainter(),
-          ),
-        );
-      case 14: // Halo
-        return Positioned(
-          left: size * 0.22,
-          top: -size * 0.06,
-          child: CustomPaint(
-            size: Size(size * 0.56, size * 0.20),
-            painter: _HaloPainter(),
-          ),
-        );
-      case 15: // Headband
-        return Positioned(
-          left: size * 0.14,
-          top: size * 0.12,
-          child: CustomPaint(
-            size: Size(size * 0.72, size * 0.10),
-            painter: _HeadbandPainter(),
-          ),
-        );
-      case 16: // Flower Crown
-        return Positioned(
-          left: size * 0.12,
-          top: size * 0.04,
-          child: CustomPaint(
-            size: Size(size * 0.76, size * 0.22),
-            painter: _FlowerCrownPainter(),
-          ),
-        );
-      case 17: // Devil Horns
-        return Positioned(
-          left: size * 0.15,
-          top: -size * 0.08,
-          child: CustomPaint(
-            size: Size(size * 0.70, size * 0.28),
-            painter: _DevilHornsPainter(),
-          ),
-        );
-      case 18: // Pirate Hat
-        return Positioned(
-          left: size * 0.08,
-          top: -size * 0.06,
-          child: CustomPaint(
-            size: Size(size * 0.84, size * 0.38),
-            painter: _PirateHatPainter(),
-          ),
-        );
-      case 19: // Antennae
-        return Positioned(
-          left: size * 0.25,
-          top: -size * 0.22,
-          child: CustomPaint(
-            size: Size(size * 0.50, size * 0.35),
-            painter: _AntennaePainter(),
-          ),
-        );
-      case 20: // Propeller Hat
-        return Positioned(
-          left: size * 0.18,
-          top: -size * 0.08,
-          child: CustomPaint(
-            size: Size(size * 0.64, size * 0.32),
-            painter: _PropellerHatPainter(),
-          ),
-        );
-      case 21: // Ninja Mask
-        return Positioned(
-          left: size * 0.14,
-          top: size * (_faceTop + _faceHeightFraction * 0.22),
-          child: CustomPaint(
-            size: Size(size * 0.72, size * 0.18),
-            painter: _NinjaMaskPainter(),
-          ),
-        );
-      default:
-        return const SizedBox.shrink();
-    }
+        ),
+      ),
+    );
   }
 }
 
-// ══════════════════════════════════════════════════════════════════════
-//  FACE PAINTER
-// ══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+//  HELPER: Constant animation value wrapper for painters that expect
+//  Animation<double>. Bridges skeleton-driven values to painter APIs.
+// ═══════════════════════════════════════════════════════════════════════
 
-class _FacePainter extends CustomPainter {
+class _ConstantAnimation extends Animation<double> {
+  final double _value;
+  const _ConstantAnimation(this._value);
+
+  @override
+  double get value => _value;
+
+  @override
+  AnimationStatus get status => AnimationStatus.forward;
+
+  @override
+  void addListener(VoidCallback listener) {}
+  @override
+  void removeListener(VoidCallback listener) {}
+  @override
+  void addStatusListener(AnimationStatusListener listener) {}
+  @override
+  void removeStatusListener(AnimationStatusListener listener) {}
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  HELPER: Listenable that can be manually triggered for repaint
+// ═══════════════════════════════════════════════════════════════════════
+
+class _TickNotifier extends ChangeNotifier {
+  void notify() => notifyListeners();
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  FACE PAINTER
+//  - Warm-to-cool radial gradient (forehead highlight → jaw shadow)
+//  - Ambient occlusion under chin, around nose bridge
+//  - Gradient ears with inner shadow
+//  - Breathing scaleY + idle sway rotation
+// ═══════════════════════════════════════════════════════════════════════
+
+class FacePainter extends CustomPainter {
   final Color skinColor;
   final int faceShape;
+  final Animation<double> breathingValue;
+  final Animation<double> swayValue;
 
-  _FacePainter({required this.skinColor, required this.faceShape});
+  FacePainter({
+    required this.skinColor,
+    required this.faceShape,
+    required this.breathingValue,
+    required this.swayValue,
+    super.repaint,
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    final paint = Paint()..color = skinColor;
+    final center = Offset(w / 2, h / 2);
 
+    final breathScale = 1.0 + breathingValue.value * 0.02;
+    final swayAngle = (swayValue.value - 0.5) * 2 * (2 * pi / 180);
+
+    canvas.save();
+    canvas.translate(center.dx, center.dy);
+    canvas.rotate(swayAngle);
+    canvas.scale(1.0, breathScale);
+    canvas.translate(-center.dx, -center.dy);
+
+    // ── Chin ambient occlusion ──
+    final chinAO = Paint()
+      ..color = const Color(0xFF3A3060).withValues(alpha: 0.12)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8.0);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(w * 0.5, h * 1.0),
+        width: w * 0.65,
+        height: h * 0.16,
+      ),
+      chinAO,
+    );
+
+    // ── Ears ──
+    _drawEars(canvas, w, h);
+
+    // ── Face with warm-to-cool 3D gradient ──
+    final faceRect = Rect.fromLTWH(0, 0, w, h);
+    // Warm highlight on forehead, cool shadow on jaw
+    final warmHighlight = Color.lerp(skinColor, const Color(0xFFFFF8E0), 0.15)!;
+    final coolShadow = Color.lerp(skinColor, const Color(0xFF6A5A8E), 0.12)!;
+    final gradient = RadialGradient(
+      center: const Alignment(-0.1, -0.35),
+      radius: 0.95,
+      colors: [
+        warmHighlight,
+        skinColor,
+        Color.lerp(skinColor, coolShadow, 0.4)!,
+        coolShadow,
+      ],
+      stops: const [0.0, 0.35, 0.7, 1.0],
+    );
+    final gradientPaint = Paint()
+      ..shader = gradient.createShader(faceRect);
+
+    final facePath = _buildFacePath(w, h);
+    canvas.drawPath(facePath, gradientPaint);
+
+    // ── Subtle rim light (warm edge highlight on the lit side) ──
+    final rimLight = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.6, -0.4),
+        radius: 1.1,
+        colors: [
+          const Color(0xFFFFF0D0).withValues(alpha: 0.08),
+          Colors.transparent,
+        ],
+        stops: const [0.0, 0.4],
+      ).createShader(faceRect);
+    canvas.drawPath(facePath, rimLight);
+
+    // ── Cool edge shadow (right/bottom ambient occlusion) ──
+    final edgeAO = Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(0.4, 0.5),
+        radius: 0.8,
+        colors: [
+          Colors.transparent,
+          const Color(0xFF4A3A6E).withValues(alpha: 0.07),
+        ],
+        stops: const [0.5, 1.0],
+      ).createShader(faceRect);
+    canvas.drawPath(facePath, edgeAO);
+
+    // ── Nose bridge ambient occlusion ──
+    final noseBridgeAO = Paint()
+      ..color = const Color(0xFF5A4A7E).withValues(alpha: 0.06)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(w * 0.5, h * 0.42),
+        width: w * 0.15,
+        height: h * 0.22,
+      ),
+      noseBridgeAO,
+    );
+
+    canvas.restore();
+  }
+
+  void _drawEars(Canvas canvas, double w, double h) {
+    final earW = w * 0.13;
+    final earH = h * 0.17;
+    final earY = h * 0.38;
+
+    for (final isLeft in [true, false]) {
+      final cx = isLeft ? -earW * 0.25 : w + earW * 0.25;
+      final earRect = Rect.fromCenter(
+        center: Offset(cx, earY),
+        width: earW,
+        height: earH,
+      );
+
+      // Ear base with gradient
+      final warmSide = Color.lerp(skinColor, const Color(0xFFFFF8E0), 0.08)!;
+      final coolSide = Color.lerp(skinColor, const Color(0xFF6A5A8E), 0.08)!;
+      final earGradient = RadialGradient(
+        center: Alignment(isLeft ? 0.3 : -0.3, -0.2),
+        radius: 0.8,
+        colors: [warmSide, skinColor, coolSide],
+        stops: const [0.0, 0.5, 1.0],
+      );
+      canvas.drawOval(earRect, Paint()..shader = earGradient.createShader(earRect));
+
+      // Inner ear shadow — pinkish
+      final innerCx = isLeft ? -earW * 0.15 : w + earW * 0.15;
+      final innerRect = Rect.fromCenter(
+        center: Offset(innerCx, earY),
+        width: earW * 0.5,
+        height: earH * 0.5,
+      );
+      final innerGradient = RadialGradient(
+        colors: [
+          Color.lerp(skinColor, const Color(0xFFFF9090), 0.2)!
+              .withValues(alpha: 0.5),
+          Colors.transparent,
+        ],
+      );
+      canvas.drawOval(
+        innerRect,
+        Paint()..shader = innerGradient.createShader(innerRect),
+      );
+    }
+  }
+
+  Path _buildFacePath(double w, double h) {
     switch (faceShape) {
       case 0: // Round
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-              Rect.fromLTWH(0, 0, w, h), Radius.circular(w * 0.5)),
-          paint,
-        );
-
-      case 1: // Square-ish (rounded)
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-              Rect.fromLTWH(0, 0, w, h), Radius.circular(w * 0.28)),
-          paint,
-        );
-
+        return Path()
+          ..addRRect(RRect.fromRectAndRadius(
+            Rect.fromLTWH(0, 0, w, h),
+            Radius.circular(w * 0.5),
+          ));
+      case 1: // Square-ish
+        return Path()
+          ..addRRect(RRect.fromRectAndRadius(
+            Rect.fromLTWH(0, 0, w, h),
+            Radius.circular(w * 0.28),
+          ));
       case 2: // Oval
-        canvas.drawOval(Rect.fromLTWH(0, 0, w, h), paint);
-
+        return Path()..addOval(Rect.fromLTWH(0, 0, w, h));
       case 3: // Heart
-        final path = Path()
+        return Path()
           ..moveTo(w * 0.50, h * 0.18)
-          ..cubicTo(w * 0.50, h * 0.05, w * 0.80, h * -0.02, w * 0.90, h * 0.20)
-          ..cubicTo(w * 1.00, h * 0.42, w * 0.80, h * 0.65, w * 0.50, h * 0.98)
-          ..cubicTo(w * 0.20, h * 0.65, w * 0.00, h * 0.42, w * 0.10, h * 0.20)
-          ..cubicTo(w * 0.20, h * -0.02, w * 0.50, h * 0.05, w * 0.50, h * 0.18)
+          ..cubicTo(w * 0.50, h * 0.05, w * 0.80, h * -0.02, w * 0.90,
+              h * 0.20)
+          ..cubicTo(w * 1.00, h * 0.42, w * 0.80, h * 0.65, w * 0.50,
+              h * 0.98)
+          ..cubicTo(w * 0.20, h * 0.65, w * 0.00, h * 0.42, w * 0.10,
+              h * 0.20)
+          ..cubicTo(w * 0.20, h * -0.02, w * 0.50, h * 0.05, w * 0.50,
+              h * 0.18)
           ..close();
-        canvas.drawPath(path, paint);
-
       case 4: // Diamond
-        final path = Path()
+        return Path()
           ..moveTo(w * 0.50, h * 0.02)
           ..quadraticBezierTo(w * 0.95, h * 0.30, w * 0.88, h * 0.55)
           ..quadraticBezierTo(w * 0.78, h * 0.85, w * 0.50, h * 0.98)
           ..quadraticBezierTo(w * 0.22, h * 0.85, w * 0.12, h * 0.55)
           ..quadraticBezierTo(w * 0.05, h * 0.30, w * 0.50, h * 0.02)
           ..close();
-        canvas.drawPath(path, paint);
-
       default:
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-              Rect.fromLTWH(0, 0, w, h), Radius.circular(w * 0.5)),
-          paint,
-        );
+        return Path()
+          ..addRRect(RRect.fromRectAndRadius(
+            Rect.fromLTWH(0, 0, w, h),
+            Radius.circular(w * 0.5),
+          ));
     }
   }
 
   @override
-  bool shouldRepaint(_FacePainter old) =>
+  bool shouldRepaint(FacePainter old) =>
       old.skinColor != skinColor || old.faceShape != faceShape;
 }
 
-// ══════════════════════════════════════════════════════════════════════
-//  NOSE PAINTER
-// ══════════════════════════════════════════════════════════════════════
-
-class _NosePainter extends CustomPainter {
-  final int style;
-  final Color skinColor;
-
-  _NosePainter({required this.style, required this.skinColor});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    // Slightly darker than skin for subtle shading
-    final nosePaint = Paint()
-      ..color = Color.lerp(skinColor, Colors.black, 0.12)!;
-    final highlightPaint = Paint()
-      ..color = Color.lerp(skinColor, Colors.white, 0.15)!;
-
-    switch (style) {
-      case 0: // Button — small circle
-        canvas.drawCircle(
-            Offset(w * 0.5, h * 0.5), w * 0.22, nosePaint);
-        canvas.drawCircle(
-            Offset(w * 0.55, h * 0.40), w * 0.08, highlightPaint);
-
-      case 1: // Small — tiny dot
-        canvas.drawCircle(
-            Offset(w * 0.5, h * 0.5), w * 0.14, nosePaint);
-
-      case 2: // Round — bigger circle
-        canvas.drawCircle(
-            Offset(w * 0.5, h * 0.5), w * 0.28, nosePaint);
-        canvas.drawCircle(
-            Offset(w * 0.58, h * 0.38), w * 0.10, highlightPaint);
-
-      case 3: // Pointed — small triangle
-        final path = Path()
-          ..moveTo(w * 0.5, h * 0.15)
-          ..lineTo(w * 0.68, h * 0.80)
-          ..quadraticBezierTo(w * 0.5, h * 0.92, w * 0.32, h * 0.80)
-          ..close();
-        canvas.drawPath(path, nosePaint);
-
-      case 4: // Snub — upturned
-        final path = Path()
-          ..moveTo(w * 0.35, h * 0.30)
-          ..quadraticBezierTo(w * 0.50, h * 0.10, w * 0.65, h * 0.30)
-          ..quadraticBezierTo(w * 0.72, h * 0.60, w * 0.60, h * 0.75)
-          ..quadraticBezierTo(w * 0.50, h * 0.82, w * 0.40, h * 0.75)
-          ..quadraticBezierTo(w * 0.28, h * 0.60, w * 0.35, h * 0.30)
-          ..close();
-        canvas.drawPath(path, nosePaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_NosePainter old) =>
-      old.style != style || old.skinColor != skinColor;
-}
-
-// ══════════════════════════════════════════════════════════════════════
-//  CHEEK PAINTER
-// ══════════════════════════════════════════════════════════════════════
-
-class _CheekPainter extends CustomPainter {
-  final int style;
-  final Color skinColor;
-
-  _CheekPainter({required this.style, required this.skinColor});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final leftCheek = Offset(w * 0.18, h * 0.50);
-    final rightCheek = Offset(w * 0.82, h * 0.50);
-
-    switch (style) {
-      case 1: // Rosy — translucent pink circles
-        final paint = Paint()..color = const Color(0xFFFF7090).withValues(alpha: 0.35);
-        canvas.drawOval(
-          Rect.fromCenter(center: leftCheek, width: w * 0.22, height: h * 0.55),
-          paint,
-        );
-        canvas.drawOval(
-          Rect.fromCenter(center: rightCheek, width: w * 0.22, height: h * 0.55),
-          paint,
-        );
-
-      case 2: // Freckles — small dots
-        final paint = Paint()
-          ..color = Color.lerp(skinColor, Colors.brown, 0.35)!;
-        final rng = Random(7);
-        for (final center in [leftCheek, rightCheek]) {
-          for (int i = 0; i < 5; i++) {
-            final dx = (rng.nextDouble() - 0.5) * w * 0.14;
-            final dy = (rng.nextDouble() - 0.5) * h * 0.40;
-            canvas.drawCircle(
-              center.translate(dx, dy),
-              w * 0.012 + rng.nextDouble() * w * 0.008,
-              paint,
-            );
-          }
-        }
-
-      case 3: // Blush — larger pink gradient
-        final paint = Paint()..color = const Color(0xFFFF6090).withValues(alpha: 0.28);
-        canvas.drawOval(
-          Rect.fromCenter(center: leftCheek, width: w * 0.26, height: h * 0.65),
-          paint,
-        );
-        canvas.drawOval(
-          Rect.fromCenter(center: rightCheek, width: w * 0.26, height: h * 0.65),
-          paint,
-        );
-
-      case 4: // Sparkle — tiny stars on cheeks
-        final paint = Paint()..color = AppColors.starGold.withValues(alpha: 0.7);
-        for (final center in [leftCheek, rightCheek]) {
-          _drawMiniStar(canvas, center, w * 0.04, paint);
-          _drawMiniStar(canvas, center.translate(w * 0.05, -h * 0.15), w * 0.025, paint);
-        }
-
-      case 5: // Hearts — tiny heart stamps
-        final paint = Paint()..color = const Color(0xFFFF4D6A).withValues(alpha: 0.6);
-        for (final center in [leftCheek, rightCheek]) {
-          _drawMiniHeart(canvas, center, w * 0.04, paint);
-        }
-
-      case 6: // Stars — tiny star stamps
-        final paint = Paint()..color = AppColors.starGold.withValues(alpha: 0.6);
-        for (final center in [leftCheek, rightCheek]) {
-          _drawMiniStar(canvas, center, w * 0.05, paint);
-        }
-    }
-  }
-
-  void _drawMiniStar(Canvas canvas, Offset center, double r, Paint paint) {
-    final path = Path();
-    for (int i = 0; i < 5; i++) {
-      final outerAngle = -pi / 2 + i * 2 * pi / 5;
-      final innerAngle = outerAngle + pi / 5;
-      final ox = center.dx + r * cos(outerAngle);
-      final oy = center.dy + r * sin(outerAngle);
-      final ix = center.dx + r * 0.4 * cos(innerAngle);
-      final iy = center.dy + r * 0.4 * sin(innerAngle);
-      if (i == 0) {
-        path.moveTo(ox, oy);
-      } else {
-        path.lineTo(ox, oy);
-      }
-      path.lineTo(ix, iy);
-    }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  void _drawMiniHeart(Canvas canvas, Offset center, double r, Paint paint) {
-    final x = center.dx;
-    final y = center.dy;
-    final path = Path()
-      ..moveTo(x, y + r * 0.5)
-      ..cubicTo(x - r * 1.2, y - r * 0.3, x - r * 0.5, y - r * 1.0, x, y - r * 0.3)
-      ..cubicTo(x + r * 0.5, y - r * 1.0, x + r * 1.2, y - r * 0.3, x, y + r * 0.5)
-      ..close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_CheekPainter old) =>
-      old.style != style || old.skinColor != skinColor;
-}
-
-// ══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 //  EYES PAINTER
-// ══════════════════════════════════════════════════════════════════════
+//  - Limbal ring (dark outer iris edge)
+//  - Radial fiber texture via thin lines emanating from pupil
+//  - Caustic-like light patterns on iris
+//  - Dual specular highlights (large soft + small sharp)
+//  - Eyelid-sweep blink (skin-colored shape sweeps down, not scaleY)
+//  - Pupil dilation micro-animation
+//  - Eye tracking (pupils shift with idle sway)
+// ═══════════════════════════════════════════════════════════════════════
 
-class _EyesPainter extends CustomPainter {
+class EyesPainter extends CustomPainter {
   final int style;
   final Color eyeColor;
+  final Color skinColor;
+  final Animation<double> blinkValue;
+  final Animation<double> swayValue;
+  final Animation<double> pupilDilationValue;
+  final AvatarExpression expression;
 
-  _EyesPainter({required this.style, required this.eyeColor});
+  /// Target point for eye tracking (avatar-local coords). Null = idle sway.
+  final Offset? lookTarget;
+
+  /// Full avatar widget size, used to normalize lookTarget into pupil offset.
+  final double avatarSize;
+
+  EyesPainter({
+    required this.style,
+    required this.eyeColor,
+    required this.skinColor,
+    required this.blinkValue,
+    required this.swayValue,
+    required this.pupilDilationValue,
+    this.expression = AvatarExpression.neutral,
+    this.lookTarget,
+    this.avatarSize = 80,
+    super.repaint,
+  });
+
+  // Mutable state set during paint() for use by sub-methods
+  double _currentTrackY = 0.0;
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -729,124 +1129,498 @@ class _EyesPainter extends CustomPainter {
     final h = size.height;
     final leftCenter = Offset(w * 0.25, h * 0.5);
     final rightCenter = Offset(w * 0.75, h * 0.5);
-    final eyeRadius = w * 0.12;
+
+    // Expression-aware eye scaling
+    final eyeScaleFactor = switch (expression) {
+      AvatarExpression.excited => 1.15,
+      AvatarExpression.surprised => 1.25,
+      AvatarExpression.thinking => 0.85,
+      _ => 1.0,
+    };
+    final eyeRadius = w * 0.12 * eyeScaleFactor;
+
+    // Eye tracking: use lookTarget if set, otherwise idle sway
+    double trackX;
+    double trackY = 0.0;
+    if (lookTarget != null) {
+      // Normalize target relative to avatar center, clamp to ±1
+      final eyeAreaLeft = avatarSize * 0.26;
+      final eyeAreaTop = avatarSize * 0.28;
+      final eyesCenterX = eyeAreaLeft + w * 0.5;
+      final eyesCenterY = eyeAreaTop + h * 0.5;
+      final dx = ((lookTarget!.dx - eyesCenterX) / avatarSize).clamp(-1.0, 1.0);
+      final dy = ((lookTarget!.dy - eyesCenterY) / avatarSize).clamp(-1.0, 1.0);
+      trackX = dx * eyeRadius * 0.25;
+      trackY = dy * eyeRadius * 0.15;
+    } else {
+      trackX = (swayValue.value - 0.5) * eyeRadius * 0.15;
+    }
+
+    // Pupil dilation: radius oscillates 0.28r ↔ 0.35r
+    // Surprised expression dilates more
+    final baseDilation = expression == AvatarExpression.surprised ? 0.32 : 0.28;
+    final pupilScale = baseDilation + pupilDilationValue.value * 0.07;
+
+    // Store trackY for use in drawing methods
+    _currentTrackY = trackY;
 
     switch (style) {
       case 0: // Round
-        _drawRoundEyes(canvas, leftCenter, rightCenter, eyeRadius);
-
+        _drawFullEye(canvas, leftCenter, eyeRadius, trackX, pupilScale);
+        _drawFullEye(canvas, rightCenter, eyeRadius, trackX, pupilScale);
+        _drawEyelid(canvas, leftCenter, eyeRadius, w);
+        _drawEyelid(canvas, rightCenter, eyeRadius, w);
       case 1: // Star
         final paint = Paint()..color = AppColors.starGold;
         _drawStar(canvas, leftCenter, eyeRadius, paint);
         _drawStar(canvas, rightCenter, eyeRadius, paint);
-
       case 2: // Hearts
         final paint = Paint()..color = const Color(0xFFFF4D6A);
         _drawHeart(canvas, leftCenter, eyeRadius, paint);
         _drawHeart(canvas, rightCenter, eyeRadius, paint);
-
       case 3: // Happy Crescents
         _drawCrescentEyes(canvas, leftCenter, rightCenter, eyeRadius);
-
       case 4: // Sparkle
-        _drawSparkleEyes(canvas, leftCenter, rightCenter, eyeRadius);
-
+        _drawSparkleEye(canvas, leftCenter, eyeRadius, trackX, pupilScale);
+        _drawSparkleEye(canvas, rightCenter, eyeRadius, trackX, pupilScale);
+        _drawEyelid(canvas, leftCenter, eyeRadius * 1.3, w);
+        _drawEyelid(canvas, rightCenter, eyeRadius * 1.3, w);
       case 5: // Almond
-        _drawAlmondEyes(canvas, leftCenter, rightCenter, eyeRadius);
-
-      case 6: // Wink — left eye open, right eye winking
-        _drawRoundEye(canvas, leftCenter, eyeRadius);
+        _drawAlmondEye(canvas, leftCenter, eyeRadius, trackX, pupilScale);
+        _drawAlmondEye(canvas, rightCenter, eyeRadius, trackX, pupilScale);
+        _drawAlmondEyelid(canvas, leftCenter, eyeRadius);
+        _drawAlmondEyelid(canvas, rightCenter, eyeRadius);
+      case 6: // Wink
+        _drawFullEye(canvas, leftCenter, eyeRadius, trackX, pupilScale);
+        _drawEyelid(canvas, leftCenter, eyeRadius, w);
         _drawWinkEye(canvas, rightCenter, eyeRadius);
-
-      case 7: // Sleepy — half-closed
-        _drawSleepyEyes(canvas, leftCenter, rightCenter, eyeRadius);
+      case 7: // Sleepy
+        _drawSleepyEyes(canvas, leftCenter, rightCenter, eyeRadius, trackX);
     }
   }
 
-  void _drawRoundEyes(Canvas canvas, Offset left, Offset right, double r) {
-    _drawRoundEye(canvas, left, r);
-    _drawRoundEye(canvas, right, r);
-  }
+  /// The fully detailed round eye with iris fibers, limbal ring, etc.
+  void _drawFullEye(Canvas canvas, Offset center, double r, double trackX,
+      double pupilScale) {
+    // ── Sclera ──
+    canvas.drawCircle(center, r, Paint()..color = Colors.white);
 
-  void _drawRoundEye(Canvas canvas, Offset center, double r) {
-    final whitePaint = Paint()..color = Colors.white;
-    final irisPaint = Paint()..color = eyeColor;
-    final pupilPaint = Paint()..color = const Color(0xFF1A1A2E);
-
-    canvas.drawCircle(center, r, whitePaint);
-    canvas.drawCircle(center.translate(r * 0.12, 0), r * 0.58, irisPaint);
-    canvas.drawCircle(center.translate(r * 0.15, 0), r * 0.32, pupilPaint);
-    // Highlight
+    // Sclera top shadow (subtle blue-gray, like eyelid casting shadow)
     canvas.drawCircle(
-        center.translate(r * 0.30, -r * 0.25), r * 0.18, whitePaint);
-  }
+      center,
+      r,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(center.dx, center.dy - r),
+          Offset(center.dx, center.dy - r * 0.3),
+          [
+            const Color(0xFF8892B0).withValues(alpha: 0.18),
+            Colors.transparent,
+          ],
+        ),
+    );
 
-  void _drawAlmondEyes(Canvas canvas, Offset left, Offset right, double r) {
-    for (final center in [left, right]) {
-      // Almond shape — pointed at corners
-      final path = Path()
-        ..moveTo(center.dx - r * 1.2, center.dy)
-        ..quadraticBezierTo(
-            center.dx, center.dy - r * 1.0, center.dx + r * 1.2, center.dy)
-        ..quadraticBezierTo(
-            center.dx, center.dy + r * 0.8, center.dx - r * 1.2, center.dy)
-        ..close();
-      canvas.drawPath(path, Paint()..color = Colors.white);
+    // ── Iris ──
+    final irisCenter = center.translate(r * 0.10 + trackX, _currentTrackY);
+    final irisR = r * 0.58;
+    final irisRect = Rect.fromCircle(center: irisCenter, radius: irisR);
 
-      // Iris
-      canvas.drawCircle(
-          center.translate(r * 0.10, 0), r * 0.50, Paint()..color = eyeColor);
-      // Pupil
-      canvas.drawCircle(center.translate(r * 0.12, 0), r * 0.28,
-          Paint()..color = const Color(0xFF1A1A2E));
-      // Highlight
-      canvas.drawCircle(
-          center.translate(r * 0.28, -r * 0.20), r * 0.15, Paint()..color = Colors.white);
-    }
-  }
+    // Base iris gradient (3-stop: lighter inner, main, darker outer)
+    final irisGradient = RadialGradient(
+      center: Alignment.center,
+      radius: 1.0,
+      colors: [
+        Color.lerp(eyeColor, Colors.white, 0.35)!,
+        eyeColor,
+        Color.lerp(eyeColor, Colors.black, 0.3)!,
+      ],
+      stops: const [0.0, 0.5, 1.0],
+    );
+    canvas.drawCircle(
+      irisCenter,
+      irisR,
+      Paint()..shader = irisGradient.createShader(irisRect),
+    );
 
-  void _drawWinkEye(Canvas canvas, Offset center, double r) {
-    final paint = Paint()
-      ..color = const Color(0xFF1A1A2E)
+    // ── Radial fiber texture ──
+    // Draw thin semi-transparent lines from pupil edge outward
+    final fiberPaint = Paint()
       ..style = PaintingStyle.stroke
-      ..strokeWidth = r * 0.4
-      ..strokeCap = StrokeCap.round;
-    canvas.drawArc(
-      Rect.fromCenter(center: center, width: r * 2.0, height: r * 1.2),
-      pi * 0.1,
-      pi * 0.8,
-      false,
-      paint,
+      ..strokeWidth = irisR * 0.03;
+    final fiberRng = Random(42); // deterministic for consistency
+    for (int i = 0; i < 24; i++) {
+      final angle = (i / 24) * 2 * pi + fiberRng.nextDouble() * 0.1;
+      final innerR = irisR * 0.35;
+      final outerR = irisR * (0.75 + fiberRng.nextDouble() * 0.2);
+      final brightness = fiberRng.nextDouble();
+      fiberPaint.color = brightness > 0.5
+          ? Color.lerp(eyeColor, Colors.white, 0.25)!.withValues(alpha: 0.2)
+          : Color.lerp(eyeColor, Colors.black, 0.2)!.withValues(alpha: 0.15);
+      canvas.drawLine(
+        Offset(
+          irisCenter.dx + innerR * cos(angle),
+          irisCenter.dy + innerR * sin(angle),
+        ),
+        Offset(
+          irisCenter.dx + outerR * cos(angle),
+          irisCenter.dy + outerR * sin(angle),
+        ),
+        fiberPaint,
+      );
+    }
+
+    // ── Caustic-like light pattern ──
+    // A crescent of lighter color on the upper-left iris area
+    canvas.save();
+    canvas.clipPath(Path()..addOval(irisRect));
+    final causticRect = Rect.fromCenter(
+      center: irisCenter.translate(-irisR * 0.2, -irisR * 0.15),
+      width: irisR * 1.0,
+      height: irisR * 0.6,
+    );
+    canvas.drawOval(
+      causticRect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Color.lerp(eyeColor, Colors.white, 0.4)!.withValues(alpha: 0.2),
+            Colors.transparent,
+          ],
+        ).createShader(causticRect),
+    );
+    canvas.restore();
+
+    // ── Limbal ring (dark outer iris edge) ──
+    canvas.drawCircle(
+      irisCenter,
+      irisR,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = irisR * 0.08
+        ..color = Color.lerp(eyeColor, Colors.black, 0.5)!
+            .withValues(alpha: 0.6),
+    );
+
+    // ── Pupil ──
+    final pupilR = r * pupilScale;
+    final pupilCenter = center.translate(r * 0.12 + trackX, _currentTrackY);
+    canvas.drawCircle(
+      pupilCenter,
+      pupilR,
+      Paint()..color = const Color(0xFF050510),
+    );
+
+    // ── Dual specular highlights ──
+    // Large soft highlight (top-left)
+    final bigHighlightCenter = center.translate(r * 0.22, -r * 0.22);
+    final bigHighlightRect = Rect.fromCenter(
+      center: bigHighlightCenter,
+      width: r * 0.42,
+      height: r * 0.32,
+    );
+    canvas.drawOval(
+      bigHighlightRect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Colors.white.withValues(alpha: 0.92),
+            Colors.white.withValues(alpha: 0.0),
+          ],
+        ).createShader(bigHighlightRect),
+    );
+
+    // Small sharp highlight (bottom-right)
+    canvas.drawCircle(
+      center.translate(-r * 0.12, r * 0.18),
+      r * 0.08,
+      Paint()..color = Colors.white.withValues(alpha: 0.7),
     );
   }
 
-  void _drawSleepyEyes(Canvas canvas, Offset left, Offset right, double r) {
-    for (final center in [left, right]) {
-      // Half-open eye
-      final whitePaint = Paint()..color = Colors.white;
-      // Bottom half of eye visible
-      canvas.save();
-      canvas.clipRect(Rect.fromLTWH(
-          center.dx - r * 1.2, center.dy - r * 0.15, r * 2.4, r * 1.2));
-      canvas.drawCircle(center, r, whitePaint);
-      canvas.drawCircle(
-          center.translate(r * 0.1, 0.05), r * 0.55, Paint()..color = eyeColor);
-      canvas.drawCircle(center.translate(r * 0.12, 0.05), r * 0.30,
-          Paint()..color = const Color(0xFF1A1A2E));
-      canvas.restore();
+  /// Eyelid-sweep blink: a skin-colored arc sweeps down over the eye.
+  void _drawEyelid(Canvas canvas, Offset center, double r, double totalW) {
+    final blink = blinkValue.value;
+    if (blink < 0.01) return;
 
-      // Eyelid line
-      final lidPaint = Paint()
-        ..color = const Color(0xFF1A1A2E).withValues(alpha: 0.5)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = r * 0.2
+    // Eyelid sweeps from top of eye downward
+    final lidTop = center.dy - r * 1.1;
+    final lidBottom = center.dy - r * 1.1 + (r * 2.2) * blink;
+
+    canvas.save();
+    // Clip to eye area so eyelid doesn't spill outside
+    canvas.clipPath(Path()..addOval(
+      Rect.fromCircle(center: center, radius: r * 1.05),
+    ));
+
+    // Eyelid skin
+    final lidRect = Rect.fromLTWH(
+      center.dx - r * 1.1,
+      lidTop,
+      r * 2.2,
+      lidBottom - lidTop,
+    );
+    final lidGradient = LinearGradient(
+      begin: Alignment.topCenter,
+      end: Alignment.bottomCenter,
+      colors: [
+        Color.lerp(skinColor, const Color(0xFFFFF8E0), 0.05)!,
+        skinColor,
+        Color.lerp(skinColor, const Color(0xFF6A5A8E), 0.08)!,
+      ],
+    );
+    canvas.drawRect(lidRect, Paint()..shader = lidGradient.createShader(lidRect));
+
+    // Eyelid crease shadow at the bottom edge
+    final creasePaint = Paint()
+      ..color = Color.lerp(skinColor, const Color(0xFF4A3A6E), 0.2)!
+          .withValues(alpha: 0.4)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+    canvas.drawLine(
+      Offset(center.dx - r * 0.9, lidBottom),
+      Offset(center.dx + r * 0.9, lidBottom),
+      creasePaint..strokeWidth = r * 0.12,
+    );
+
+    // Lash line at bottom of eyelid
+    if (blink > 0.3) {
+      final lashLine = Paint()
+        ..color = const Color(0xFF1A1A2E).withValues(alpha: 0.5 * blink)
+        ..strokeWidth = r * 0.08
         ..strokeCap = StrokeCap.round;
-      canvas.drawLine(
-        Offset(center.dx - r * 0.9, center.dy - r * 0.1),
-        Offset(center.dx + r * 0.9, center.dy - r * 0.1),
-        lidPaint,
+      canvas.drawArc(
+        Rect.fromCenter(center: Offset(center.dx, lidBottom), width: r * 1.8, height: r * 0.6),
+        0,
+        pi,
+        false,
+        lashLine,
       );
     }
+
+    canvas.restore();
+  }
+
+  /// Almond eyelid sweep adapted to almond eye shape.
+  void _drawAlmondEyelid(Canvas canvas, Offset center, double r) {
+    final blink = blinkValue.value;
+    if (blink < 0.01) return;
+
+    final lidTop = center.dy - r * 1.0;
+    final lidBottom = center.dy - r * 1.0 + (r * 2.0) * blink;
+
+    canvas.save();
+    // Clip to almond eye shape
+    final almondPath = Path()
+      ..moveTo(center.dx - r * 1.2, center.dy)
+      ..quadraticBezierTo(
+          center.dx, center.dy - r * 1.0, center.dx + r * 1.2, center.dy)
+      ..quadraticBezierTo(
+          center.dx, center.dy + r * 0.8, center.dx - r * 1.2, center.dy)
+      ..close();
+    canvas.clipPath(almondPath);
+
+    final lidRect = Rect.fromLTWH(
+      center.dx - r * 1.3,
+      lidTop,
+      r * 2.6,
+      lidBottom - lidTop,
+    );
+    canvas.drawRect(
+      lidRect,
+      Paint()
+        ..shader = LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Color.lerp(skinColor, const Color(0xFFFFF8E0), 0.05)!,
+            skinColor,
+          ],
+        ).createShader(lidRect),
+    );
+
+    canvas.restore();
+  }
+
+  void _drawSparkleEye(Canvas canvas, Offset center, double r, double trackX,
+      double pupilScale) {
+    final bigR = r * 1.3;
+
+    // White sclera
+    canvas.drawCircle(center, bigR, Paint()..color = Colors.white);
+
+    // Sclera top shadow
+    canvas.drawCircle(
+      center,
+      bigR,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(center.dx, center.dy - bigR),
+          Offset(center.dx, center.dy - bigR * 0.3),
+          [
+            const Color(0xFF8892B0).withValues(alpha: 0.15),
+            Colors.transparent,
+          ],
+        ),
+    );
+
+    // Iris with gradient + limbal ring
+    final irisR = bigR * 0.65;
+    final irisRect = Rect.fromCircle(center: center, radius: irisR);
+    canvas.drawCircle(
+      center,
+      irisR,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Color.lerp(eyeColor, Colors.white, 0.35)!,
+            eyeColor,
+            Color.lerp(eyeColor, Colors.black, 0.3)!,
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(irisRect),
+    );
+
+    // Limbal ring
+    canvas.drawCircle(
+      center,
+      irisR,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = irisR * 0.07
+        ..color = Color.lerp(eyeColor, Colors.black, 0.45)!
+            .withValues(alpha: 0.5),
+    );
+
+    // Pupil
+    canvas.drawCircle(
+      center,
+      bigR * pupilScale * 0.85,
+      Paint()..color = const Color(0xFF050510),
+    );
+
+    // Large sparkle highlights
+    canvas.drawCircle(
+      center.translate(bigR * 0.3, -bigR * 0.2),
+      bigR * 0.28,
+      Paint()..color = Colors.white.withValues(alpha: 0.9),
+    );
+    canvas.drawCircle(
+      center.translate(-bigR * 0.2, bigR * 0.25),
+      bigR * 0.14,
+      Paint()..color = Colors.white.withValues(alpha: 0.6),
+    );
+  }
+
+  void _drawAlmondEye(Canvas canvas, Offset center, double r, double trackX,
+      double pupilScale) {
+    // Almond shape
+    final path = Path()
+      ..moveTo(center.dx - r * 1.2, center.dy)
+      ..quadraticBezierTo(
+          center.dx, center.dy - r * 1.0, center.dx + r * 1.2, center.dy)
+      ..quadraticBezierTo(
+          center.dx, center.dy + r * 0.8, center.dx - r * 1.2, center.dy)
+      ..close();
+
+    canvas.save();
+    canvas.clipPath(path);
+
+    // White sclera fill
+    canvas.drawPath(path, Paint()..color = Colors.white);
+
+    // Sclera top shadow
+    final scleraRect = Rect.fromCircle(center: center, radius: r * 1.2);
+    canvas.drawRect(
+      scleraRect,
+      Paint()
+        ..shader = ui.Gradient.linear(
+          Offset(center.dx, center.dy - r),
+          Offset(center.dx, center.dy - r * 0.2),
+          [
+            const Color(0xFF8892B0).withValues(alpha: 0.15),
+            Colors.transparent,
+          ],
+        ),
+    );
+
+    // Iris with gradient
+    final irisCenter = center.translate(r * 0.10 + trackX, _currentTrackY);
+    final irisR = r * 0.50;
+    final irisRect = Rect.fromCircle(center: irisCenter, radius: irisR);
+    canvas.drawCircle(
+      irisCenter,
+      irisR,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            Color.lerp(eyeColor, Colors.white, 0.3)!,
+            eyeColor,
+            Color.lerp(eyeColor, Colors.black, 0.3)!,
+          ],
+          stops: const [0.0, 0.45, 1.0],
+        ).createShader(irisRect),
+    );
+
+    // Limbal ring
+    canvas.drawCircle(
+      irisCenter,
+      irisR,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = irisR * 0.08
+        ..color = Color.lerp(eyeColor, Colors.black, 0.45)!
+            .withValues(alpha: 0.5),
+    );
+
+    // Fiber texture (fewer for almond — 16 fibers)
+    final fiberPaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = irisR * 0.03;
+    final fiberRng = Random(42);
+    for (int i = 0; i < 16; i++) {
+      final angle = (i / 16) * 2 * pi + fiberRng.nextDouble() * 0.1;
+      final innerR = irisR * 0.35;
+      final outerR = irisR * (0.7 + fiberRng.nextDouble() * 0.25);
+      fiberPaint.color = fiberRng.nextDouble() > 0.5
+          ? Color.lerp(eyeColor, Colors.white, 0.2)!.withValues(alpha: 0.15)
+          : Color.lerp(eyeColor, Colors.black, 0.15)!.withValues(alpha: 0.12);
+      canvas.drawLine(
+        Offset(
+          irisCenter.dx + innerR * cos(angle),
+          irisCenter.dy + innerR * sin(angle),
+        ),
+        Offset(
+          irisCenter.dx + outerR * cos(angle),
+          irisCenter.dy + outerR * sin(angle),
+        ),
+        fiberPaint,
+      );
+    }
+
+    // Pupil
+    canvas.drawCircle(
+      center.translate(r * 0.12 + trackX, _currentTrackY),
+      r * pupilScale,
+      Paint()..color = const Color(0xFF050510),
+    );
+
+    // Highlight
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: center.translate(r * 0.22, -r * 0.18),
+        width: r * 0.32,
+        height: r * 0.22,
+      ),
+      Paint()..color = Colors.white.withValues(alpha: 0.85),
+    );
+
+    // Small highlight
+    canvas.drawCircle(
+      center.translate(-r * 0.1, r * 0.15),
+      r * 0.07,
+      Paint()..color = Colors.white.withValues(alpha: 0.5),
+    );
+
+    canvas.restore();
   }
 
   void _drawCrescentEyes(Canvas canvas, Offset left, Offset right, double r) {
@@ -872,19 +1646,87 @@ class _EyesPainter extends CustomPainter {
     );
   }
 
-  void _drawSparkleEyes(Canvas canvas, Offset left, Offset right, double r) {
-    final bigR = r * 1.3;
-    final whitePaint = Paint()..color = Colors.white;
-    final irisPaint = Paint()..color = eyeColor;
+  void _drawWinkEye(Canvas canvas, Offset center, double r) {
+    final paint = Paint()
+      ..color = const Color(0xFF1A1A2E)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = r * 0.4
+      ..strokeCap = StrokeCap.round;
+    canvas.drawArc(
+      Rect.fromCenter(center: center, width: r * 2.0, height: r * 1.2),
+      pi * 0.1,
+      pi * 0.8,
+      false,
+      paint,
+    );
+  }
 
+  void _drawSleepyEyes(
+      Canvas canvas, Offset left, Offset right, double r, double trackX) {
     for (final center in [left, right]) {
-      canvas.drawCircle(center, bigR, whitePaint);
-      canvas.drawCircle(center, bigR * 0.65, irisPaint);
-      // Large sparkle highlights
+      canvas.save();
+      canvas.clipRect(Rect.fromLTWH(
+          center.dx - r * 1.2, center.dy - r * 0.15, r * 2.4, r * 1.2));
+
+      canvas.drawCircle(center, r, Paint()..color = Colors.white);
+
+      // Iris with gradient
+      final irisCenter = center.translate(r * 0.1 + trackX, 0.05 + _currentTrackY);
+      final irisR = r * 0.55;
+      final irisRect = Rect.fromCircle(center: irisCenter, radius: irisR);
       canvas.drawCircle(
-          center.translate(bigR * 0.3, -bigR * 0.2), bigR * 0.28, whitePaint);
+        irisCenter,
+        irisR,
+        Paint()
+          ..shader = RadialGradient(
+            colors: [
+              Color.lerp(eyeColor, Colors.white, 0.25)!,
+              eyeColor,
+              Color.lerp(eyeColor, Colors.black, 0.3)!,
+            ],
+            stops: const [0.0, 0.5, 1.0],
+          ).createShader(irisRect),
+      );
+
+      // Limbal ring
       canvas.drawCircle(
-          center.translate(-bigR * 0.2, bigR * 0.25), bigR * 0.14, whitePaint);
+        irisCenter,
+        irisR,
+        Paint()
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = irisR * 0.07
+          ..color = Color.lerp(eyeColor, Colors.black, 0.4)!
+              .withValues(alpha: 0.4),
+      );
+
+      // Pupil
+      canvas.drawCircle(
+        center.translate(r * 0.12 + trackX, 0.05 + _currentTrackY),
+        r * 0.30,
+        Paint()..color = const Color(0xFF050510),
+      );
+
+      // Small highlight
+      canvas.drawCircle(
+        center.translate(r * 0.2, -r * 0.05),
+        r * 0.1,
+        Paint()..color = Colors.white.withValues(alpha: 0.7),
+      );
+
+      canvas.restore();
+
+      // Eyelid line — sleepy droop
+      final lidPaint = Paint()
+        ..color = Color.lerp(skinColor, const Color(0xFF4A3A6E), 0.15)!
+            .withValues(alpha: 0.6)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = r * 0.22
+        ..strokeCap = StrokeCap.round;
+      canvas.drawLine(
+        Offset(center.dx - r * 0.9, center.dy - r * 0.1),
+        Offset(center.dx + r * 0.9, center.dy - r * 0.1),
+        lidPaint,
+      );
     }
   }
 
@@ -893,16 +1735,16 @@ class _EyesPainter extends CustomPainter {
     for (int i = 0; i < 5; i++) {
       final outerAngle = -pi / 2 + i * 2 * pi / 5;
       final innerAngle = outerAngle + pi / 5;
-      final outerX = center.dx + r * cos(outerAngle);
-      final outerY = center.dy + r * sin(outerAngle);
-      final innerX = center.dx + r * 0.4 * cos(innerAngle);
-      final innerY = center.dy + r * 0.4 * sin(innerAngle);
+      final ox = center.dx + r * cos(outerAngle);
+      final oy = center.dy + r * sin(outerAngle);
+      final ix = center.dx + r * 0.4 * cos(innerAngle);
+      final iy = center.dy + r * 0.4 * sin(innerAngle);
       if (i == 0) {
-        path.moveTo(outerX, outerY);
+        path.moveTo(ox, oy);
       } else {
-        path.lineTo(outerX, outerY);
+        path.lineTo(ox, oy);
       }
-      path.lineTo(innerX, innerY);
+      path.lineTo(ix, iy);
     }
     path.close();
     canvas.drawPath(path, paint);
@@ -913,35 +1755,775 @@ class _EyesPainter extends CustomPainter {
     final y = center.dy;
     final path = Path()
       ..moveTo(x, y + r * 0.5)
-      ..cubicTo(x - r * 1.2, y - r * 0.3, x - r * 0.5, y - r * 1.0, x, y - r * 0.3)
-      ..cubicTo(x + r * 0.5, y - r * 1.0, x + r * 1.2, y - r * 0.3, x, y + r * 0.5)
+      ..cubicTo(
+          x - r * 1.2, y - r * 0.3, x - r * 0.5, y - r * 1.0, x, y - r * 0.3)
+      ..cubicTo(
+          x + r * 0.5, y - r * 1.0, x + r * 1.2, y - r * 0.3, x, y + r * 0.5)
       ..close();
     canvas.drawPath(path, paint);
   }
 
   @override
-  bool shouldRepaint(_EyesPainter old) =>
-      old.style != style || old.eyeColor != eyeColor;
+  bool shouldRepaint(EyesPainter old) =>
+      old.style != style ||
+      old.eyeColor != eyeColor ||
+      old.skinColor != skinColor ||
+      old.expression != expression ||
+      old.lookTarget != lookTarget;
 }
 
-// ══════════════════════════════════════════════════════════════════════
-//  EYELASH PAINTER
-// ══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+//  MOUTH PAINTER
+//  - Gradient lips (darker top, lighter bottom with warm shift)
+//  - Individual tooth shapes with rounded corners
+//  - Tongue with center-line gradient (pink → red with darker center line)
+// ═══════════════════════════════════════════════════════════════════════
 
-class _EyelashPainter extends CustomPainter {
+class MouthPainter extends CustomPainter {
   final int style;
-  final int eyeStyle;
+  final Color lipColor;
+  final AvatarExpression expression;
+  final double mouthOpenAmount;
 
-  _EyelashPainter({required this.style, required this.eyeStyle});
+  MouthPainter({
+    required this.style,
+    required this.lipColor,
+    this.expression = AvatarExpression.neutral,
+    this.mouthOpenAmount = 0.0,
+    super.repaint,
+  });
+
+  Color get _effectiveLipFill =>
+      (lipColor.a * 255.0).round().clamp(0, 255) == 0
+          ? const Color(0xFF1A1A2E)
+          : lipColor;
+
+  bool get _hasLipColor => (lipColor.a * 255.0).round().clamp(0, 255) > 0;
+
+  Paint _lipGradientPaint(Rect rect) {
+    final base = _effectiveLipFill;
+    return Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.topCenter,
+        end: Alignment.bottomCenter,
+        colors: [
+          Color.lerp(base, const Color(0xFF4A2040), 0.2)!, // cool dark top lip
+          base,
+          Color.lerp(base, const Color(0xFFFFF0E0), 0.12)!, // warm bottom lip
+        ],
+        stops: const [0.0, 0.45, 1.0],
+      ).createShader(rect);
+  }
+
+  /// Draw individual rounded teeth inside a clipped mouth area.
+  void _drawIndividualTeeth(Canvas canvas, double x, double y, double teethW,
+      double teethH, int count) {
+    final toothW = teethW / count;
+    final toothR = toothW * 0.15;
+
+    // White base for all teeth
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(x, y, teethW, teethH),
+        Radius.circular(toothR),
+      ),
+      Paint()..color = Colors.white,
+    );
+
+    // Individual tooth separator lines
+    final sepPaint = Paint()
+      ..color = const Color(0xFFD8D8E0).withValues(alpha: 0.6)
+      ..strokeWidth = teethW * 0.008;
+    for (int i = 1; i < count; i++) {
+      final tx = x + toothW * i;
+      canvas.drawLine(Offset(tx, y + teethH * 0.1),
+          Offset(tx, y + teethH * 0.9), sepPaint);
+    }
+
+    // Subtle gradient on teeth for 3D feel
+    final teethRect = Rect.fromLTWH(x, y, teethW, teethH);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(teethRect, Radius.circular(toothR)),
+      Paint()
+        ..shader = const LinearGradient(
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [
+            Colors.white,
+            Color(0xFFF0F0F5),
+          ],
+        ).createShader(teethRect),
+    );
+  }
+
+  /// Tongue with center-line gradient.
+  void _drawTongue(Canvas canvas, Offset center, double w, double h) {
+    final tongueRect = Rect.fromCenter(center: center, width: w, height: h);
+
+    // Base tongue gradient (pink edges → red center)
+    canvas.drawOval(
+      tongueRect,
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment.center,
+          radius: 0.8,
+          colors: [
+            Color(0xFFE04060), // darker center
+            Color(0xFFFF8FAB), // pink edges
+          ],
+        ).createShader(tongueRect),
+    );
+
+    // Center line (darker groove)
+    final centerLinePaint = Paint()
+      ..color = const Color(0xFFCC3050).withValues(alpha: 0.4)
+      ..strokeWidth = w * 0.06
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(
+      Offset(center.dx, center.dy - h * 0.3),
+      Offset(center.dx, center.dy + h * 0.35),
+      centerLinePaint,
+    );
+
+    // Subtle highlight on tongue
+    final highlightRect = Rect.fromCenter(
+      center: center.translate(-w * 0.1, -h * 0.15),
+      width: w * 0.4,
+      height: h * 0.3,
+    );
+    canvas.drawOval(
+      highlightRect,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            const Color(0xFFFFB0C0).withValues(alpha: 0.3),
+            Colors.transparent,
+          ],
+        ).createShader(highlightRect),
+    );
+  }
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    // Lashes sit above the eyes
+
+    // ── Expression overrides ──
+    if (expression == AvatarExpression.talking && mouthOpenAmount > 0.01) {
+      _drawTalkingMouth(canvas, w, h, mouthOpenAmount);
+      return;
+    }
+    if (expression == AvatarExpression.excited) {
+      _drawExcitedMouth(canvas, w, h);
+      return;
+    }
+    if (expression == AvatarExpression.thinking) {
+      _drawThinkingMouth(canvas, w, h);
+      return;
+    }
+    if (expression == AvatarExpression.surprised) {
+      _drawSurprisedMouth(canvas, w, h);
+      return;
+    }
+
+    switch (style) {
+      case 0: // Smile
+        if (_hasLipColor) {
+          final path = Path()
+            ..moveTo(w * 0.10, h * 0.20)
+            ..quadraticBezierTo(w * 0.50, h * 1.0, w * 0.90, h * 0.20)
+            ..quadraticBezierTo(w * 0.50, h * 0.50, w * 0.10, h * 0.20)
+            ..close();
+          canvas.drawPath(path, _lipGradientPaint(Rect.fromLTWH(0, 0, w, h)));
+        } else {
+          final paint = Paint()
+            ..color = const Color(0xFF1A1A2E)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = w * 0.08
+            ..strokeCap = StrokeCap.round;
+          canvas.drawArc(
+            Rect.fromLTWH(w * 0.1, -h * 0.2, w * 0.8, h * 1.0),
+            0.2,
+            pi * 0.6,
+            false,
+            paint,
+          );
+        }
+
+      case 1: // Big Grin
+        // Mouth shape
+        final mouthPath = Path()
+          ..moveTo(w * 0.05, h * 0.2)
+          ..quadraticBezierTo(w * 0.5, h * 1.2, w * 0.95, h * 0.2)
+          ..close();
+
+        // Dark mouth interior
+        canvas.drawPath(mouthPath, Paint()..color = const Color(0xFF2D1A2E));
+
+        // Individual teeth
+        canvas.save();
+        canvas.clipPath(mouthPath);
+        _drawIndividualTeeth(canvas, w * 0.2, h * 0.2, w * 0.6, h * 0.22, 5);
+        canvas.restore();
+
+        // Lip outline with gradient
+        canvas.drawPath(mouthPath, _lipGradientPaint(Rect.fromLTWH(0, 0, w, h))
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = w * 0.05);
+
+      case 2: // Tongue Out
+        final mouthPath = Path()
+          ..moveTo(w * 0.10, h * 0.15)
+          ..quadraticBezierTo(w * 0.5, h * 1.0, w * 0.90, h * 0.15)
+          ..close();
+
+        // Dark interior
+        canvas.drawPath(mouthPath, Paint()..color = const Color(0xFF2D1A2E));
+
+        // Lip gradient
+        canvas.drawPath(mouthPath, _lipGradientPaint(Rect.fromLTWH(0, 0, w, h))
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = w * 0.04);
+
+        // Tongue with center-line
+        _drawTongue(canvas, Offset(w * 0.5, h * 0.65), w * 0.35, h * 0.55);
+
+      case 3: // Surprised O
+        // Outer lip ring
+        final outerRect = Rect.fromCenter(
+          center: Offset(w * 0.5, h * 0.45),
+          width: w * 0.45,
+          height: h * 0.80,
+        );
+        canvas.drawOval(outerRect, _lipGradientPaint(outerRect));
+
+        // Dark mouth interior
+        canvas.drawOval(
+          Rect.fromCenter(
+            center: Offset(w * 0.5, h * 0.45),
+            width: w * 0.30,
+            height: h * 0.55,
+          ),
+          Paint()..color = const Color(0xFF2D1A2E),
+        );
+
+        // Subtle teeth visible at top
+        canvas.save();
+        canvas.clipPath(Path()..addOval(Rect.fromCenter(
+          center: Offset(w * 0.5, h * 0.45),
+          width: w * 0.30,
+          height: h * 0.55,
+        )));
+        _drawIndividualTeeth(canvas, w * 0.3, h * 0.2, w * 0.4, h * 0.12, 4);
+        canvas.restore();
+
+      case 4: // Kissy
+        final path = Path()
+          ..moveTo(w * 0.25, h * 0.30)
+          ..quadraticBezierTo(w * 0.15, h * 0.50, w * 0.30, h * 0.70)
+          ..quadraticBezierTo(w * 0.50, h * 0.90, w * 0.70, h * 0.70)
+          ..quadraticBezierTo(w * 0.85, h * 0.50, w * 0.75, h * 0.30)
+          ..quadraticBezierTo(w * 0.50, h * 0.45, w * 0.25, h * 0.30)
+          ..close();
+        final col = _hasLipColor ? _effectiveLipFill : const Color(0xFFFF6B8A);
+        final rect = Rect.fromLTWH(0, 0, w, h);
+        canvas.drawPath(
+          path,
+          Paint()
+            ..shader = LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color.lerp(col, const Color(0xFF4A2040), 0.18)!,
+                col,
+                Color.lerp(col, const Color(0xFFFFF0E0), 0.1)!,
+              ],
+            ).createShader(rect),
+        );
+
+        // Lip highlight
+        final highlightRect = Rect.fromCenter(
+          center: Offset(w * 0.48, h * 0.42),
+          width: w * 0.15,
+          height: h * 0.12,
+        );
+        canvas.drawOval(
+          highlightRect,
+          Paint()
+            ..shader = RadialGradient(
+              colors: [
+                Colors.white.withValues(alpha: 0.25),
+                Colors.transparent,
+              ],
+            ).createShader(highlightRect),
+        );
+
+      case 5: // Cat Smile
+        final paint = Paint()
+          ..color = _effectiveLipFill
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = w * 0.07
+          ..strokeCap = StrokeCap.round;
+        final path = Path()
+          ..moveTo(w * 0.05, h * 0.30)
+          ..quadraticBezierTo(w * 0.25, h * 0.70, w * 0.50, h * 0.25)
+          ..quadraticBezierTo(w * 0.75, h * 0.70, w * 0.95, h * 0.30);
+        canvas.drawPath(path, paint);
+
+      case 6: // Smirk
+        if (_hasLipColor) {
+          final path = Path()
+            ..moveTo(w * 0.15, h * 0.40)
+            ..quadraticBezierTo(w * 0.55, h * 0.35, w * 0.90, h * 0.15)
+            ..quadraticBezierTo(w * 0.55, h * 0.80, w * 0.15, h * 0.40)
+            ..close();
+          canvas.drawPath(path, _lipGradientPaint(Rect.fromLTWH(0, 0, w, h)));
+        } else {
+          final paint = Paint()
+            ..color = _effectiveLipFill
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = w * 0.07
+            ..strokeCap = StrokeCap.round;
+          final path = Path()
+            ..moveTo(w * 0.15, h * 0.40)
+            ..quadraticBezierTo(w * 0.55, h * 0.60, w * 0.90, h * 0.15);
+          canvas.drawPath(path, paint);
+        }
+
+      case 7: // Tiny Smile
+        if (_hasLipColor) {
+          final path = Path()
+            ..moveTo(w * 0.30, h * 0.35)
+            ..quadraticBezierTo(w * 0.50, h * 0.75, w * 0.70, h * 0.35)
+            ..quadraticBezierTo(w * 0.50, h * 0.50, w * 0.30, h * 0.35)
+            ..close();
+          canvas.drawPath(path, _lipGradientPaint(Rect.fromLTWH(0, 0, w, h)));
+        } else {
+          final paint = Paint()
+            ..color = _effectiveLipFill
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = w * 0.06
+            ..strokeCap = StrokeCap.round;
+          canvas.drawArc(
+            Rect.fromLTWH(w * 0.25, -h * 0.1, w * 0.50, h * 0.80),
+            0.3,
+            pi * 0.4,
+            false,
+            paint,
+          );
+        }
+    }
+  }
+
+  /// Talking mouth — open oval that scales with [amount] (0..1).
+  /// Talking mouth with viseme interpolation.
+  ///
+  /// amount 0.0 = closed (lips together)
+  /// amount 0.3 = slightly_open (consonants)
+  /// amount 0.7 = open (vowels like "eh", "ih")
+  /// amount 1.0 = wide_open (for "ah", "oh")
+  ///
+  /// Bezier control points lerp between these poses for smooth blending.
+  void _drawTalkingMouth(Canvas canvas, double w, double h, double amount) {
+    // Jaw drops with openness — subtle Y offset for realism
+    final jawDrop = h * 0.08 * amount;
+    final center = Offset(w * 0.5, h * 0.4 + jawDrop * 0.5);
+
+    // Interpolate mouth dimensions between 4 viseme keyframes
+    // Closed → slightly_open → open → wide_open
+    final openH = _lerpViseme(amount, h * 0.08, h * 0.25, h * 0.55, h * 0.85);
+    final openW = _lerpViseme(amount, w * 0.45, w * 0.38, w * 0.48, w * 0.55);
+
+    // Build mouth shape as bezier path (more natural than oval)
+    final mouthPath = Path();
+    final topY = center.dy - openH * 0.5;
+    final botY = center.dy + openH * 0.5;
+    final leftX = center.dx - openW * 0.5;
+    final rightX = center.dx + openW * 0.5;
+
+    // Upper lip arch (flatter) + lower lip curve (rounder)
+    final upperArch = openH * (0.15 + amount * 0.1);
+    final lowerArch = openH * (0.3 + amount * 0.2);
+
+    mouthPath.moveTo(leftX, center.dy - openH * 0.1);
+    mouthPath.quadraticBezierTo(center.dx, topY - upperArch, rightX, center.dy - openH * 0.1);
+    mouthPath.quadraticBezierTo(center.dx, botY + lowerArch, leftX, center.dy - openH * 0.1);
+    mouthPath.close();
+
+    final mouthRect = Rect.fromLTRB(leftX, topY, rightX, botY + lowerArch);
+
+    // Dark mouth interior
+    canvas.drawPath(mouthPath, Paint()..color = const Color(0xFF2D1A2E));
+
+    // Lip gradient outline
+    canvas.drawPath(mouthPath, _lipGradientPaint(mouthRect)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.04);
+
+    // Teeth when mouth is open enough (viseme > slightly_open)
+    if (amount > 0.2) {
+      canvas.save();
+      canvas.clipPath(mouthPath);
+      final teethW = openW * 0.65;
+      final teethH = openH * 0.18;
+      _drawIndividualTeeth(canvas, center.dx - teethW * 0.5,
+          center.dy - openH * 0.35, teethW, teethH, 4);
+      canvas.restore();
+    }
+
+    // Tongue when mouth is wide enough (viseme > open)
+    if (amount > 0.4) {
+      final tongueAmount = ((amount - 0.4) / 0.6).clamp(0.0, 1.0);
+      _drawTongue(
+        canvas,
+        Offset(center.dx, center.dy + openH * 0.15),
+        openW * 0.5 * tongueAmount,
+        openH * 0.3 * tongueAmount,
+      );
+    }
+  }
+
+  /// 4-keyframe linear interpolation for viseme blending.
+  /// amount 0.0→v0, 0.33→v1, 0.67→v2, 1.0→v3
+  static double _lerpViseme(double t, double v0, double v1, double v2, double v3) {
+    if (t <= 0.33) {
+      return v0 + (v1 - v0) * (t / 0.33);
+    } else if (t <= 0.67) {
+      return v1 + (v2 - v1) * ((t - 0.33) / 0.34);
+    } else {
+      return v2 + (v3 - v2) * ((t - 0.67) / 0.33);
+    }
+  }
+
+  /// Excited mouth — big happy grin with teeth.
+  void _drawExcitedMouth(Canvas canvas, double w, double h) {
+    final mouthPath = Path()
+      ..moveTo(w * 0.02, h * 0.15)
+      ..quadraticBezierTo(w * 0.5, h * 1.4, w * 0.98, h * 0.15)
+      ..close();
+
+    canvas.drawPath(mouthPath, Paint()..color = const Color(0xFF2D1A2E));
+
+    canvas.save();
+    canvas.clipPath(mouthPath);
+    _drawIndividualTeeth(canvas, w * 0.15, h * 0.15, w * 0.7, h * 0.25, 6);
+    canvas.restore();
+
+    canvas.drawPath(mouthPath, _lipGradientPaint(Rect.fromLTWH(0, 0, w, h))
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = w * 0.05);
+  }
+
+  /// Thinking mouth — small pursed 'o'.
+  void _drawThinkingMouth(Canvas canvas, double w, double h) {
+    final center = Offset(w * 0.5, h * 0.4);
+    final ovalRect = Rect.fromCenter(center: center, width: w * 0.22, height: h * 0.45);
+
+    canvas.drawOval(ovalRect, _lipGradientPaint(ovalRect));
+    canvas.drawOval(
+      Rect.fromCenter(center: center, width: w * 0.12, height: h * 0.25),
+      Paint()..color = const Color(0xFF2D1A2E),
+    );
+  }
+
+  /// Surprised mouth — wide round 'O' with visible teeth.
+  void _drawSurprisedMouth(Canvas canvas, double w, double h) {
+    final center = Offset(w * 0.5, h * 0.4);
+    final outerRect = Rect.fromCenter(center: center, width: w * 0.50, height: h * 0.85);
+    final innerRect = Rect.fromCenter(center: center, width: w * 0.35, height: h * 0.60);
+
+    // Lip ring
+    canvas.drawOval(outerRect, _lipGradientPaint(outerRect));
+
+    // Dark mouth interior
+    canvas.drawOval(innerRect, Paint()..color = const Color(0xFF2D1A2E));
+
+    // Top teeth peeking
+    canvas.save();
+    canvas.clipPath(Path()..addOval(innerRect));
+    _drawIndividualTeeth(canvas, center.dx - w * 0.12, center.dy - h * 0.28,
+        w * 0.24, h * 0.15, 3);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(MouthPainter old) =>
+      old.style != style || old.lipColor != lipColor ||
+      old.expression != expression || old.mouthOpenAmount != mouthOpenAmount;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  NOSE PAINTER
+//  - Nostril shadows with MaskFilter.blur
+//  - Bridge highlight
+//  - Breathing micro-animation (subtle nostril flare)
+// ═══════════════════════════════════════════════════════════════════════
+
+class NosePainter extends CustomPainter {
+  final int style;
+  final Color skinColor;
+  final Animation<double> breathingValue;
+
+  NosePainter({
+    required this.style,
+    required this.skinColor,
+    required this.breathingValue,
+    super.repaint,
+  });
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final nosePaint = Paint()
+      ..color = Color.lerp(skinColor, Colors.black, 0.12)!;
+    final highlightPaint = Paint()
+      ..color = Color.lerp(skinColor, const Color(0xFFFFF8E0), 0.22)!;
+    final shadowPaint = Paint()
+      ..color = Color.lerp(skinColor, const Color(0xFF4A3A6E), 0.22)!
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.0);
+
+    // Breathing: nostrils flare slightly
+    final breathFlare = breathingValue.value * 0.03;
+
+    switch (style) {
+      case 0: // Button
+        canvas.drawCircle(Offset(w * 0.5, h * 0.5), w * 0.22, nosePaint);
+        // Nostril shadows (with breathing flare)
+        canvas.drawCircle(
+            Offset(w * (0.36 - breathFlare), h * 0.58), w * 0.065, shadowPaint);
+        canvas.drawCircle(
+            Offset(w * (0.64 + breathFlare), h * 0.58), w * 0.065, shadowPaint);
+        // Bridge highlight
+        canvas.drawCircle(Offset(w * 0.53, h * 0.36), w * 0.09, highlightPaint);
+
+      case 1: // Small
+        canvas.drawCircle(Offset(w * 0.5, h * 0.5), w * 0.14, nosePaint);
+        // Tiny nostrils
+        canvas.drawCircle(
+            Offset(w * (0.42 - breathFlare), h * 0.56), w * 0.035, shadowPaint);
+        canvas.drawCircle(
+            Offset(w * (0.58 + breathFlare), h * 0.56), w * 0.035, shadowPaint);
+        canvas.drawCircle(Offset(w * 0.53, h * 0.42), w * 0.05, highlightPaint);
+
+      case 2: // Round
+        canvas.drawCircle(Offset(w * 0.5, h * 0.5), w * 0.28, nosePaint);
+        canvas.drawCircle(
+            Offset(w * (0.34 - breathFlare), h * 0.58), w * 0.075, shadowPaint);
+        canvas.drawCircle(
+            Offset(w * (0.66 + breathFlare), h * 0.58), w * 0.075, shadowPaint);
+        canvas.drawCircle(Offset(w * 0.56, h * 0.34), w * 0.11, highlightPaint);
+
+      case 3: // Pointed
+        final path = Path()
+          ..moveTo(w * 0.5, h * 0.15)
+          ..quadraticBezierTo(w * 0.68, h * 0.55, w * 0.65, h * 0.80)
+          ..quadraticBezierTo(w * 0.5, h * 0.92, w * 0.35, h * 0.80)
+          ..quadraticBezierTo(w * 0.32, h * 0.55, w * 0.5, h * 0.15)
+          ..close();
+        canvas.drawPath(path, nosePaint);
+        canvas.drawCircle(
+            Offset(w * (0.40 - breathFlare), h * 0.78), w * 0.05, shadowPaint);
+        canvas.drawCircle(
+            Offset(w * (0.60 + breathFlare), h * 0.78), w * 0.05, shadowPaint);
+        canvas.drawCircle(Offset(w * 0.52, h * 0.32), w * 0.06, highlightPaint);
+
+      case 4: // Snub
+        final path = Path()
+          ..moveTo(w * 0.35, h * 0.30)
+          ..quadraticBezierTo(w * 0.50, h * 0.10, w * 0.65, h * 0.30)
+          ..quadraticBezierTo(w * 0.72, h * 0.60, w * 0.60, h * 0.75)
+          ..quadraticBezierTo(w * 0.50, h * 0.82, w * 0.40, h * 0.75)
+          ..quadraticBezierTo(w * 0.28, h * 0.60, w * 0.35, h * 0.30)
+          ..close();
+        canvas.drawPath(path, nosePaint);
+        canvas.drawCircle(
+            Offset(w * (0.42 - breathFlare), h * 0.68), w * 0.05, shadowPaint);
+        canvas.drawCircle(
+            Offset(w * (0.58 + breathFlare), h * 0.68), w * 0.05, shadowPaint);
+        canvas.drawCircle(Offset(w * 0.52, h * 0.28), w * 0.06, highlightPaint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(NosePainter old) =>
+      old.style != style || old.skinColor != skinColor;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  CHEEK PAINTER
+//  - Gaussian-like falloff (multi-stop radial gradient fading to transparent)
+//  - Gradient-filled sparkle shapes
+//  - Freckles with slight size variation
+// ═══════════════════════════════════════════════════════════════════════
+
+class CheekPainter extends CustomPainter {
+  final int style;
+  final Color skinColor;
+
+  CheekPainter({required this.style, required this.skinColor});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
+    final leftCheek = Offset(w * 0.18, h * 0.50);
+    final rightCheek = Offset(w * 0.82, h * 0.50);
+
+    switch (style) {
+      case 1: // Rosy — gaussian-like multi-stop radial gradient
+        for (final center in [leftCheek, rightCheek]) {
+          final rect = Rect.fromCenter(
+              center: center, width: w * 0.24, height: h * 0.60);
+          final gradient = RadialGradient(
+            colors: [
+              const Color(0xFFFF7090).withValues(alpha: 0.50),
+              const Color(0xFFFF7090).withValues(alpha: 0.30),
+              const Color(0xFFFF7090).withValues(alpha: 0.12),
+              const Color(0xFFFF7090).withValues(alpha: 0.03),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.25, 0.5, 0.75, 1.0],
+          );
+          canvas.drawOval(
+              rect, Paint()..shader = gradient.createShader(rect));
+        }
+
+      case 2: // Freckles — dots with random size variation
+        final rng = Random(7);
+        for (final center in [leftCheek, rightCheek]) {
+          for (int i = 0; i < 7; i++) {
+            final dx = (rng.nextDouble() - 0.5) * w * 0.16;
+            final dy = (rng.nextDouble() - 0.5) * h * 0.45;
+            final radius = w * 0.008 + rng.nextDouble() * w * 0.012;
+            final darkness = 0.25 + rng.nextDouble() * 0.15;
+            canvas.drawCircle(
+              center.translate(dx, dy),
+              radius,
+              Paint()..color = Color.lerp(skinColor, Colors.brown, darkness)!,
+            );
+          }
+        }
+
+      case 3: // Blush — wide gaussian gradient
+        for (final center in [leftCheek, rightCheek]) {
+          final rect = Rect.fromCenter(
+              center: center, width: w * 0.30, height: h * 0.75);
+          final gradient = RadialGradient(
+            colors: [
+              const Color(0xFFFF6090).withValues(alpha: 0.40),
+              const Color(0xFFFF6090).withValues(alpha: 0.22),
+              const Color(0xFFFF6090).withValues(alpha: 0.08),
+              const Color(0xFFFF6090).withValues(alpha: 0.02),
+              Colors.transparent,
+            ],
+            stops: const [0.0, 0.3, 0.55, 0.8, 1.0],
+          );
+          canvas.drawOval(
+              rect, Paint()..shader = gradient.createShader(rect));
+        }
+
+      case 4: // Sparkle — 4-point stars with gold gradient
+        for (final center in [leftCheek, rightCheek]) {
+          _drawGradientStar(canvas, center, w * 0.045, 4);
+          _drawGradientStar(
+              canvas, center.translate(w * 0.05, -h * 0.15), w * 0.028, 4);
+          _drawGradientStar(
+              canvas, center.translate(-w * 0.03, h * 0.1), w * 0.02, 4);
+        }
+
+      case 5: // Hearts — mini hearts with gradient fill
+        for (final center in [leftCheek, rightCheek]) {
+          _drawGradientHeart(canvas, center, w * 0.045);
+        }
+
+      case 6: // Stars — 5-point with gold gradient
+        for (final center in [leftCheek, rightCheek]) {
+          _drawGradientStar(canvas, center, w * 0.055, 5);
+        }
+    }
+  }
+
+  void _drawGradientStar(
+      Canvas canvas, Offset center, double r, int points) {
+    final path = Path();
+    final innerRatio = points == 4 ? 0.35 : 0.4;
+    for (int i = 0; i < points; i++) {
+      final outerAngle = -pi / 2 + i * 2 * pi / points;
+      final innerAngle = outerAngle + pi / points;
+      final ox = center.dx + r * cos(outerAngle);
+      final oy = center.dy + r * sin(outerAngle);
+      final ix = center.dx + r * innerRatio * cos(innerAngle);
+      final iy = center.dy + r * innerRatio * sin(innerAngle);
+      if (i == 0) {
+        path.moveTo(ox, oy);
+      } else {
+        path.lineTo(ox, oy);
+      }
+      path.lineTo(ix, iy);
+    }
+    path.close();
+
+    final rect = Rect.fromCircle(center: center, radius: r);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = RadialGradient(
+          colors: [
+            AppColors.starGold,
+            AppColors.starGold.withValues(alpha: 0.6),
+          ],
+        ).createShader(rect),
+    );
+  }
+
+  void _drawGradientHeart(Canvas canvas, Offset center, double r) {
+    final x = center.dx;
+    final y = center.dy;
+    final path = Path()
+      ..moveTo(x, y + r * 0.5)
+      ..cubicTo(
+          x - r * 1.2, y - r * 0.3, x - r * 0.5, y - r * 1.0, x, y - r * 0.3)
+      ..cubicTo(
+          x + r * 0.5, y - r * 1.0, x + r * 1.2, y - r * 0.3, x, y + r * 0.5)
+      ..close();
+
+    final rect = Rect.fromCircle(center: center, radius: r);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..shader = RadialGradient(
+          center: const Alignment(-0.2, -0.3),
+          colors: [
+            const Color(0xFFFF7090),
+            const Color(0xFFFF4D6A).withValues(alpha: 0.7),
+          ],
+        ).createShader(rect),
+    );
+  }
+
+  @override
+  bool shouldRepaint(CheekPainter old) =>
+      old.style != style || old.skinColor != skinColor;
+}
+
+// ═══════════════════════════════════════════════════════════════════════
+//  EYELASH PAINTER — curved bezier lash strokes
+// ═══════════════════════════════════════════════════════════════════════
+
+class EyelashPainter extends CustomPainter {
+  final int style;
+  final int eyeStyle;
+
+  EyelashPainter({required this.style, required this.eyeStyle});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width;
+    final h = size.height;
     final leftX = w * 0.25;
     final rightX = w * 0.75;
-    final eyeY = h * 0.65; // center of eye zone in this canvas
+    final eyeY = h * 0.65;
     final r = w * 0.12;
 
     final lashPaint = Paint()
@@ -950,84 +2532,71 @@ class _EyelashPainter extends CustomPainter {
       ..strokeCap = StrokeCap.round;
 
     switch (style) {
-      case 1: // Natural — 3 short lashes per eye
+      case 1: // Natural — 3 curved lashes per eye
         lashPaint.strokeWidth = r * 0.12;
         for (final cx in [leftX, rightX]) {
           for (int i = 0; i < 3; i++) {
             final angle = -pi / 2 + (i - 1) * 0.4;
-            canvas.drawLine(
-              Offset(cx + r * 0.8 * cos(angle), eyeY + r * 0.8 * sin(angle)),
-              Offset(cx + r * 1.2 * cos(angle), eyeY + r * 1.2 * sin(angle)),
-              lashPaint,
-            );
+            _drawCurvedLash(canvas, cx, eyeY, r, angle, 0.8, 1.25, lashPaint);
           }
         }
 
-      case 2: // Long — 3 longer lashes
+      case 2: // Long — 3 longer curved lashes
         lashPaint.strokeWidth = r * 0.14;
         for (final cx in [leftX, rightX]) {
           for (int i = 0; i < 3; i++) {
             final angle = -pi / 2 + (i - 1) * 0.35;
-            canvas.drawLine(
-              Offset(cx + r * 0.7 * cos(angle), eyeY + r * 0.7 * sin(angle)),
-              Offset(cx + r * 1.5 * cos(angle), eyeY + r * 1.5 * sin(angle)),
-              lashPaint,
-            );
+            _drawCurvedLash(canvas, cx, eyeY, r, angle, 0.7, 1.55, lashPaint);
           }
         }
 
-      case 3: // Dramatic — 5 lashes fanning out
-        lashPaint.strokeWidth = r * 0.15;
+      case 3: // Dramatic — 5 curved lashes fanning out
+        lashPaint.strokeWidth = r * 0.14;
         for (final cx in [leftX, rightX]) {
           for (int i = 0; i < 5; i++) {
             final angle = -pi * 0.75 + i * 0.25;
-            canvas.drawLine(
-              Offset(cx + r * 0.75 * cos(angle), eyeY + r * 0.75 * sin(angle)),
-              Offset(cx + r * 1.45 * cos(angle), eyeY + r * 1.45 * sin(angle)),
-              lashPaint,
-            );
+            _drawCurvedLash(canvas, cx, eyeY, r, angle, 0.75, 1.5, lashPaint);
           }
         }
 
-      case 4: // Flutter — curved lashes
-        lashPaint.strokeWidth = r * 0.12;
+      case 4: // Flutter — gracefully curved with taper
         for (final cx in [leftX, rightX]) {
           for (int i = 0; i < 4; i++) {
             final angle = -pi * 0.7 + i * 0.28;
-            final startX = cx + r * 0.78 * cos(angle);
-            final startY = eyeY + r * 0.78 * sin(angle);
-            final endX = cx + r * 1.4 * cos(angle - 0.15);
-            final endY = eyeY + r * 1.4 * sin(angle - 0.15);
-            final path = Path()
-              ..moveTo(startX, startY)
-              ..quadraticBezierTo(
-                cx + r * 1.1 * cos(angle + 0.1),
-                eyeY + r * 1.1 * sin(angle + 0.1),
-                endX,
-                endY,
-              );
-            canvas.drawPath(path, lashPaint);
+            // Taper: outer lashes thinner
+            lashPaint.strokeWidth = r * (0.14 - i * 0.01);
+            _drawCurvedLash(canvas, cx, eyeY, r, angle, 0.78, 1.45, lashPaint);
           }
         }
 
-      case 5: // Sparkle — lashes with tiny stars
+      case 5: // Sparkle — curved lashes with tiny stars at tips
         lashPaint.strokeWidth = r * 0.12;
         final starPaint = Paint()..color = AppColors.starGold;
         for (final cx in [leftX, rightX]) {
           for (int i = 0; i < 3; i++) {
             final angle = -pi / 2 + (i - 1) * 0.4;
-            final ex = cx + r * 1.3 * cos(angle);
-            final ey = eyeY + r * 1.3 * sin(angle);
-            canvas.drawLine(
-              Offset(cx + r * 0.8 * cos(angle), eyeY + r * 0.8 * sin(angle)),
-              Offset(ex, ey),
-              lashPaint,
-            );
-            // Tiny star at tip
-            _drawTinyStar(canvas, Offset(ex, ey), r * 0.15, starPaint);
+            final endX = cx + r * 1.3 * cos(angle - 0.08);
+            final endY = eyeY + r * 1.3 * sin(angle - 0.08);
+            _drawCurvedLash(canvas, cx, eyeY, r, angle, 0.8, 1.3, lashPaint);
+            _drawTinyStar(canvas, Offset(endX, endY), r * 0.15, starPaint);
           }
         }
     }
+  }
+
+  /// Helper: draw a single curved lash at the given angle.
+  void _drawCurvedLash(Canvas canvas, double cx, double eyeY, double r,
+      double angle, double innerMul, double outerMul, Paint paint) {
+    final startX = cx + r * innerMul * cos(angle);
+    final startY = eyeY + r * innerMul * sin(angle);
+    final endX = cx + r * outerMul * cos(angle - 0.08);
+    final endY = eyeY + r * outerMul * sin(angle - 0.08);
+    final ctrlX = cx + r * (innerMul + outerMul) * 0.5 * cos(angle + 0.12);
+    final ctrlY = eyeY + r * (innerMul + outerMul) * 0.5 * sin(angle + 0.12);
+    final path = Path()
+      ..moveTo(startX, startY)
+      ..quadraticBezierTo(ctrlX, ctrlY, endX, endY);
+    canvas.drawPath(path, paint);
   }
 
   void _drawTinyStar(Canvas canvas, Offset center, double r, Paint paint) {
@@ -1047,81 +2616,95 @@ class _EyelashPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_EyelashPainter old) =>
+  bool shouldRepaint(EyelashPainter old) =>
       old.style != style || old.eyeStyle != eyeStyle;
 }
 
-// ══════════════════════════════════════════════════════════════════════
-//  EYEBROW PAINTER
-// ══════════════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
+//  EYEBROW PAINTER — gradient fill matching hair color, warm-cool shift
+// ═══════════════════════════════════════════════════════════════════════
 
-class _EyebrowPainter extends CustomPainter {
+class EyebrowPainter extends CustomPainter {
   final int style;
   final Color color;
 
-  _EyebrowPainter({required this.style, required this.color});
+  EyebrowPainter({required this.style, required this.color});
 
   @override
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    // Use hair color darkened slightly for brows
     final browColor = Color.lerp(color, const Color(0xFF1A1A2E), 0.3)!;
-    final paint = Paint()
-      ..color = browColor
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
 
     final leftStart = Offset(w * 0.10, h * 0.50);
     final leftEnd = Offset(w * 0.40, h * 0.50);
     final rightStart = Offset(w * 0.60, h * 0.50);
     final rightEnd = Offset(w * 0.90, h * 0.50);
 
+    Paint browPaint(Rect bounds) {
+      return Paint()
+        ..shader = LinearGradient(
+          colors: [
+            Color.lerp(browColor, const Color(0xFF4A3A6E), 0.1)!, // cool edge
+            browColor, // center
+            Color.lerp(browColor, const Color(0xFF4A3A6E), 0.1)!, // cool edge
+          ],
+          stops: const [0.0, 0.5, 1.0],
+        ).createShader(bounds)
+        ..style = PaintingStyle.stroke
+        ..strokeCap = StrokeCap.round;
+    }
+
     switch (style) {
-      case 0: // Natural — gentle arch
-        paint.strokeWidth = w * 0.035;
-        _drawBrow(canvas, leftStart, leftEnd, -h * 0.25, paint);
-        _drawBrow(canvas, rightStart, rightEnd, -h * 0.25, paint);
+      case 0: // Natural
+        final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.035;
+        _drawBrow(canvas, leftStart, leftEnd, -h * 0.25, p);
+        _drawBrow(canvas, rightStart, rightEnd, -h * 0.25, p);
 
       case 1: // Thin
-        paint.strokeWidth = w * 0.022;
-        _drawBrow(canvas, leftStart, leftEnd, -h * 0.20, paint);
-        _drawBrow(canvas, rightStart, rightEnd, -h * 0.20, paint);
+        final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.022;
+        _drawBrow(canvas, leftStart, leftEnd, -h * 0.20, p);
+        _drawBrow(canvas, rightStart, rightEnd, -h * 0.20, p);
 
       case 2: // Thick
-        paint.strokeWidth = w * 0.055;
-        _drawBrow(canvas, leftStart, leftEnd, -h * 0.25, paint);
-        _drawBrow(canvas, rightStart, rightEnd, -h * 0.25, paint);
+        final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.055;
+        _drawBrow(canvas, leftStart, leftEnd, -h * 0.25, p);
+        _drawBrow(canvas, rightStart, rightEnd, -h * 0.25, p);
 
-      case 3: // Arched — high arch
-        paint.strokeWidth = w * 0.035;
-        _drawBrow(canvas, leftStart, leftEnd, -h * 0.50, paint);
-        _drawBrow(canvas, rightStart, rightEnd, -h * 0.50, paint);
+      case 3: // Arched
+        final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.035;
+        _drawBrow(canvas, leftStart, leftEnd, -h * 0.50, p);
+        _drawBrow(canvas, rightStart, rightEnd, -h * 0.50, p);
 
       case 4: // Straight
-        paint.strokeWidth = w * 0.035;
-        canvas.drawLine(leftStart, leftEnd, paint);
-        canvas.drawLine(rightStart, rightEnd, paint);
+        final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.035;
+        canvas.drawLine(leftStart, leftEnd, p);
+        canvas.drawLine(rightStart, rightEnd, p);
 
-      case 5: // Bushy — thick with texture
-        paint.strokeWidth = w * 0.05;
-        _drawBrow(canvas, leftStart, leftEnd, -h * 0.22, paint);
-        _drawBrow(canvas, rightStart, rightEnd, -h * 0.22, paint);
-        // Extra texture strokes
-        paint.strokeWidth = w * 0.02;
-        paint.color = browColor.withValues(alpha: 0.5);
-        _drawBrow(
-            canvas,
-            leftStart.translate(0, -h * 0.08),
-            leftEnd.translate(0, -h * 0.08),
-            -h * 0.15,
-            paint);
-        _drawBrow(
-            canvas,
-            rightStart.translate(0, -h * 0.08),
-            rightEnd.translate(0, -h * 0.08),
-            -h * 0.15,
-            paint);
+      case 5: // Bushy
+        final p = browPaint(Rect.fromLTWH(0, 0, w, h))..strokeWidth = w * 0.05;
+        _drawBrow(canvas, leftStart, leftEnd, -h * 0.22, p);
+        _drawBrow(canvas, rightStart, rightEnd, -h * 0.22, p);
+        // Extra texture strokes for bushy look
+        final pThin = Paint()
+          ..color = browColor.withValues(alpha: 0.5)
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = w * 0.02;
+        _drawBrow(canvas, leftStart.translate(0, -h * 0.08),
+            leftEnd.translate(0, -h * 0.08), -h * 0.15, pThin);
+        _drawBrow(canvas, rightStart.translate(0, -h * 0.08),
+            rightEnd.translate(0, -h * 0.08), -h * 0.15, pThin);
+        // Additional wispy strokes
+        final pWisp = Paint()
+          ..color = browColor.withValues(alpha: 0.3)
+          ..style = PaintingStyle.stroke
+          ..strokeCap = StrokeCap.round
+          ..strokeWidth = w * 0.012;
+        _drawBrow(canvas, leftStart.translate(w * 0.02, h * 0.05),
+            leftEnd.translate(-w * 0.02, h * 0.05), -h * 0.18, pWisp);
+        _drawBrow(canvas, rightStart.translate(w * 0.02, h * 0.05),
+            rightEnd.translate(-w * 0.02, h * 0.05), -h * 0.18, pWisp);
     }
   }
 
@@ -1135,1761 +2718,6 @@ class _EyebrowPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(_EyebrowPainter old) =>
+  bool shouldRepaint(EyebrowPainter old) =>
       old.style != style || old.color != color;
-}
-
-// ══════════════════════════════════════════════════════════════════════
-//  MOUTH PAINTER
-// ══════════════════════════════════════════════════════════════════════
-
-class _MouthPainter extends CustomPainter {
-  final int style;
-  final Color lipColor;
-
-  _MouthPainter({required this.style, required this.lipColor});
-
-  // Natural lip color is transparent → use default dark
-  Color get _effectiveLipFill =>
-      (lipColor.a * 255.0).round().clamp(0, 255) == 0 ? const Color(0xFF1A1A2E) : lipColor;
-
-  bool get _hasLipColor => (lipColor.a * 255.0).round().clamp(0, 255) > 0;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    switch (style) {
-      case 0: // Smile
-        final paint = Paint()
-          ..color = _hasLipColor ? _effectiveLipFill : const Color(0xFF1A1A2E)
-          ..style = _hasLipColor ? PaintingStyle.fill : PaintingStyle.stroke
-          ..strokeWidth = w * 0.08
-          ..strokeCap = StrokeCap.round;
-        if (_hasLipColor) {
-          // Filled smile
-          final path = Path()
-            ..moveTo(w * 0.10, h * 0.20)
-            ..quadraticBezierTo(w * 0.50, h * 1.0, w * 0.90, h * 0.20)
-            ..quadraticBezierTo(w * 0.50, h * 0.50, w * 0.10, h * 0.20)
-            ..close();
-          canvas.drawPath(path, paint);
-        } else {
-          canvas.drawArc(
-            Rect.fromLTWH(w * 0.1, -h * 0.2, w * 0.8, h * 1.0),
-            0.2,
-            pi * 0.6,
-            false,
-            paint,
-          );
-        }
-
-      case 1: // Big Grin
-        final path = Path()
-          ..moveTo(w * 0.05, h * 0.2)
-          ..quadraticBezierTo(w * 0.5, h * 1.2, w * 0.95, h * 0.2)
-          ..close();
-        canvas.drawPath(path, Paint()..color = _effectiveLipFill);
-        // Teeth
-        canvas.drawRect(
-          Rect.fromLTWH(w * 0.25, h * 0.2, w * 0.5, h * 0.2),
-          Paint()..color = Colors.white,
-        );
-
-      case 2: // Tongue Out
-        final path = Path()
-          ..moveTo(w * 0.10, h * 0.15)
-          ..quadraticBezierTo(w * 0.5, h * 1.0, w * 0.90, h * 0.15)
-          ..close();
-        canvas.drawPath(path, Paint()..color = _effectiveLipFill);
-        // Tongue
-        canvas.drawOval(
-          Rect.fromCenter(
-            center: Offset(w * 0.5, h * 0.65),
-            width: w * 0.35,
-            height: h * 0.55,
-          ),
-          Paint()..color = const Color(0xFFFF6B8A),
-        );
-
-      case 3: // Surprised O
-        canvas.drawOval(
-          Rect.fromCenter(
-            center: Offset(w * 0.5, h * 0.45),
-            width: w * 0.45,
-            height: h * 0.80,
-          ),
-          Paint()..color = _effectiveLipFill,
-        );
-        canvas.drawOval(
-          Rect.fromCenter(
-            center: Offset(w * 0.5, h * 0.45),
-            width: w * 0.30,
-            height: h * 0.55,
-          ),
-          Paint()..color = const Color(0xFF2D2D4E),
-        );
-
-      case 4: // Kissy — puckered lips
-        final path = Path()
-          ..moveTo(w * 0.25, h * 0.30)
-          ..quadraticBezierTo(w * 0.15, h * 0.50, w * 0.30, h * 0.70)
-          ..quadraticBezierTo(w * 0.50, h * 0.90, w * 0.70, h * 0.70)
-          ..quadraticBezierTo(w * 0.85, h * 0.50, w * 0.75, h * 0.30)
-          ..quadraticBezierTo(w * 0.50, h * 0.45, w * 0.25, h * 0.30)
-          ..close();
-        canvas.drawPath(
-            path, Paint()..color = _hasLipColor ? _effectiveLipFill : const Color(0xFFFF6B8A));
-
-      case 5: // Cat Smile — w-shape
-        final paint = Paint()
-          ..color = _effectiveLipFill
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = w * 0.07
-          ..strokeCap = StrokeCap.round;
-        final path = Path()
-          ..moveTo(w * 0.05, h * 0.30)
-          ..quadraticBezierTo(w * 0.25, h * 0.70, w * 0.50, h * 0.25)
-          ..quadraticBezierTo(w * 0.75, h * 0.70, w * 0.95, h * 0.30);
-        canvas.drawPath(path, paint);
-
-      case 6: // Smirk — asymmetric smile
-        final paint = Paint()
-          ..color = _effectiveLipFill
-          ..style = _hasLipColor ? PaintingStyle.fill : PaintingStyle.stroke
-          ..strokeWidth = w * 0.07
-          ..strokeCap = StrokeCap.round;
-        if (_hasLipColor) {
-          final path = Path()
-            ..moveTo(w * 0.15, h * 0.40)
-            ..quadraticBezierTo(w * 0.55, h * 0.35, w * 0.90, h * 0.15)
-            ..quadraticBezierTo(w * 0.55, h * 0.80, w * 0.15, h * 0.40)
-            ..close();
-          canvas.drawPath(path, paint);
-        } else {
-          final path = Path()
-            ..moveTo(w * 0.15, h * 0.40)
-            ..quadraticBezierTo(w * 0.55, h * 0.60, w * 0.90, h * 0.15);
-          canvas.drawPath(path, paint);
-        }
-
-      case 7: // Tiny Smile — small gentle smile
-        final paint = Paint()
-          ..color = _effectiveLipFill
-          ..style = _hasLipColor ? PaintingStyle.fill : PaintingStyle.stroke
-          ..strokeWidth = w * 0.06
-          ..strokeCap = StrokeCap.round;
-        if (_hasLipColor) {
-          final path = Path()
-            ..moveTo(w * 0.30, h * 0.35)
-            ..quadraticBezierTo(w * 0.50, h * 0.75, w * 0.70, h * 0.35)
-            ..quadraticBezierTo(w * 0.50, h * 0.50, w * 0.30, h * 0.35)
-            ..close();
-          canvas.drawPath(path, paint);
-        } else {
-          canvas.drawArc(
-            Rect.fromLTWH(w * 0.25, -h * 0.1, w * 0.50, h * 0.80),
-            0.3,
-            pi * 0.4,
-            false,
-            paint,
-          );
-        }
-    }
-  }
-
-  @override
-  bool shouldRepaint(_MouthPainter old) =>
-      old.style != style || old.lipColor != lipColor;
-}
-
-// ══════════════════════════════════════════════════════════════════════
-//  FACE PAINT PAINTER
-// ══════════════════════════════════════════════════════════════════════
-
-class _FacePaintPainter extends CustomPainter {
-  final int style;
-
-  _FacePaintPainter({required this.style});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    switch (style) {
-      case 1: // Star on left cheek
-        final paint = Paint()..color = AppColors.starGold.withValues(alpha: 0.7);
-        _drawStar(canvas, Offset(w * 0.18, h * 0.55), w * 0.08, paint);
-
-      case 2: // Butterfly on right cheek
-        _drawButterfly(canvas, Offset(w * 0.80, h * 0.52), w * 0.12);
-
-      case 3: // Heart on left cheek
-        final paint = Paint()..color = const Color(0xFFFF4D6A).withValues(alpha: 0.65);
-        _drawHeart(canvas, Offset(w * 0.18, h * 0.55), w * 0.07, paint);
-
-      case 4: // Rainbow across forehead
-        _drawRainbow(canvas, Offset(w * 0.50, h * 0.12), w * 0.30, h * 0.08);
-
-      case 5: // Cat whiskers
-        _drawWhiskers(canvas, w, h);
-
-      case 6: // Tiger stripes
-        _drawTigerStripes(canvas, w, h);
-
-      case 7: // Flower on right cheek
-        _drawFlower(canvas, Offset(w * 0.80, h * 0.52), w * 0.08);
-
-      case 8: // Lightning bolt on left cheek
-        _drawLightning(canvas, Offset(w * 0.15, h * 0.45), w * 0.10, h * 0.18);
-
-      case 9: // Dots across nose bridge
-        _drawDots(canvas, w, h);
-    }
-  }
-
-  void _drawStar(Canvas canvas, Offset center, double r, Paint paint) {
-    final path = Path();
-    for (int i = 0; i < 5; i++) {
-      final outerAngle = -pi / 2 + i * 2 * pi / 5;
-      final innerAngle = outerAngle + pi / 5;
-      if (i == 0) {
-        path.moveTo(center.dx + r * cos(outerAngle),
-            center.dy + r * sin(outerAngle));
-      } else {
-        path.lineTo(center.dx + r * cos(outerAngle),
-            center.dy + r * sin(outerAngle));
-      }
-      path.lineTo(center.dx + r * 0.4 * cos(innerAngle),
-          center.dy + r * 0.4 * sin(innerAngle));
-    }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  void _drawHeart(Canvas canvas, Offset center, double r, Paint paint) {
-    final x = center.dx;
-    final y = center.dy;
-    final path = Path()
-      ..moveTo(x, y + r * 0.5)
-      ..cubicTo(x - r * 1.2, y - r * 0.3, x - r * 0.5, y - r * 1.0, x, y - r * 0.3)
-      ..cubicTo(x + r * 0.5, y - r * 1.0, x + r * 1.2, y - r * 0.3, x, y + r * 0.5)
-      ..close();
-    canvas.drawPath(path, paint);
-  }
-
-  void _drawButterfly(Canvas canvas, Offset center, double r) {
-    final paint = Paint()..color = const Color(0xFFB794F6).withValues(alpha: 0.6);
-    // Left wing
-    canvas.drawOval(
-      Rect.fromCenter(
-          center: center.translate(-r * 0.4, 0), width: r * 0.8, height: r * 0.5),
-      paint,
-    );
-    // Right wing
-    canvas.drawOval(
-      Rect.fromCenter(
-          center: center.translate(r * 0.4, 0), width: r * 0.8, height: r * 0.5),
-      paint,
-    );
-    // Body
-    canvas.drawLine(
-      center.translate(0, -r * 0.2),
-      center.translate(0, r * 0.2),
-      Paint()
-        ..color = const Color(0xFF1A1A2E).withValues(alpha: 0.5)
-        ..strokeWidth = r * 0.08
-        ..strokeCap = StrokeCap.round,
-    );
-  }
-
-  void _drawRainbow(Canvas canvas, Offset center, double width, double height) {
-    const colors = [
-      Color(0xFFFF4444),
-      Color(0xFFFF8C42),
-      Color(0xFFFFD700),
-      Color(0xFF00E68A),
-      Color(0xFF4A90D9),
-      Color(0xFF9B59B6),
-    ];
-    final bandH = height / colors.length;
-    for (int i = 0; i < colors.length; i++) {
-      final paint = Paint()
-        ..color = colors[i].withValues(alpha: 0.5)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = bandH * 0.8;
-      final r = width - i * bandH;
-      canvas.drawArc(
-        Rect.fromCenter(center: center, width: r * 2, height: r),
-        pi,
-        pi,
-        false,
-        paint,
-      );
-    }
-  }
-
-  void _drawWhiskers(Canvas canvas, double w, double h) {
-    final paint = Paint()
-      ..color = const Color(0xFF1A1A2E).withValues(alpha: 0.4)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.012
-      ..strokeCap = StrokeCap.round;
-    // Left whiskers
-    canvas.drawLine(Offset(w * 0.05, h * 0.50), Offset(w * 0.30, h * 0.52), paint);
-    canvas.drawLine(Offset(w * 0.05, h * 0.56), Offset(w * 0.30, h * 0.56), paint);
-    canvas.drawLine(Offset(w * 0.05, h * 0.62), Offset(w * 0.30, h * 0.60), paint);
-    // Right whiskers
-    canvas.drawLine(Offset(w * 0.70, h * 0.52), Offset(w * 0.95, h * 0.50), paint);
-    canvas.drawLine(Offset(w * 0.70, h * 0.56), Offset(w * 0.95, h * 0.56), paint);
-    canvas.drawLine(Offset(w * 0.70, h * 0.60), Offset(w * 0.95, h * 0.62), paint);
-  }
-
-  void _drawTigerStripes(Canvas canvas, double w, double h) {
-    final paint = Paint()
-      ..color = const Color(0xFFFF8C42).withValues(alpha: 0.45)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.025
-      ..strokeCap = StrokeCap.round;
-    // Stripes on forehead and cheeks
-    canvas.drawLine(Offset(w * 0.15, h * 0.15), Offset(w * 0.30, h * 0.22), paint);
-    canvas.drawLine(Offset(w * 0.10, h * 0.25), Offset(w * 0.25, h * 0.30), paint);
-    canvas.drawLine(Offset(w * 0.70, h * 0.22), Offset(w * 0.85, h * 0.15), paint);
-    canvas.drawLine(Offset(w * 0.75, h * 0.30), Offset(w * 0.90, h * 0.25), paint);
-  }
-
-  void _drawFlower(Canvas canvas, Offset center, double r) {
-    final petalPaint = Paint()..color = const Color(0xFFFF7EB3).withValues(alpha: 0.55);
-    final centerPaint = Paint()..color = AppColors.starGold.withValues(alpha: 0.6);
-    for (int i = 0; i < 5; i++) {
-      final angle = i * 2 * pi / 5 - pi / 2;
-      canvas.drawCircle(
-        Offset(center.dx + r * 0.55 * cos(angle),
-            center.dy + r * 0.55 * sin(angle)),
-        r * 0.35,
-        petalPaint,
-      );
-    }
-    canvas.drawCircle(center, r * 0.25, centerPaint);
-  }
-
-  void _drawLightning(Canvas canvas, Offset start, double w, double h) {
-    final paint = Paint()..color = AppColors.starGold.withValues(alpha: 0.65);
-    final path = Path()
-      ..moveTo(start.dx + w * 0.40, start.dy)
-      ..lineTo(start.dx + w * 0.10, start.dy + h * 0.45)
-      ..lineTo(start.dx + w * 0.45, start.dy + h * 0.45)
-      ..lineTo(start.dx + w * 0.20, start.dy + h)
-      ..lineTo(start.dx + w * 0.80, start.dy + h * 0.35)
-      ..lineTo(start.dx + w * 0.50, start.dy + h * 0.35)
-      ..lineTo(start.dx + w * 0.70, start.dy)
-      ..close();
-    canvas.drawPath(path, paint);
-  }
-
-  void _drawDots(Canvas canvas, double w, double h) {
-    final colors = [
-      const Color(0xFFFF4D6A).withValues(alpha: 0.5),
-      AppColors.starGold.withValues(alpha: 0.5),
-      const Color(0xFF4A90D9).withValues(alpha: 0.5),
-      const Color(0xFF00E68A).withValues(alpha: 0.5),
-      const Color(0xFFB794F6).withValues(alpha: 0.5),
-    ];
-    for (int i = 0; i < 5; i++) {
-      canvas.drawCircle(
-        Offset(w * (0.30 + i * 0.10), h * 0.42),
-        w * 0.018,
-        Paint()..color = colors[i],
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_FacePaintPainter old) => old.style != style;
-}
-
-// ══════════════════════════════════════════════════════════════════════
-//  GLASSES PAINTER
-// ══════════════════════════════════════════════════════════════════════
-
-class _GlassesPainter extends CustomPainter {
-  final int style;
-
-  _GlassesPainter({required this.style});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final paint = Paint()
-      ..color = const Color(0xFF1A1A2E)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.035;
-
-    switch (style) {
-      case 1: // Round
-        canvas.drawOval(
-          Rect.fromCenter(
-              center: Offset(w * 0.28, h * 0.50), width: w * 0.36, height: h * 0.80),
-          paint,
-        );
-        canvas.drawOval(
-          Rect.fromCenter(
-              center: Offset(w * 0.72, h * 0.50), width: w * 0.36, height: h * 0.80),
-          paint,
-        );
-        canvas.drawLine(
-            Offset(w * 0.46, h * 0.45), Offset(w * 0.54, h * 0.45), paint);
-
-      case 2: // Square
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromCenter(
-                center: Offset(w * 0.28, h * 0.50),
-                width: w * 0.36,
-                height: h * 0.72),
-            Radius.circular(w * 0.03),
-          ),
-          paint,
-        );
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromCenter(
-                center: Offset(w * 0.72, h * 0.50),
-                width: w * 0.36,
-                height: h * 0.72),
-            Radius.circular(w * 0.03),
-          ),
-          paint,
-        );
-        canvas.drawLine(
-            Offset(w * 0.46, h * 0.45), Offset(w * 0.54, h * 0.45), paint);
-
-      case 3: // Cat Eye — pointed at top corners
-        for (final cx in [w * 0.28, w * 0.72]) {
-          final path = Path()
-            ..moveTo(cx - w * 0.16, h * 0.50)
-            ..quadraticBezierTo(cx - w * 0.18, h * 0.15, cx, h * 0.20)
-            ..quadraticBezierTo(cx + w * 0.18, h * 0.15, cx + w * 0.16, h * 0.50)
-            ..quadraticBezierTo(cx + w * 0.14, h * 0.82, cx, h * 0.85)
-            ..quadraticBezierTo(cx - w * 0.14, h * 0.82, cx - w * 0.16, h * 0.50)
-            ..close();
-          canvas.drawPath(path, paint);
-        }
-        canvas.drawLine(
-            Offset(w * 0.44, h * 0.45), Offset(w * 0.56, h * 0.45), paint);
-
-      case 4: // Star-shaped
-        for (final cx in [w * 0.28, w * 0.72]) {
-          _drawStarOutline(canvas, Offset(cx, h * 0.50), w * 0.17, paint);
-        }
-        canvas.drawLine(
-            Offset(w * 0.45, h * 0.48), Offset(w * 0.55, h * 0.48), paint);
-
-      case 5: // Heart-shaped
-        for (final cx in [w * 0.28, w * 0.72]) {
-          _drawHeartOutline(canvas, Offset(cx, h * 0.50), w * 0.15, paint);
-        }
-        canvas.drawLine(
-            Offset(w * 0.43, h * 0.45), Offset(w * 0.57, h * 0.45), paint);
-
-      case 6: // Aviator
-        for (final cx in [w * 0.28, w * 0.72]) {
-          final path = Path()
-            ..moveTo(cx - w * 0.16, h * 0.25)
-            ..lineTo(cx + w * 0.16, h * 0.25)
-            ..quadraticBezierTo(
-                cx + w * 0.20, h * 0.50, cx + w * 0.12, h * 0.82)
-            ..quadraticBezierTo(cx, h * 0.90, cx - w * 0.12, h * 0.82)
-            ..quadraticBezierTo(
-                cx - w * 0.20, h * 0.50, cx - w * 0.16, h * 0.25)
-            ..close();
-          canvas.drawPath(path, paint);
-        }
-        canvas.drawLine(
-            Offset(w * 0.44, h * 0.30), Offset(w * 0.56, h * 0.30), paint);
-    }
-  }
-
-  void _drawStarOutline(
-      Canvas canvas, Offset center, double r, Paint paint) {
-    final path = Path();
-    for (int i = 0; i < 5; i++) {
-      final outerAngle = -pi / 2 + i * 2 * pi / 5;
-      final innerAngle = outerAngle + pi / 5;
-      if (i == 0) {
-        path.moveTo(center.dx + r * cos(outerAngle),
-            center.dy + r * sin(outerAngle));
-      } else {
-        path.lineTo(center.dx + r * cos(outerAngle),
-            center.dy + r * sin(outerAngle));
-      }
-      path.lineTo(center.dx + r * 0.45 * cos(innerAngle),
-          center.dy + r * 0.45 * sin(innerAngle));
-    }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  void _drawHeartOutline(
-      Canvas canvas, Offset center, double r, Paint paint) {
-    final x = center.dx;
-    final y = center.dy;
-    final path = Path()
-      ..moveTo(x, y + r * 0.5)
-      ..cubicTo(x - r * 1.3, y - r * 0.3, x - r * 0.5, y - r * 1.1, x, y - r * 0.3)
-      ..cubicTo(x + r * 0.5, y - r * 1.1, x + r * 1.3, y - r * 0.3, x, y + r * 0.5)
-      ..close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(_GlassesPainter old) => old.style != style;
-}
-
-// ══════════════════════════════════════════════════════════════════════
-//  BACK HAIR PAINTER (behind the face)
-// ══════════════════════════════════════════════════════════════════════
-
-class _BackHairPainter extends CustomPainter {
-  final int style;
-  final Color color;
-  final bool isRainbow;
-  final int faceShape;
-
-  _BackHairPainter({
-    required this.style,
-    required this.color,
-    this.isRainbow = false,
-    this.faceShape = 0,
-  });
-
-  Paint get _paint {
-    if (isRainbow) {
-      return Paint()
-        ..shader = const LinearGradient(
-          colors: [
-            Color(0xFFFF4444),
-            Color(0xFFFF8C42),
-            Color(0xFFFFD700),
-            Color(0xFF00E68A),
-            Color(0xFF4A90D9),
-            Color(0xFF9B59B6),
-          ],
-        ).createShader(const Rect.fromLTWH(0, 0, 100, 100));
-    }
-    return Paint()..color = color;
-  }
-
-  /// Get face-shape-aware inner edge offsets.
-  /// Returns (innerLeft, innerRight, innerTop) as fractions of w/h.
-  ({double left, double right, double top}) _innerEdge() {
-    switch (faceShape) {
-      case 1: // Square — wider, flatter top
-        return (left: 0.16, right: 0.84, top: 0.19);
-      case 2: // Oval — narrower at top
-        return (left: 0.22, right: 0.78, top: 0.18);
-      case 3: // Heart — dips in center top
-        return (left: 0.20, right: 0.80, top: 0.19);
-      case 4: // Diamond — pointed top, narrow
-        return (left: 0.26, right: 0.74, top: 0.18);
-      default: // Round
-        return (left: 0.18, right: 0.82, top: 0.19);
-    }
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final paint = _paint..style = PaintingStyle.fill;
-    final ie = _innerEdge();
-
-    switch (style) {
-      case 1: // Long — flowing down sides behind face
-        final path = Path()
-          ..moveTo(w * 0.10, h * 0.75)
-          ..lineTo(w * 0.10, h * 0.32)
-          ..quadraticBezierTo(w * 0.10, h * 0.08, w * 0.50, h * 0.05)
-          ..quadraticBezierTo(w * 0.90, h * 0.08, w * 0.90, h * 0.32)
-          ..lineTo(w * 0.90, h * 0.75)
-          ..quadraticBezierTo(w * 0.88, h * 0.82, w * ie.right, h * 0.78)
-          ..lineTo(w * ie.right, h * 0.35)
-          ..quadraticBezierTo(w * ie.right, h * ie.top, w * 0.50, h * ie.top)
-          ..quadraticBezierTo(w * ie.left, h * ie.top, w * ie.left, h * 0.35)
-          ..lineTo(w * ie.left, h * 0.78)
-          ..quadraticBezierTo(w * 0.12, h * 0.82, w * 0.10, h * 0.75)
-          ..close();
-        canvas.drawPath(path, paint);
-
-      case 10: // Wavy — long wavy flowing behind
-        final path = Path()
-          ..moveTo(w * 0.08, h * 0.78)
-          ..quadraticBezierTo(w * 0.05, h * 0.60, w * 0.10, h * 0.32)
-          ..quadraticBezierTo(w * 0.10, h * 0.08, w * 0.50, h * 0.05)
-          ..quadraticBezierTo(w * 0.90, h * 0.08, w * 0.90, h * 0.32)
-          ..quadraticBezierTo(w * 0.95, h * 0.60, w * 0.92, h * 0.78)
-          ..quadraticBezierTo(w * 0.88, h * 0.85, w * 0.84, h * 0.78)
-          ..quadraticBezierTo(w * 0.86, h * 0.60, w * ie.right, h * 0.35)
-          ..quadraticBezierTo(w * ie.right, h * ie.top, w * 0.50, h * ie.top)
-          ..quadraticBezierTo(w * ie.left, h * ie.top, w * ie.left, h * 0.35)
-          ..quadraticBezierTo(w * 0.14, h * 0.60, w * 0.16, h * 0.78)
-          ..quadraticBezierTo(w * 0.12, h * 0.85, w * 0.08, h * 0.78)
-          ..close();
-        canvas.drawPath(path, paint);
-
-      case 14: // Long Wavy — even longer, past shoulders
-        final path = Path()
-          ..moveTo(w * 0.06, h * 0.88)
-          ..quadraticBezierTo(w * 0.04, h * 0.60, w * 0.10, h * 0.32)
-          ..quadraticBezierTo(w * 0.10, h * 0.08, w * 0.50, h * 0.05)
-          ..quadraticBezierTo(w * 0.90, h * 0.08, w * 0.90, h * 0.32)
-          ..quadraticBezierTo(w * 0.96, h * 0.60, w * 0.94, h * 0.88)
-          ..quadraticBezierTo(w * 0.90, h * 0.95, w * 0.84, h * 0.85)
-          ..quadraticBezierTo(w * 0.86, h * 0.60, w * ie.right, h * 0.35)
-          ..quadraticBezierTo(w * ie.right, h * ie.top, w * 0.50, h * ie.top)
-          ..quadraticBezierTo(w * ie.left, h * ie.top, w * ie.left, h * 0.35)
-          ..quadraticBezierTo(w * 0.14, h * 0.60, w * 0.16, h * 0.85)
-          ..quadraticBezierTo(w * 0.10, h * 0.95, w * 0.06, h * 0.88)
-          ..close();
-        canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_BackHairPainter old) =>
-      old.style != style ||
-      old.color != color ||
-      old.isRainbow != isRainbow ||
-      old.faceShape != faceShape;
-}
-
-// ══════════════════════════════════════════════════════════════════════
-//  FRONT HAIR PAINTER (on top of face)
-// ══════════════════════════════════════════════════════════════════════
-
-class _FrontHairPainter extends CustomPainter {
-  final int style;
-  final Color color;
-  final bool isRainbow;
-  final int faceShape;
-
-  _FrontHairPainter({
-    required this.style,
-    required this.color,
-    this.isRainbow = false,
-    this.faceShape = 0,
-  });
-
-  Paint get _paint {
-    if (isRainbow) {
-      return Paint()
-        ..shader = const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [
-            Color(0xFFFF4444),
-            Color(0xFFFF8C42),
-            Color(0xFFFFD700),
-            Color(0xFF00E68A),
-            Color(0xFF4A90D9),
-            Color(0xFF9B59B6),
-          ],
-        ).createShader(const Rect.fromLTWH(0, 0, 100, 100));
-    }
-    return Paint()..color = color;
-  }
-
-  /// Face-shape-aware edge positions for the hair's inner cutout.
-  /// The inner edge must hug the face shape to avoid gaps.
-  /// Returns (outerLeft, outerRight, outerBottom, innerLeft, innerRight, innerTop)
-  ({double oL, double oR, double oB, double iL, double iR, double iT})
-      _edges() {
-    switch (faceShape) {
-      case 1: // Square — wider face, needs wider hair
-        return (
-          oL: 0.12,
-          oR: 0.88,
-          oB: 0.38,
-          iL: 0.16,
-          iR: 0.84,
-          iT: 0.20
-        );
-      case 2: // Oval — narrower, taller face
-        return (
-          oL: 0.14,
-          oR: 0.86,
-          oB: 0.36,
-          iL: 0.22,
-          iR: 0.78,
-          iT: 0.19
-        );
-      case 3: // Heart — wide top with center dip
-        return (
-          oL: 0.12,
-          oR: 0.88,
-          oB: 0.37,
-          iL: 0.18,
-          iR: 0.82,
-          iT: 0.20
-        );
-      case 4: // Diamond — pointed top, narrow sides
-        return (
-          oL: 0.14,
-          oR: 0.86,
-          oB: 0.36,
-          iL: 0.24,
-          iR: 0.76,
-          iT: 0.19
-        );
-      default: // Round
-        return (
-          oL: 0.13,
-          oR: 0.87,
-          oB: 0.37,
-          iL: 0.18,
-          iR: 0.82,
-          iT: 0.20
-        );
-    }
-  }
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final paint = _paint..style = PaintingStyle.fill;
-    final w = size.width;
-    final h = size.height;
-    final e = _edges();
-
-    switch (style) {
-      case 0: // Short — flat top hair
-        final path = Path()
-          ..moveTo(w * e.oL, h * e.oB)
-          ..quadraticBezierTo(w * e.oL, h * 0.10, w * 0.35, h * 0.08)
-          ..quadraticBezierTo(w * 0.50, h * 0.04, w * 0.65, h * 0.08)
-          ..quadraticBezierTo(w * e.oR, h * 0.10, w * e.oR, h * e.oB)
-          ..lineTo(w * e.oR, h * 0.28)
-          ..quadraticBezierTo(w * e.iR, h * e.iT, w * 0.65, h * (e.iT + 0.04))
-          ..quadraticBezierTo(
-              w * 0.50, h * e.iT, w * 0.35, h * (e.iT + 0.04))
-          ..quadraticBezierTo(w * e.iL, h * e.iT, w * e.oL, h * 0.28)
-          ..close();
-        canvas.drawPath(path, paint);
-
-      case 1: // Long — front bang fringe
-        final path = Path()
-          ..moveTo(w * e.oL, h * e.oB)
-          ..quadraticBezierTo(w * e.oL, h * 0.10, w * 0.35, h * 0.08)
-          ..quadraticBezierTo(w * 0.50, h * 0.04, w * 0.65, h * 0.08)
-          ..quadraticBezierTo(w * e.oR, h * 0.10, w * e.oR, h * e.oB)
-          ..lineTo(w * e.iR, h * 0.28)
-          ..quadraticBezierTo(w * e.iR, h * e.iT, w * 0.50, h * e.iT)
-          ..quadraticBezierTo(w * e.iL, h * e.iT, w * e.iL, h * 0.28)
-          ..close();
-        canvas.drawPath(path, paint);
-
-      case 2: // Curly — bumpy silhouette
-        final path = Path()
-          ..moveTo(w * 0.10, h * 0.40);
-        path.quadraticBezierTo(w * 0.04, h * 0.30, w * 0.08, h * 0.20);
-        path.quadraticBezierTo(w * 0.10, h * 0.10, w * 0.22, h * 0.07);
-        path.quadraticBezierTo(w * 0.30, h * 0.01, w * 0.42, h * 0.04);
-        path.quadraticBezierTo(w * 0.50, h * 0.00, w * 0.58, h * 0.04);
-        path.quadraticBezierTo(w * 0.70, h * 0.01, w * 0.78, h * 0.07);
-        path.quadraticBezierTo(w * 0.90, h * 0.10, w * 0.92, h * 0.20);
-        path.quadraticBezierTo(w * 0.96, h * 0.30, w * 0.90, h * 0.40);
-        path.quadraticBezierTo(w * 0.94, h * 0.52, w * 0.88, h * 0.58);
-        path.lineTo(w * e.iR, h * 0.35);
-        path.quadraticBezierTo(w * e.iR, h * e.iT, w * 0.50, h * e.iT);
-        path.quadraticBezierTo(w * e.iL, h * e.iT, w * e.iL, h * 0.35);
-        path.lineTo(w * 0.12, h * 0.58);
-        path.quadraticBezierTo(w * 0.06, h * 0.52, w * 0.10, h * 0.40);
-        path.close();
-        canvas.drawPath(path, paint);
-
-      case 3: // Braids — top cap + two braids
-        _drawHairCap(canvas, paint, w, h);
-        _drawBraid(
-            canvas, paint, Offset(w * e.oL, h * e.oB), w * 0.07, h * 0.08, 4);
-        _drawBraid(canvas, paint, Offset(w * (e.oR - 0.07), h * e.oB),
-            w * 0.07, h * 0.08, 4);
-
-      case 4: // Ponytail — cap + side tail
-        _drawHairCap(canvas, paint, w, h);
-        final tail = Path()
-          ..moveTo(w * e.iR, h * 0.22)
-          ..quadraticBezierTo(w * 0.95, h * 0.20, w * 0.96, h * 0.35)
-          ..quadraticBezierTo(w * 0.97, h * 0.55, w * 0.90, h * 0.65)
-          ..quadraticBezierTo(w * 0.84, h * 0.58, w * 0.86, h * 0.40)
-          ..quadraticBezierTo(w * 0.88, h * 0.28, w * e.iR, h * 0.26)
-          ..close();
-        canvas.drawPath(tail, paint);
-
-      case 5: // Buzz — thin stubble
-        final path = Path()
-          ..moveTo(w * (e.oL + 0.01), h * 0.30)
-          ..quadraticBezierTo(w * (e.oL + 0.01), h * 0.12, w * 0.50, h * 0.10)
-          ..quadraticBezierTo(w * (e.oR - 0.01), h * 0.12,
-              w * (e.oR - 0.01), h * 0.30)
-          ..lineTo(w * (e.iR - 0.02), h * 0.26)
-          ..quadraticBezierTo(w * (e.iR - 0.02), h * e.iT, w * 0.50,
-              h * (e.iT + 0.02))
-          ..quadraticBezierTo(w * (e.iL + 0.02), h * e.iT,
-              w * (e.iL + 0.02), h * 0.26)
-          ..close();
-        canvas.drawPath(path, paint);
-
-      case 6: // Afro — big round puff
-        canvas.drawOval(
-          Rect.fromCenter(
-            center: Offset(w * 0.50, h * 0.28),
-            width: w * 0.86,
-            height: h * 0.48,
-          ),
-          paint,
-        );
-
-      case 7: // Bun — cap + bun on top
-        _drawHairCap(canvas, paint, w, h);
-        canvas.drawCircle(Offset(w * 0.50, h * 0.06), w * 0.14, paint);
-
-      case 8: // Pigtails — cap + two side buns
-        _drawHairCap(canvas, paint, w, h);
-        canvas.drawCircle(
-            Offset(w * (e.oL - 0.03), h * 0.32), w * 0.10, paint);
-        canvas.drawCircle(
-            Offset(w * (e.oR + 0.03), h * 0.32), w * 0.10, paint);
-
-      case 9: // Bob — chin-length with curve
-        final path = Path()
-          ..moveTo(w * 0.10, h * 0.58)
-          ..quadraticBezierTo(w * 0.08, h * 0.30, w * e.oL, h * 0.14)
-          ..quadraticBezierTo(w * 0.20, h * 0.06, w * 0.50, h * 0.05)
-          ..quadraticBezierTo(w * 0.80, h * 0.06, w * e.oR, h * 0.14)
-          ..quadraticBezierTo(w * 0.92, h * 0.30, w * 0.90, h * 0.58)
-          ..quadraticBezierTo(w * 0.88, h * 0.64, w * e.iR, h * 0.60)
-          ..quadraticBezierTo(w * e.iR, h * 0.30, w * e.iR, h * 0.25)
-          ..quadraticBezierTo(w * (e.iR - 0.02), h * e.iT, w * 0.50, h * e.iT)
-          ..quadraticBezierTo(w * (e.iL + 0.02), h * e.iT, w * e.iL, h * 0.25)
-          ..quadraticBezierTo(w * e.iL, h * 0.30, w * e.iL, h * 0.60)
-          ..quadraticBezierTo(w * 0.12, h * 0.64, w * 0.10, h * 0.58)
-          ..close();
-        canvas.drawPath(path, paint);
-
-      case 10: // Wavy — front fringe
-        final path = Path()
-          ..moveTo(w * e.oL, h * e.oB)
-          ..quadraticBezierTo(w * 0.10, h * 0.12, w * 0.30, h * 0.08)
-          ..quadraticBezierTo(w * 0.40, h * 0.04, w * 0.50, h * 0.06)
-          ..quadraticBezierTo(w * 0.60, h * 0.03, w * 0.70, h * 0.08)
-          ..quadraticBezierTo(w * 0.90, h * 0.12, w * e.oR, h * e.oB)
-          ..lineTo(w * e.iR, h * 0.28)
-          ..quadraticBezierTo(w * e.iR, h * e.iT, w * 0.50, h * e.iT)
-          ..quadraticBezierTo(w * e.iL, h * e.iT, w * e.iL, h * 0.28)
-          ..close();
-        canvas.drawPath(path, paint);
-
-      case 11: // Side Swept — parted to one side
-        final path = Path()
-          ..moveTo(w * e.oL, h * 0.30)
-          ..quadraticBezierTo(w * 0.10, h * 0.10, w * 0.35, h * 0.06)
-          ..quadraticBezierTo(w * 0.60, h * 0.03, w * 0.80, h * 0.08)
-          ..quadraticBezierTo(w * 0.92, h * 0.12, w * e.oR, h * 0.38)
-          ..lineTo(w * e.iR, h * 0.28)
-          ..quadraticBezierTo(w * 0.75, h * e.iT, w * 0.50, h * e.iT)
-          ..quadraticBezierTo(w * e.iL, h * (e.iT - 0.02), w * e.oL, h * 0.30)
-          ..close();
-        canvas.drawPath(path, paint);
-
-      case 12: // Mohawk — tall center strip
-        final path = Path()
-          ..moveTo(w * 0.35, h * 0.25)
-          ..quadraticBezierTo(w * 0.38, h * -0.05, w * 0.50, h * -0.08)
-          ..quadraticBezierTo(w * 0.62, h * -0.05, w * 0.65, h * 0.25)
-          ..quadraticBezierTo(w * 0.58, h * e.iT, w * 0.50, h * e.iT)
-          ..quadraticBezierTo(w * 0.42, h * e.iT, w * 0.35, h * 0.25)
-          ..close();
-        canvas.drawPath(path, paint);
-        // Thin sides
-        final sides = Path()
-          ..moveTo(w * (e.oL + 0.01), h * 0.30)
-          ..quadraticBezierTo(w * (e.oL + 0.01), h * 0.18, w * 0.35, h * 0.18)
-          ..lineTo(w * 0.35, h * 0.24)
-          ..quadraticBezierTo(
-              w * (e.iL), h * e.iT, w * (e.oL + 0.03), h * 0.28)
-          ..close();
-        canvas.drawPath(sides, paint);
-        final sidesR = Path()
-          ..moveTo(w * (e.oR - 0.01), h * 0.30)
-          ..quadraticBezierTo(
-              w * (e.oR - 0.01), h * 0.18, w * 0.65, h * 0.18)
-          ..lineTo(w * 0.65, h * 0.24)
-          ..quadraticBezierTo(
-              w * (e.iR), h * e.iT, w * (e.oR - 0.03), h * 0.28)
-          ..close();
-        canvas.drawPath(sidesR, paint);
-
-      case 13: // Space Buns — cap + two buns on top
-        _drawHairCap(canvas, paint, w, h);
-        canvas.drawCircle(Offset(w * 0.28, h * 0.06), w * 0.12, paint);
-        canvas.drawCircle(Offset(w * 0.72, h * 0.06), w * 0.12, paint);
-
-      case 14: // Long Wavy — front fringe
-        final path = Path()
-          ..moveTo(w * e.oL, h * e.oB)
-          ..quadraticBezierTo(w * 0.10, h * 0.10, w * 0.30, h * 0.06)
-          ..quadraticBezierTo(w * 0.42, h * 0.02, w * 0.55, h * 0.05)
-          ..quadraticBezierTo(w * 0.68, h * 0.02, w * 0.80, h * 0.06)
-          ..quadraticBezierTo(w * 0.90, h * 0.10, w * e.oR, h * e.oB)
-          ..lineTo(w * e.iR, h * 0.28)
-          ..quadraticBezierTo(w * e.iR, h * e.iT, w * 0.50, h * e.iT)
-          ..quadraticBezierTo(w * e.iL, h * e.iT, w * e.iL, h * 0.28)
-          ..close();
-        canvas.drawPath(path, paint);
-
-      case 15: // Fishtail braid — cap + single braid down the back
-        _drawHairCap(canvas, paint, w, h);
-        _drawBraid(
-            canvas, paint, Offset(w * 0.44, h * 0.30), w * 0.08, h * 0.09, 5);
-    }
-  }
-
-  void _drawHairCap(Canvas canvas, Paint paint, double w, double h) {
-    final e = _edges();
-    final path = Path()
-      ..moveTo(w * e.oL, h * e.oB)
-      ..quadraticBezierTo(w * e.oL, h * 0.08, w * 0.50, h * 0.06)
-      ..quadraticBezierTo(w * e.oR, h * 0.08, w * e.oR, h * e.oB)
-      ..lineTo(w * e.iR, h * 0.28)
-      ..quadraticBezierTo(w * e.iR, h * e.iT, w * 0.50, h * (e.iT + 0.02))
-      ..quadraticBezierTo(w * e.iL, h * e.iT, w * e.iL, h * 0.28)
-      ..close();
-    canvas.drawPath(path, paint);
-  }
-
-  void _drawBraid(Canvas canvas, Paint paint, Offset start, double w,
-      double h, int segments) {
-    for (int i = 0; i < segments; i++) {
-      final y = start.dy + i * h * 0.9;
-      final xOff = (i.isEven) ? -w * 0.2 : w * 0.2;
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(start.dx + w / 2 + xOff, y + h / 2),
-          width: w,
-          height: h,
-        ),
-        paint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_FrontHairPainter old) =>
-      old.style != style ||
-      old.color != color ||
-      old.isRainbow != isRainbow ||
-      old.faceShape != faceShape;
-}
-
-// ══════════════════════════════════════════════════════════════════════
-//  ACCESSORY PAINTERS
-// ══════════════════════════════════════════════════════════════════════
-
-class _CrownPainter extends CustomPainter {
-  final Color color;
-  final bool jewels;
-
-  _CrownPainter({required this.color, this.jewels = false});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final paint = Paint()..color = color;
-
-    final path = Path()
-      ..moveTo(0, h)
-      ..lineTo(0, h * 0.4)
-      ..lineTo(w * 0.15, h * 0.6)
-      ..lineTo(w * 0.30, h * 0.1)
-      ..lineTo(w * 0.50, h * 0.5)
-      ..lineTo(w * 0.70, h * 0.1)
-      ..lineTo(w * 0.85, h * 0.6)
-      ..lineTo(w, h * 0.4)
-      ..lineTo(w, h)
-      ..close();
-    canvas.drawPath(path, paint);
-
-    if (jewels) {
-      canvas.drawCircle(
-          Offset(w * 0.30, h * 0.45), w * 0.05, Paint()..color = const Color(0xFFFF4D6A));
-      canvas.drawCircle(
-          Offset(w * 0.50, h * 0.65), w * 0.05, Paint()..color = AppColors.electricBlue);
-      canvas.drawCircle(
-          Offset(w * 0.70, h * 0.45), w * 0.05, Paint()..color = AppColors.emerald);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_CrownPainter old) =>
-      old.color != color || old.jewels != jewels;
-}
-
-class _FlowerPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final c = Offset(size.width / 2, size.height / 2);
-    final petalR = size.width * 0.28;
-    final paint = Paint()..color = const Color(0xFFFF7EB3);
-
-    for (int i = 0; i < 5; i++) {
-      final angle = i * 2 * pi / 5 - pi / 2;
-      canvas.drawCircle(
-        Offset(c.dx + petalR * cos(angle), c.dy + petalR * sin(angle)),
-        petalR * 0.55,
-        paint,
-      );
-    }
-    canvas.drawCircle(c, petalR * 0.4, Paint()..color = AppColors.starGold);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _BowPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final paint = Paint()..color = const Color(0xFFFF7EB3);
-
-    canvas.drawOval(Rect.fromLTWH(0, 0, w * 0.45, h), paint);
-    canvas.drawOval(Rect.fromLTWH(w * 0.55, 0, w * 0.45, h), paint);
-    canvas.drawCircle(
-      Offset(w * 0.5, h * 0.5),
-      w * 0.1,
-      Paint()..color = const Color(0xFFE0559D),
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _CapPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final paint = Paint()..color = const Color(0xFF4A90D9);
-
-    final dome = Path()
-      ..moveTo(w * 0.05, h * 0.85)
-      ..quadraticBezierTo(w * 0.05, h * 0.15, w * 0.50, h * 0.12)
-      ..quadraticBezierTo(w * 0.95, h * 0.15, w * 0.95, h * 0.85)
-      ..close();
-    canvas.drawPath(dome, paint);
-
-    final brim = Path()
-      ..moveTo(0, h * 0.85)
-      ..quadraticBezierTo(w * 0.5, h * 0.95, w, h * 0.85)
-      ..lineTo(w, h)
-      ..lineTo(0, h)
-      ..close();
-    canvas.drawPath(brim, Paint()..color = const Color(0xFF3B7AC7));
-
-    canvas.drawCircle(
-        Offset(w * 0.50, h * 0.15), w * 0.05, Paint()..color = Colors.white);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _WizardHatPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final hat = Path()
-      ..moveTo(w * 0.50, 0)
-      ..lineTo(w * 0.05, h * 0.85)
-      ..quadraticBezierTo(w * 0.50, h * 0.75, w * 0.95, h * 0.85)
-      ..close();
-    canvas.drawPath(hat, Paint()..color = AppColors.violet);
-
-    canvas.drawOval(
-      Rect.fromCenter(
-          center: Offset(w * 0.50, h * 0.85), width: w, height: h * 0.30),
-      Paint()..color = AppColors.violet,
-    );
-
-    _drawStar(canvas, Offset(w * 0.48, h * 0.38), w * 0.10,
-        Paint()..color = AppColors.starGold);
-  }
-
-  void _drawStar(Canvas canvas, Offset center, double r, Paint paint) {
-    final path = Path();
-    for (int i = 0; i < 5; i++) {
-      final outerAngle = -pi / 2 + i * 2 * pi / 5;
-      final innerAngle = outerAngle + pi / 5;
-      if (i == 0) {
-        path.moveTo(center.dx + r * cos(outerAngle),
-            center.dy + r * sin(outerAngle));
-      } else {
-        path.lineTo(center.dx + r * cos(outerAngle),
-            center.dy + r * sin(outerAngle));
-      }
-      path.lineTo(center.dx + r * 0.4 * cos(innerAngle),
-          center.dy + r * 0.4 * sin(innerAngle));
-    }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _WingsPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final wingPaint = Paint()
-      ..color = AppColors.electricBlue.withValues(alpha: 0.5);
-    final wingOutline = Paint()
-      ..color = AppColors.electricBlue.withValues(alpha: 0.8)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.008;
-
-    final leftWing = Path()
-      ..moveTo(w * 0.38, h * 0.45)
-      ..quadraticBezierTo(w * 0.10, h * 0.10, w * 0.02, h * 0.40)
-      ..quadraticBezierTo(w * 0.0, h * 0.70, w * 0.20, h * 0.90)
-      ..quadraticBezierTo(w * 0.30, h * 0.75, w * 0.38, h * 0.55)
-      ..close();
-    canvas.drawPath(leftWing, wingPaint);
-    canvas.drawPath(leftWing, wingOutline);
-
-    final rightWing = Path()
-      ..moveTo(w * 0.62, h * 0.45)
-      ..quadraticBezierTo(w * 0.90, h * 0.10, w * 0.98, h * 0.40)
-      ..quadraticBezierTo(w * 1.0, h * 0.70, w * 0.80, h * 0.90)
-      ..quadraticBezierTo(w * 0.70, h * 0.75, w * 0.62, h * 0.55)
-      ..close();
-    canvas.drawPath(rightWing, wingPaint);
-    canvas.drawPath(rightWing, wingOutline);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _TiaraPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final bandPaint = Paint()..color = const Color(0xFFFFB6C1);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, h * 0.55, w, h * 0.35),
-        Radius.circular(h * 0.15),
-      ),
-      bandPaint,
-    );
-
-    final path = Path()
-      ..moveTo(w * 0.10, h * 0.65)
-      ..lineTo(w * 0.20, h * 0.20)
-      ..lineTo(w * 0.30, h * 0.55)
-      ..lineTo(w * 0.40, h * 0.10)
-      ..lineTo(w * 0.50, h * 0.45)
-      ..lineTo(w * 0.60, h * 0.10)
-      ..lineTo(w * 0.70, h * 0.55)
-      ..lineTo(w * 0.80, h * 0.20)
-      ..lineTo(w * 0.90, h * 0.65)
-      ..close();
-    canvas.drawPath(path, bandPaint);
-
-    canvas.drawCircle(
-        Offset(w * 0.40, h * 0.18), w * 0.035, Paint()..color = const Color(0xFFE0559D));
-    canvas.drawCircle(
-        Offset(w * 0.60, h * 0.18), w * 0.035, Paint()..color = const Color(0xFFE0559D));
-    canvas.drawCircle(
-        Offset(w * 0.50, h * 0.50), w * 0.04, Paint()..color = AppColors.starGold);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _BunnyEarsPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final outerPaint = Paint()..color = const Color(0xFFF5F5F5);
-    final innerPaint = Paint()..color = const Color(0xFFFFB6C1);
-
-    final leftOuter = Path()
-      ..moveTo(w * 0.20, h * 0.95)
-      ..quadraticBezierTo(w * 0.05, h * 0.50, w * 0.15, h * 0.05)
-      ..quadraticBezierTo(w * 0.25, h * 0.00, w * 0.35, h * 0.15)
-      ..quadraticBezierTo(w * 0.40, h * 0.55, w * 0.35, h * 0.95)
-      ..close();
-    canvas.drawPath(leftOuter, outerPaint);
-
-    final leftInner = Path()
-      ..moveTo(w * 0.22, h * 0.85)
-      ..quadraticBezierTo(w * 0.12, h * 0.52, w * 0.18, h * 0.15)
-      ..quadraticBezierTo(w * 0.24, h * 0.08, w * 0.32, h * 0.22)
-      ..quadraticBezierTo(w * 0.36, h * 0.55, w * 0.32, h * 0.85)
-      ..close();
-    canvas.drawPath(leftInner, innerPaint);
-
-    final rightOuter = Path()
-      ..moveTo(w * 0.65, h * 0.95)
-      ..quadraticBezierTo(w * 0.60, h * 0.55, w * 0.65, h * 0.15)
-      ..quadraticBezierTo(w * 0.75, h * 0.00, w * 0.85, h * 0.05)
-      ..quadraticBezierTo(w * 0.95, h * 0.50, w * 0.80, h * 0.95)
-      ..close();
-    canvas.drawPath(rightOuter, outerPaint);
-
-    final rightInner = Path()
-      ..moveTo(w * 0.68, h * 0.85)
-      ..quadraticBezierTo(w * 0.64, h * 0.55, w * 0.68, h * 0.22)
-      ..quadraticBezierTo(w * 0.76, h * 0.08, w * 0.82, h * 0.15)
-      ..quadraticBezierTo(w * 0.88, h * 0.52, w * 0.78, h * 0.85)
-      ..close();
-    canvas.drawPath(rightInner, innerPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _CatEarsPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final outerPaint = Paint()..color = const Color(0xFFB794F6);
-    final innerPaint = Paint()..color = const Color(0xFFFFB6C1);
-
-    final leftOuter = Path()
-      ..moveTo(w * 0.10, h * 0.90)
-      ..lineTo(w * 0.18, h * 0.05)
-      ..lineTo(w * 0.40, h * 0.75)
-      ..close();
-    canvas.drawPath(leftOuter, outerPaint);
-    final leftInner = Path()
-      ..moveTo(w * 0.14, h * 0.78)
-      ..lineTo(w * 0.20, h * 0.20)
-      ..lineTo(w * 0.35, h * 0.68)
-      ..close();
-    canvas.drawPath(leftInner, innerPaint);
-
-    final rightOuter = Path()
-      ..moveTo(w * 0.60, h * 0.75)
-      ..lineTo(w * 0.82, h * 0.05)
-      ..lineTo(w * 0.90, h * 0.90)
-      ..close();
-    canvas.drawPath(rightOuter, outerPaint);
-    final rightInner = Path()
-      ..moveTo(w * 0.65, h * 0.68)
-      ..lineTo(w * 0.80, h * 0.20)
-      ..lineTo(w * 0.86, h * 0.78)
-      ..close();
-    canvas.drawPath(rightInner, innerPaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _UnicornHornPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final hornPath = Path()
-      ..moveTo(w * 0.50, 0)
-      ..lineTo(w * 0.30, h * 0.90)
-      ..lineTo(w * 0.70, h * 0.90)
-      ..close();
-
-    final hornPaint = Paint()
-      ..shader = const LinearGradient(
-        begin: Alignment.topCenter,
-        end: Alignment.bottomCenter,
-        colors: [Color(0xFFE0C3FC), Color(0xFFFFB6C1), Color(0xFFFFD700)],
-      ).createShader(Rect.fromLTWH(0, 0, w, h));
-
-    canvas.drawPath(hornPath, hornPaint);
-
-    final ridgePaint = Paint()
-      ..color = Colors.white.withValues(alpha: 0.5)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.05;
-
-    for (int i = 1; i < 5; i++) {
-      final y = h * (0.15 + i * 0.16);
-      final halfWidth = w * 0.15 * (1 - i * 0.12);
-      canvas.drawLine(
-        Offset(w * 0.50 - halfWidth, y),
-        Offset(w * 0.50 + halfWidth, y + h * 0.04),
-        ridgePaint,
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _StarHeadbandPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final bandPaint = Paint()
-      ..color = AppColors.starGold
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = h * 0.25
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      Rect.fromLTWH(w * 0.02, -h * 0.2, w * 0.96, h * 1.4),
-      pi * 0.05,
-      pi * 0.90,
-      false,
-      bandPaint,
-    );
-
-    final starPaint = Paint()..color = AppColors.starGold;
-    final positions = [
-      Offset(w * 0.15, h * 0.45),
-      Offset(w * 0.35, h * 0.20),
-      Offset(w * 0.50, h * 0.12),
-      Offset(w * 0.65, h * 0.20),
-      Offset(w * 0.85, h * 0.45),
-    ];
-
-    for (int i = 0; i < positions.length; i++) {
-      final starSize = (i == 2) ? w * 0.07 : w * 0.05;
-      _drawStar(canvas, positions[i], starSize, starPaint);
-    }
-  }
-
-  void _drawStar(Canvas canvas, Offset center, double r, Paint paint) {
-    final path = Path();
-    for (int i = 0; i < 5; i++) {
-      final outerAngle = -pi / 2 + i * 2 * pi / 5;
-      final innerAngle = outerAngle + pi / 5;
-      if (i == 0) {
-        path.moveTo(center.dx + r * cos(outerAngle),
-            center.dy + r * sin(outerAngle));
-      } else {
-        path.lineTo(center.dx + r * cos(outerAngle),
-            center.dy + r * sin(outerAngle));
-      }
-      path.lineTo(center.dx + r * 0.4 * cos(innerAngle),
-          center.dy + r * 0.4 * sin(innerAngle));
-    }
-    path.close();
-    canvas.drawPath(path, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ── New Accessory Painters ──────────────────────────────────────────
-
-class _HaloPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final paint = Paint()
-      ..color = AppColors.starGold.withValues(alpha: 0.7)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = h * 0.22;
-
-    canvas.drawOval(
-      Rect.fromCenter(
-          center: Offset(w * 0.50, h * 0.50), width: w * 0.85, height: h * 0.70),
-      paint,
-    );
-
-    // Inner glow
-    final glow = Paint()
-      ..color = AppColors.starGold.withValues(alpha: 0.25)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = h * 0.40;
-    canvas.drawOval(
-      Rect.fromCenter(
-          center: Offset(w * 0.50, h * 0.50), width: w * 0.85, height: h * 0.70),
-      glow,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _HeadbandPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final paint = Paint()
-      ..color = const Color(0xFFFF7EB3)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = h * 0.50
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      Rect.fromLTWH(0, -h * 0.5, w, h * 2.0),
-      pi * 0.08,
-      pi * 0.84,
-      false,
-      paint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _FlowerCrownPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    // Vine / band
-    final bandPaint = Paint()
-      ..color = const Color(0xFF4CBB8A)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = h * 0.12
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawArc(
-      Rect.fromLTWH(w * 0.02, h * 0.20, w * 0.96, h * 1.0),
-      pi * 0.08,
-      pi * 0.84,
-      false,
-      bandPaint,
-    );
-
-    // Flowers along the crown
-    final flowerPositions = [
-      Offset(w * 0.15, h * 0.55),
-      Offset(w * 0.32, h * 0.32),
-      Offset(w * 0.50, h * 0.22),
-      Offset(w * 0.68, h * 0.32),
-      Offset(w * 0.85, h * 0.55),
-    ];
-    final flowerColors = [
-      const Color(0xFFFF7EB3),
-      const Color(0xFFFFBF69),
-      const Color(0xFFFF4D6A),
-      const Color(0xFFB794F6),
-      const Color(0xFFFF7EB3),
-    ];
-
-    for (int i = 0; i < flowerPositions.length; i++) {
-      final fc = flowerPositions[i];
-      final r = w * 0.05;
-      final paint = Paint()..color = flowerColors[i];
-      for (int j = 0; j < 5; j++) {
-        final angle = j * 2 * pi / 5 - pi / 2;
-        canvas.drawCircle(
-          Offset(fc.dx + r * 0.6 * cos(angle), fc.dy + r * 0.6 * sin(angle)),
-          r * 0.45,
-          paint,
-        );
-      }
-      canvas.drawCircle(fc, r * 0.28, Paint()..color = AppColors.starGold);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _DevilHornsPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-    final paint = Paint()..color = const Color(0xFFFF4444);
-
-    // Left horn
-    final left = Path()
-      ..moveTo(w * 0.18, h * 0.95)
-      ..quadraticBezierTo(w * 0.05, h * 0.50, w * 0.15, h * 0.05)
-      ..quadraticBezierTo(w * 0.22, h * 0.02, w * 0.30, h * 0.10)
-      ..quadraticBezierTo(w * 0.28, h * 0.55, w * 0.32, h * 0.95)
-      ..close();
-    canvas.drawPath(left, paint);
-
-    // Right horn
-    final right = Path()
-      ..moveTo(w * 0.68, h * 0.95)
-      ..quadraticBezierTo(w * 0.72, h * 0.55, w * 0.70, h * 0.10)
-      ..quadraticBezierTo(w * 0.78, h * 0.02, w * 0.85, h * 0.05)
-      ..quadraticBezierTo(w * 0.95, h * 0.50, w * 0.82, h * 0.95)
-      ..close();
-    canvas.drawPath(right, paint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _PirateHatPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    // Main hat body
-    final hat = Path()
-      ..moveTo(w * 0.05, h * 0.75)
-      ..quadraticBezierTo(w * 0.10, h * 0.40, w * 0.25, h * 0.20)
-      ..quadraticBezierTo(w * 0.50, h * 0.05, w * 0.75, h * 0.20)
-      ..quadraticBezierTo(w * 0.90, h * 0.40, w * 0.95, h * 0.75)
-      ..close();
-    canvas.drawPath(hat, Paint()..color = const Color(0xFF2A2A2A));
-
-    // Brim
-    canvas.drawOval(
-      Rect.fromCenter(
-          center: Offset(w * 0.50, h * 0.78), width: w * 0.98, height: h * 0.30),
-      Paint()..color = const Color(0xFF1A1A1A),
-    );
-
-    // Skull symbol
-    canvas.drawCircle(
-      Offset(w * 0.50, h * 0.45),
-      w * 0.08,
-      Paint()..color = Colors.white,
-    );
-    // Cross bones
-    final bonePaint = Paint()
-      ..color = Colors.white
-      ..strokeWidth = w * 0.025
-      ..strokeCap = StrokeCap.round;
-    canvas.drawLine(
-        Offset(w * 0.38, h * 0.55), Offset(w * 0.62, h * 0.65), bonePaint);
-    canvas.drawLine(
-        Offset(w * 0.62, h * 0.55), Offset(w * 0.38, h * 0.65), bonePaint);
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _AntennaePainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    final stalkPaint = Paint()
-      ..color = const Color(0xFF00E68A)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = w * 0.06
-      ..strokeCap = StrokeCap.round;
-
-    // Left stalk
-    final leftPath = Path()
-      ..moveTo(w * 0.25, h)
-      ..quadraticBezierTo(w * 0.10, h * 0.50, w * 0.15, h * 0.10);
-    canvas.drawPath(leftPath, stalkPaint);
-    // Left ball
-    canvas.drawCircle(
-        Offset(w * 0.15, h * 0.10), w * 0.10, Paint()..color = const Color(0xFF00E68A));
-
-    // Right stalk
-    final rightPath = Path()
-      ..moveTo(w * 0.75, h)
-      ..quadraticBezierTo(w * 0.90, h * 0.50, w * 0.85, h * 0.10);
-    canvas.drawPath(rightPath, stalkPaint);
-    // Right ball
-    canvas.drawCircle(
-        Offset(w * 0.85, h * 0.10), w * 0.10, Paint()..color = const Color(0xFF00E68A));
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _PropellerHatPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    // Beanie base
-    final beanie = Path()
-      ..moveTo(w * 0.05, h * 0.90)
-      ..quadraticBezierTo(w * 0.05, h * 0.35, w * 0.50, h * 0.30)
-      ..quadraticBezierTo(w * 0.95, h * 0.35, w * 0.95, h * 0.90)
-      ..close();
-    canvas.drawPath(beanie, Paint()..color = const Color(0xFF4A90D9));
-
-    // Brim band
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(w * 0.02, h * 0.80, w * 0.96, h * 0.15),
-        Radius.circular(h * 0.08),
-      ),
-      Paint()..color = const Color(0xFFFF4444),
-    );
-
-    // Propeller post
-    canvas.drawCircle(
-        Offset(w * 0.50, h * 0.30), w * 0.05, Paint()..color = const Color(0xFFFFD700));
-
-    // Propeller blades
-    final bladePaint = Paint()..color = const Color(0xFFFF4444);
-    final center = Offset(w * 0.50, h * 0.28);
-    for (int i = 0; i < 3; i++) {
-      final angle = i * 2 * pi / 3 - pi / 6;
-      final path = Path()
-        ..moveTo(center.dx, center.dy)
-        ..quadraticBezierTo(
-          center.dx + w * 0.15 * cos(angle + 0.3),
-          center.dy + h * 0.12 * sin(angle + 0.3),
-          center.dx + w * 0.22 * cos(angle),
-          center.dy + h * 0.18 * sin(angle),
-        )
-        ..quadraticBezierTo(
-          center.dx + w * 0.15 * cos(angle - 0.3),
-          center.dy + h * 0.12 * sin(angle - 0.3),
-          center.dx,
-          center.dy,
-        )
-        ..close();
-      canvas.drawPath(path, bladePaint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-class _NinjaMaskPainter extends CustomPainter {
-  @override
-  void paint(Canvas canvas, Size size) {
-    final w = size.width;
-    final h = size.height;
-
-    // Dark mask band across eyes
-    final maskPaint = Paint()..color = const Color(0xFF1A1A2E).withValues(alpha: 0.85);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromLTWH(0, h * 0.10, w, h * 0.70),
-        Radius.circular(h * 0.20),
-      ),
-      maskPaint,
-    );
-
-    // Eye slits
-    final slitPaint = Paint()..color = Colors.white.withValues(alpha: 0.9);
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-            center: Offset(w * 0.30, h * 0.45), width: w * 0.22, height: h * 0.25),
-        Radius.circular(h * 0.08),
-      ),
-      slitPaint,
-    );
-    canvas.drawRRect(
-      RRect.fromRectAndRadius(
-        Rect.fromCenter(
-            center: Offset(w * 0.70, h * 0.45), width: w * 0.22, height: h * 0.25),
-        Radius.circular(h * 0.08),
-      ),
-      slitPaint,
-    );
-  }
-
-  @override
-  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
-}
-
-// ══════════════════════════════════════════════════════════════════════
-//  SPARKLE EFFECT PAINTER
-// ══════════════════════════════════════════════════════════════════════
-
-class _SparklePainter extends CustomPainter {
-  final bool rainbow;
-
-  _SparklePainter({required this.rainbow});
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final rng = Random(42);
-    const sparkleCount = 6;
-    final colors = rainbow
-        ? [
-            Colors.red,
-            Colors.orange,
-            Colors.yellow,
-            Colors.green,
-            Colors.blue,
-            Colors.purple,
-          ]
-        : [
-            AppColors.starGold,
-            Colors.white,
-            AppColors.starGold,
-            Colors.white,
-            AppColors.starGold,
-            Colors.white,
-          ];
-
-    for (int i = 0; i < sparkleCount; i++) {
-      final x = rng.nextDouble() * size.width;
-      final y = rng.nextDouble() * size.height;
-      final r = size.width * 0.02 + rng.nextDouble() * size.width * 0.025;
-      final paint = Paint()
-        ..color = colors[i % colors.length].withValues(alpha: 0.8);
-
-      // 4-pointed sparkle
-      final path = Path();
-      path.moveTo(x, y - r);
-      path.lineTo(x + r * 0.3, y);
-      path.lineTo(x, y + r);
-      path.lineTo(x - r * 0.3, y);
-      path.close();
-      path.moveTo(x - r, y);
-      path.lineTo(x, y + r * 0.3);
-      path.lineTo(x + r, y);
-      path.lineTo(x, y - r * 0.3);
-      path.close();
-      canvas.drawPath(path, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_SparklePainter old) => old.rainbow != rainbow;
 }

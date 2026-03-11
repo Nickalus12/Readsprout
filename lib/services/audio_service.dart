@@ -1,7 +1,11 @@
+import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math';
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/foundation.dart';
 import '../data/phrase_templates.dart';
+import 'amplitude_envelope.dart';
+import 'deepgram_tts_service.dart';
 
 /// Manages playback of pre-generated TTS audio clips.
 ///
@@ -9,8 +13,12 @@ import '../data/phrase_templates.dart';
 ///   assets/audio/words/{word}.mp3          — full word pronunciation
 ///   assets/audio/letter_names/{letter}.mp3 — spoken letter name (e.g. "ay", "bee")
 ///   assets/audio/phonics/{letter}.mp3      — phonetic letter sound (e.g. "ah", "buh")
-///   assets/audio/phrases/{cat}_{i}.mp3     — personalized encouragement
+///   assets/audio/phrases/{cat}_{i}.mp3     — personalized encouragement (bundled)
 ///   assets/audio/effects/*.mp3             — UI sound effects
+///
+/// For personalized phrases, the service first checks for runtime-generated
+/// files from [DeepgramTtsService] (stored in the app documents directory),
+/// then falls back to bundled assets.
 ///
 /// Letter NAME files (default for playLetter):
 ///   letter_names/a.mp3 → "ay"
@@ -29,19 +37,57 @@ class AudioService {
   final _rng = Random();
 
   bool _initialized = false;
+  static final bool _isDesktop = Platform.isWindows || Platform.isLinux || Platform.isMacOS;
+
+  /// Optional Deepgram TTS service for runtime-generated phrases.
+  DeepgramTtsService? _deepgramTts;
+
+  /// Active profile ID for looking up generated phrase files.
+  String? _activeProfileId;
+
+  // ── Amplitude-based lip sync ──────────────────────────────────────
+
+  /// Cache for loaded amplitude envelopes.
+  final AmplitudeEnvelopeCache _envelopeCache = AmplitudeEnvelopeCache();
+
+  /// Current mouth amplitude (0.0-1.0) driven by audio playback.
+  /// Listen to this for real-time lip sync.
+  final ValueNotifier<double> mouthAmplitude = ValueNotifier(0.0);
+
+  StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<void>? _completionSub;
 
   Future<void> init() async {
-    // Fire-and-forget — don't await because setReleaseMode can hang on Windows
-    try {
-      _wordPlayer.setReleaseMode(ReleaseMode.stop);
-      _letterPlayer.setReleaseMode(ReleaseMode.stop);
-      _letterNamePlayer.setReleaseMode(ReleaseMode.stop);
-      _effectPlayer.setReleaseMode(ReleaseMode.stop);
-      _phrasePlayer.setReleaseMode(ReleaseMode.stop);
-    } catch (e) {
-      debugPrint('AudioService setReleaseMode error: $e');
+    final players = [_wordPlayer, _letterPlayer, _letterNamePlayer, _effectPlayer, _phrasePlayer];
+    for (final p in players) {
+      try {
+        await p.setReleaseMode(ReleaseMode.stop);
+      } catch (e) {
+        debugPrint('AudioService setReleaseMode error: $e');
+      }
     }
     _initialized = true;
+  }
+
+  /// Stop a player and play a new asset source reliably.
+  /// On Windows, a brief delay between stop and play prevents silent failures
+  /// caused by the media session not fully releasing before the next play.
+  Future<void> _stopAndPlay(AudioPlayer player, Source source) async {
+    await player.stop();
+    if (_isDesktop) {
+      await Future<void>.delayed(const Duration(milliseconds: 50));
+    }
+    await player.play(source);
+  }
+
+  /// Connect the Deepgram TTS service for runtime phrase generation.
+  void setDeepgramTts(DeepgramTtsService tts) {
+    _deepgramTts = tts;
+  }
+
+  /// Set the active profile for phrase file lookup.
+  void setActiveProfile(String? profileId) {
+    _activeProfileId = profileId;
   }
 
   /// Play the full word pronunciation.
@@ -49,8 +95,10 @@ class AudioService {
   Future<bool> playWord(String word) async {
     if (!_initialized) return false;
     try {
-      await _wordPlayer.stop();
-      await _wordPlayer.play(
+      final env = await _envelopeCache.load('audio/words/${word.toLowerCase()}.mp3');
+      _startAmplitudeTracking(_wordPlayer, env);
+      await _stopAndPlay(
+        _wordPlayer,
         AssetSource('audio/words/${word.toLowerCase()}.mp3'),
       );
       return true;
@@ -66,8 +114,10 @@ class AudioService {
   Future<bool> playLetter(String letter) async {
     if (!_initialized) return false;
     try {
-      await _letterPlayer.stop();
-      await _letterPlayer.play(
+      final env = await _envelopeCache.load('audio/letter_names/${letter.toLowerCase()}.mp3');
+      _startAmplitudeTracking(_letterPlayer, env);
+      await _stopAndPlay(
+        _letterPlayer,
         AssetSource('audio/letter_names/${letter.toLowerCase()}.mp3'),
       );
       return true;
@@ -82,8 +132,10 @@ class AudioService {
   Future<bool> playLetterPhonics(String letter) async {
     if (!_initialized) return false;
     try {
-      await _letterNamePlayer.stop();
-      await _letterNamePlayer.play(
+      final env = await _envelopeCache.load('audio/phonics/${letter.toLowerCase()}.mp3');
+      _startAmplitudeTracking(_letterNamePlayer, env);
+      await _stopAndPlay(
+        _letterNamePlayer,
         AssetSource('audio/phonics/${letter.toLowerCase()}.mp3'),
       );
       return true;
@@ -99,6 +151,8 @@ class AudioService {
   /// Play a random personalized phrase from a category.
   ///
   /// Categories: 'word_complete', 'level_complete', 'welcome'.
+  /// Checks for runtime-generated audio (per-profile) first, then
+  /// falls back to bundled assets.
   /// Returns the phrase text for display, or null if no name set.
   Future<String?> playPhrase(String category, String playerName) async {
     if (!_initialized || playerName.isEmpty) return null;
@@ -117,13 +171,25 @@ class AudioService {
 
     final index = _rng.nextInt(templates.length);
     final text = templates[index].replaceAll('{name}', playerName);
-    final audioPath = 'audio/phrases/${category}_$index.mp3';
 
     try {
-      await _phrasePlayer.stop();
-      await _phrasePlayer.play(AssetSource(audioPath));
+      // Check for runtime-generated file first (per-profile personalized audio)
+      if (_deepgramTts != null && _activeProfileId != null) {
+        final localFile = _deepgramTts!.phraseFile(_activeProfileId!, category, index);
+        if (localFile.existsSync()) {
+          // No envelope for runtime-generated files — use fallback (mouth stays at 0.0)
+          _stopAmplitudeTracking();
+          await _stopAndPlay(_phrasePlayer, DeviceFileSource(localFile.path));
+          return text;
+        }
+      }
+
+      // Fall back to bundled asset with amplitude tracking
+      final env = await _envelopeCache.load('audio/phrases/${category}_$index.mp3');
+      _startAmplitudeTracking(_phrasePlayer, env);
+      await _stopAndPlay(_phrasePlayer, AssetSource('audio/phrases/${category}_$index.mp3'));
     } catch (e) {
-      debugPrint('Audio error (phrase: $audioPath): $e');
+      debugPrint('Audio error (phrase: ${category}_$index): $e');
     }
 
     return text;
@@ -151,8 +217,9 @@ class AudioService {
       ];
       final file = genericFiles[_rng.nextInt(genericFiles.length)];
       try {
-        await _phrasePlayer.stop();
-        await _phrasePlayer.play(AssetSource('audio/words/$file.mp3'));
+        final env = await _envelopeCache.load('audio/words/$file.mp3');
+        _startAmplitudeTracking(_phrasePlayer, env);
+        await _stopAndPlay(_phrasePlayer, AssetSource('audio/words/$file.mp3'));
       } catch (e) {
         debugPrint('Audio error (generic welcome: $file): $e');
       }
@@ -175,10 +242,7 @@ class AudioService {
   Future<void> playSuccess() async {
     if (!_initialized) return;
     try {
-      await _effectPlayer.stop();
-      await _effectPlayer.play(
-        AssetSource('audio/effects/success.mp3'),
-      );
+      await _stopAndPlay(_effectPlayer, AssetSource('audio/effects/success.mp3'));
     } catch (e) {
       debugPrint('Audio error (success): $e');
     }
@@ -188,10 +252,7 @@ class AudioService {
   Future<void> playError() async {
     if (!_initialized) return;
     try {
-      await _effectPlayer.stop();
-      await _effectPlayer.play(
-        AssetSource('audio/effects/error.mp3'),
-      );
+      await _stopAndPlay(_effectPlayer, AssetSource('audio/effects/error.mp3'));
     } catch (e) {
       debugPrint('Audio error (error): $e');
     }
@@ -201,16 +262,43 @@ class AudioService {
   Future<void> playLevelCompleteEffect() async {
     if (!_initialized) return;
     try {
-      await _effectPlayer.stop();
-      await _effectPlayer.play(
-        AssetSource('audio/effects/level_complete.mp3'),
-      );
+      await _stopAndPlay(_effectPlayer, AssetSource('audio/effects/level_complete.mp3'));
     } catch (e) {
       debugPrint('Audio error (level_complete): $e');
     }
   }
 
+  // ── Amplitude tracking helpers ────────────────────────────────────
+
+  /// Start tracking amplitude from the given player using the envelope.
+  void _startAmplitudeTracking(AudioPlayer player, AmplitudeEnvelope? env) {
+    _stopAmplitudeTracking();
+    if (env == null) return;
+    _positionSub = player.onPositionChanged.listen((pos) {
+      mouthAmplitude.value = env.getAmplitude(pos);
+    });
+    _completionSub = player.onPlayerComplete.listen((_) {
+      mouthAmplitude.value = 0.0;
+      _stopAmplitudeTracking();
+    });
+  }
+
+  /// Stop amplitude tracking and reset mouth to closed.
+  void _stopAmplitudeTracking() {
+    _positionSub?.cancel();
+    _positionSub = null;
+    _completionSub?.cancel();
+    _completionSub = null;
+  }
+
+  /// Pre-load envelopes for a word list (e.g. at level start).
+  Future<void> preloadEnvelopes(List<String> words) async {
+    await _envelopeCache.preloadWords(words);
+  }
+
   void dispose() {
+    _stopAmplitudeTracking();
+    mouthAmplitude.dispose();
     _wordPlayer.dispose();
     _letterPlayer.dispose();
     _letterNamePlayer.dispose();

@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../../data/dolch_words.dart';
 import '../../data/sticker_definitions.dart';
@@ -286,7 +285,7 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
       _updateGame(cappedDt);
     }
 
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   void _updateGame(double dt) {
@@ -727,22 +726,24 @@ class _UnicornFlightGameState extends State<UnicornFlightGame>
           child: Stack(
             children: [
               // Game canvas
-              CustomPaint(
-                size: Size(screenW, screenH),
-                painter: _GamePainter(
-                  stars: _stars,
-                  clouds: _clouds,
-                  bubbles: _bubbles,
-                  sparkles: _sparkles,
-                  trailSparkles: _trailSparkles,
-                  unicornY: _unicornY,
-                  unicornX: _unicornX,
-                  wingAngle: _wingAngle,
-                  hornGlow: _hornGlow,
-                  stumble: _stumbleTimer > 0,
-                  flashTimer: _flashTimer,
-                  totalTime: _totalTime,
-                  hintsEnabled: widget.hintsEnabled,
+              RepaintBoundary(
+                child: CustomPaint(
+                  size: Size(screenW, screenH),
+                  painter: _GamePainter(
+                    stars: _stars,
+                    clouds: _clouds,
+                    bubbles: _bubbles,
+                    sparkles: _sparkles,
+                    trailSparkles: _trailSparkles,
+                    unicornY: _unicornY,
+                    unicornX: _unicornX,
+                    wingAngle: _wingAngle,
+                    hornGlow: _hornGlow,
+                    stumble: _stumbleTimer > 0,
+                    flashTimer: _flashTimer,
+                    totalTime: _totalTime,
+                    hintsEnabled: widget.hintsEnabled,
+                  ),
                 ),
               ),
               // HUD

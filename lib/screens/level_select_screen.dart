@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../theme/app_theme.dart';
 import '../data/dolch_words.dart';
 import '../models/progress.dart';
@@ -8,6 +7,9 @@ import '../services/progress_service.dart';
 import '../services/audio_service.dart';
 import '../services/profile_service.dart';
 import '../services/stats_service.dart';
+import '../services/streak_service.dart';
+import '../services/avatar_personality_service.dart';
+import '../services/review_service.dart';
 import '../widgets/zone_background.dart';
 import '../widgets/tier_stars_display.dart';
 import '../widgets/tier_selection_sheet.dart';
@@ -18,7 +20,11 @@ class LevelSelectScreen extends StatefulWidget {
   final AudioService audioService;
   final ProfileService? profileService;
   final StatsService? statsService;
+  final StreakService? streakService;
+  final AvatarPersonalityService? personalityService;
+  final ReviewService? reviewService;
   final String playerName;
+  final String profileId;
 
   const LevelSelectScreen({
     super.key,
@@ -26,7 +32,11 @@ class LevelSelectScreen extends StatefulWidget {
     required this.audioService,
     this.profileService,
     this.statsService,
+    this.streakService,
+    this.personalityService,
+    this.reviewService,
     this.playerName = '',
+    this.profileId = '',
   });
 
   @override
@@ -66,7 +76,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.of(context).size.width;
-    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
 
     return Scaffold(
       body: Stack(
@@ -145,7 +155,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
 
   Widget _buildZoneSection(BuildContext context, int zoneIndex) {
     final screenW = MediaQuery.of(context).size.width;
-    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
 
     final zone = DolchWords.zones[zoneIndex];
     final isExpanded = _expanded[zoneIndex] ?? false;
@@ -348,7 +358,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
 
   Widget _buildLevelCards(Zone zone, int zoneIndex) {
     final screenW = MediaQuery.of(context).size.width;
-    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
 
     return Padding(
       padding: EdgeInsets.only(top: 6 * sf),
@@ -425,7 +435,11 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
           audioService: widget.audioService,
           profileService: widget.profileService,
           statsService: widget.statsService,
+          streakService: widget.streakService,
+          personalityService: widget.personalityService,
+          reviewService: widget.reviewService,
           playerName: widget.playerName,
+          profileId: widget.profileId,
           tier: selectedTier.value,
         ),
         transitionsBuilder: (_, animation, __, child) {
@@ -491,7 +505,7 @@ class _LevelCardState extends State<_LevelCard> {
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.of(context).size.width;
-    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
 
     final isComplete = widget.levelProgress.isComplete;
     final starsEarned = widget.levelProgress.starsEarned;
@@ -634,7 +648,7 @@ class _LevelBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.of(context).size.width;
-    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
 
     // Ring color reflects highest tier completed
     final Color ringColor;
@@ -692,7 +706,7 @@ class _TotalStarsBadge extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final screenW = MediaQuery.of(context).size.width;
-    final sf = (screenW / 400).clamp(0.7, 1.2) as double;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
 
     return Container(
       padding: EdgeInsets.symmetric(horizontal: 10 * sf, vertical: 5 * sf),

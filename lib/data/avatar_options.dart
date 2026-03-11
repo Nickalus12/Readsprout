@@ -342,6 +342,42 @@ const List<FacePaintOption> facePaintOptions = [
   FacePaintOption(9, 'Dots'),
 ];
 
+// ── Shirt Colors ─────────────────────────────────────────────────────
+
+class ShirtColorOption {
+  final int index;
+  final String label;
+  final Color color;
+
+  const ShirtColorOption(this.index, this.label, this.color);
+}
+
+const List<ShirtColorOption> shirtColorOptions = [
+  ShirtColorOption(0, 'Red', Color(0xFFE53E3E)),
+  ShirtColorOption(1, 'Blue', Color(0xFF3B82F6)),
+  ShirtColorOption(2, 'Green', Color(0xFF38A169)),
+  ShirtColorOption(3, 'Purple', Color(0xFF805AD5)),
+  ShirtColorOption(4, 'Orange', Color(0xFFED8936)),
+  ShirtColorOption(5, 'Pink', Color(0xFFED64A6)),
+  ShirtColorOption(6, 'Yellow', Color(0xFFECC94B)),
+  ShirtColorOption(7, 'White', Color(0xFFF7FAFC)),
+];
+
+// ── Shirt Styles ─────────────────────────────────────────────────────
+
+class ShirtStyleOption {
+  final int index;
+  final String label;
+
+  const ShirtStyleOption(this.index, this.label);
+}
+
+const List<ShirtStyleOption> shirtStyleOptions = [
+  ShirtStyleOption(0, 'Crew Neck'),
+  ShirtStyleOption(1, 'V-Neck'),
+  ShirtStyleOption(2, 'Collared'),
+];
+
 // ── Accessories ───────────────────────────────────────────────────────
 
 class AccessoryOption {

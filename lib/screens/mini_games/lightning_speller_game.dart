@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../data/dolch_words.dart';
 import '../../data/sticker_definitions.dart';
 import '../../models/player_profile.dart';
@@ -132,7 +131,7 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
       CurvedAnimation(parent: _boltController, curve: Curves.easeOut),
     );
     _boltController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
+      if (status == AnimationStatus.completed && mounted) {
         setState(() => _activeBoltTileIndex = null);
       }
     });
@@ -142,7 +141,7 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
       duration: const Duration(milliseconds: 400),
     );
     _errorController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
+      if (status == AnimationStatus.completed && mounted) {
         setState(() => _errorTileIndex = null);
       }
     });
@@ -175,7 +174,7 @@ class _LightningSpellerGameState extends State<LightningSpellerGame>
       duration: const Duration(milliseconds: 800),
     );
     _chainController.addStatusListener((status) {
-      if (status == AnimationStatus.completed) {
+      if (status == AnimationStatus.completed && mounted) {
         setState(() => _chainActive = false);
         // Move to next word after chain
         Future.delayed(const Duration(milliseconds: 400), () {

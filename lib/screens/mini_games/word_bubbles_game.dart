@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../data/dolch_words.dart';
 import '../../data/sticker_definitions.dart';
 import '../../models/player_profile.dart';
@@ -662,8 +661,10 @@ class _WordBubblesGameState extends State<WordBubblesGame>
   @override
   void dispose() {
     _countdownTimer?.cancel();
+    _loopController.stop();
     _loopController.removeListener(_gameLoop);
     _loopController.dispose();
+    _seaweedController.stop();
     _seaweedController.dispose();
     _sessionTimer.stop();
     super.dispose();
@@ -680,23 +681,23 @@ class _WordBubblesGameState extends State<WordBubblesGame>
           // Underwater background
           _buildBackground(context),
           // Sandy bottom
-          _buildSandyBottom(context),
+          RepaintBoundary(child: _buildSandyBottom(context)),
           // Light rays
-          _buildLightRays(context),
+          RepaintBoundary(child: _buildLightRays(context)),
           // Background particles
-          _buildBackgroundParticles(context),
+          RepaintBoundary(child: _buildBackgroundParticles(context)),
           // Ambient bubble streams
-          _buildAmbientBubbles(context),
+          RepaintBoundary(child: _buildAmbientBubbles(context)),
           // Seaweed
           _buildSeaweed(context),
           // Fish (decorative, behind game bubbles)
-          IgnorePointer(child: _buildFish(context)),
+          RepaintBoundary(child: IgnorePointer(child: _buildFish(context))),
           // Bubbles
           ..._buildBubbles(context),
           // Pop effects (IgnorePointer so it doesn't block bubble taps)
-          IgnorePointer(child: _buildPopEffects(context)),
+          RepaintBoundary(child: IgnorePointer(child: _buildPopEffects(context))),
           // Caustics overlay
-          IgnorePointer(child: _buildCaustics(context)),
+          RepaintBoundary(child: IgnorePointer(child: _buildCaustics(context))),
           // HUD
           SafeArea(child: _buildHUD(context)),
           // Game over overlay

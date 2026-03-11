@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../models/progress.dart';
 import '../services/progress_service.dart';
 import '../theme/app_theme.dart';

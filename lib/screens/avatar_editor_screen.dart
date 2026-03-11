@@ -2,7 +2,6 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 import '../data/avatar_options.dart';
 import '../models/player_profile.dart';
@@ -115,35 +114,54 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
     );
   }
 
-  // ── Header ──────────────────────────────────────────────────────────
+  // ── Header (icon-only: close X, dice randomize) ────────────────────
+
+  bool _diceSpinning = false;
 
   Widget _buildHeader() {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.close, color: AppColors.primaryText),
-            iconSize: 28,
-          ),
-          Expanded(
-            child: Text(
-              'Create Your Look',
-              textAlign: TextAlign.center,
-              style: AppFonts.fredoka(
-                fontSize: 22,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primaryText,
+          // Close button — X icon
+          GestureDetector(
+            onTap: () => Navigator.of(context).pop(),
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.surface,
+                border: Border.all(color: AppColors.border),
               ),
+              child: const Icon(Icons.close_rounded, color: AppColors.primaryText, size: 22),
             ),
           ),
-          // Randomize button
-          IconButton(
-            onPressed: _randomize,
-            icon: const Icon(Icons.casino_outlined, color: AppColors.secondaryText),
-            iconSize: 26,
-            tooltip: 'Randomize',
+          const Spacer(),
+          // Randomize — spinning dice
+          GestureDetector(
+            onTap: () {
+              setState(() => _diceSpinning = true);
+              _randomize();
+              Future.delayed(const Duration(milliseconds: 500), () {
+                if (mounted) setState(() => _diceSpinning = false);
+              });
+            },
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppColors.surface,
+                border: Border.all(color: AppColors.border),
+              ),
+              child: AnimatedRotation(
+                turns: _diceSpinning ? 1.0 : 0.0,
+                duration: const Duration(milliseconds: 500),
+                curve: Curves.easeOutCubic,
+                child: const Icon(Icons.casino_rounded, color: AppColors.secondaryText, size: 22),
+              ),
+            ),
           ),
         ],
       ),
@@ -179,28 +197,38 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
 
   Widget _buildPreview() {
     return Center(
-      child: Container(
-        width: 150,
-        height: 150,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          border: Border.all(color: AppColors.border, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.violet.withValues(alpha: 0.25),
-              blurRadius: 24,
-              spreadRadius: 2,
-            ),
-          ],
+      child: GestureDetector(
+        onTap: () {
+          // Fun tap reaction — bouncy scale
+          setState(() {});
+        },
+        child: Container(
+          width: 164,
+          height: 164,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: AppColors.border, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.violet.withValues(alpha: 0.25),
+                blurRadius: 24,
+                spreadRadius: 2,
+              ),
+            ],
+          ),
+          child: AvatarWidget(
+            config: _config,
+            size: 160.0,
+            animateEffects: true,
+          )
+              .animate(key: ValueKey(_config.hashCode))
+              .scale(
+                begin: const Offset(0.92, 0.92),
+                end: const Offset(1.0, 1.0),
+                duration: 280.ms,
+                curve: Curves.elasticOut,
+              ),
         ),
-        child: AvatarWidget(config: _config, size: 146.0)
-            .animate(key: ValueKey(_config.hashCode))
-            .scale(
-              begin: const Offset(0.92, 0.92),
-              end: const Offset(1.0, 1.0),
-              duration: 280.ms,
-              curve: Curves.elasticOut,
-            ),
       ),
     );
   }
@@ -209,12 +237,12 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
 
   Widget _buildCategoryTabs() {
     return SizedBox(
-      height: 58,
+      height: 46,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 10),
         itemCount: _categories.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 5),
+        separatorBuilder: (_, __) => const SizedBox(width: 6),
         itemBuilder: (context, index) {
           final selected = index == _selectedCategory;
           final cat = _categories[index];
@@ -222,39 +250,31 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
             onTap: () => _selectCategory(index),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
+                shape: BoxShape.circle,
                 color: selected
                     ? AppColors.violet.withValues(alpha: 0.30)
                     : AppColors.surface,
-                borderRadius: BorderRadius.circular(16),
                 border: Border.all(
                   color: selected ? AppColors.violet : AppColors.border,
-                  width: selected ? 2 : 1,
+                  width: selected ? 2.5 : 1,
                 ),
+                boxShadow: selected
+                    ? [
+                        BoxShadow(
+                          color: AppColors.violet.withValues(alpha: 0.35),
+                          blurRadius: 10,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    cat.icon,
-                    size: 18,
-                    color:
-                        selected ? AppColors.violet : AppColors.secondaryText,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    cat.label,
-                    style: AppFonts.fredoka(
-                      fontSize: 10,
-                      fontWeight:
-                          selected ? FontWeight.w600 : FontWeight.w400,
-                      color: selected
-                          ? AppColors.violet
-                          : AppColors.secondaryText,
-                    ),
-                  ),
-                ],
+              child: Icon(
+                cat.icon,
+                size: 20,
+                color: selected ? AppColors.violet : AppColors.secondaryText,
               ),
             ),
           );
@@ -325,21 +345,16 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       selectedIndex: _config.faceShape,
       builder: (index) {
         final opt = faceShapeOptions[index];
-        final r = opt.borderRadius * 30;
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 38,
-              height: (38 * opt.heightRatio).toDouble(),
-              decoration: BoxDecoration(
-                color: skinColorForIndex(_config.skinTone),
-                borderRadius: BorderRadius.circular(r),
-              ),
+        final r = opt.borderRadius * 28;
+        return Center(
+          child: Container(
+            width: 34,
+            height: (34 * opt.heightRatio).toDouble(),
+            decoration: BoxDecoration(
+              color: skinColorForIndex(_config.skinTone),
+              borderRadius: BorderRadius.circular(r),
             ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
-          ],
+          ),
         );
       },
       onTap: (index) => _updateConfig(_config.copyWith(faceShape: index)),
@@ -354,24 +369,19 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       selectedIndex: _config.skinTone,
       builder: (index) {
         final opt = skinToneOptions[index];
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Container(
-              width: 42,
-              height: 42,
-              decoration: BoxDecoration(
-                color: opt.color,
-                shape: BoxShape.circle,
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.3),
-                  width: 1.5,
-                ),
+        return Center(
+          child: Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: opt.color,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: Colors.white.withValues(alpha: 0.3),
+                width: 1.5,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle, overflow: TextOverflow.ellipsis),
-          ],
+          ),
         );
       },
       onTap: (index) => _updateConfig(_config.copyWith(skinTone: index)),
@@ -385,22 +395,17 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       itemCount: hairStyleOptions.length,
       selectedIndex: _config.hairStyle,
       builder: (index) {
-        final opt = hairStyleOptions[index];
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 42,
-              height: 42,
-              child: AvatarWidget(
-                config: _config.copyWith(hairStyle: index),
-                size: 42,
-                showBackground: false,
-              ),
+        return Center(
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: AvatarWidget(
+              animateEffects: false,
+              config: _config.copyWith(hairStyle: index),
+              size: 42,
+              showBackground: false,
             ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
-          ],
+          ),
         );
       },
       onTap: (index) => _updateConfig(_config.copyWith(hairStyle: index)),
@@ -465,14 +470,7 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
         return _OptionTileContent(
           locked: locked,
           hint: opt.unlock?.hint,
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              swatch,
-              const SizedBox(height: 4),
-              Text(opt.label, style: _optLabelStyle),
-            ],
-          ),
+          child: Center(child: swatch),
         );
       },
       onTap: (index) {
@@ -496,22 +494,17 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       itemCount: eyeStyleOptions.length,
       selectedIndex: _config.eyeStyle,
       builder: (index) {
-        final opt = eyeStyleOptions[index];
-        return Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            SizedBox(
-              width: 42,
-              height: 42,
-              child: AvatarWidget(
-                config: _config.copyWith(eyeStyle: index),
-                size: 42,
-                showBackground: false,
-              ),
+        return Center(
+          child: SizedBox(
+            width: 42,
+            height: 42,
+            child: AvatarWidget(
+              animateEffects: false,
+              config: _config.copyWith(eyeStyle: index),
+              size: 42,
+              showBackground: false,
             ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
-          ],
+          ),
         );
       },
       onTap: (index) => _updateConfig(_config.copyWith(eyeStyle: index)),
@@ -561,8 +554,6 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
           ],
         );
       },
@@ -577,7 +568,6 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       itemCount: eyelashStyleOptions.length,
       selectedIndex: _config.eyelashStyle,
       builder: (index) {
-        final opt = eyelashStyleOptions[index];
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -590,13 +580,12 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                 width: 42,
                 height: 42,
                 child: AvatarWidget(
+                  animateEffects: false,
                   config: _config.copyWith(eyelashStyle: index),
                   size: 42,
                   showBackground: false,
                 ),
               ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
           ],
         );
       },
@@ -611,7 +600,6 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       itemCount: eyebrowStyleOptions.length,
       selectedIndex: _config.eyebrowStyle,
       builder: (index) {
-        final opt = eyebrowStyleOptions[index];
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -619,13 +607,12 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
               width: 42,
               height: 42,
               child: AvatarWidget(
+                animateEffects: false,
                 config: _config.copyWith(eyebrowStyle: index),
                 size: 42,
                 showBackground: false,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
           ],
         );
       },
@@ -640,7 +627,6 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       itemCount: mouthStyleOptions.length,
       selectedIndex: _config.mouthStyle,
       builder: (index) {
-        final opt = mouthStyleOptions[index];
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -648,13 +634,12 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
               width: 42,
               height: 42,
               child: AvatarWidget(
+                animateEffects: false,
                 config: _config.copyWith(mouthStyle: index),
                 size: 42,
                 showBackground: false,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
           ],
         );
       },
@@ -703,8 +688,6 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                   ),
                 ),
               ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
           ],
         );
       },
@@ -719,7 +702,6 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       itemCount: cheekStyleOptions.length,
       selectedIndex: _config.cheekStyle,
       builder: (index) {
-        final opt = cheekStyleOptions[index];
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -732,13 +714,12 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                 width: 42,
                 height: 42,
                 child: AvatarWidget(
+                  animateEffects: false,
                   config: _config.copyWith(cheekStyle: index),
                   size: 42,
                   showBackground: false,
                 ),
               ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
           ],
         );
       },
@@ -753,7 +734,6 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       itemCount: noseStyleOptions.length,
       selectedIndex: _config.noseStyle,
       builder: (index) {
-        final opt = noseStyleOptions[index];
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -761,13 +741,12 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
               width: 42,
               height: 42,
               child: AvatarWidget(
+                animateEffects: false,
                 config: _config.copyWith(noseStyle: index),
                 size: 42,
                 showBackground: false,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
           ],
         );
       },
@@ -782,7 +761,6 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       itemCount: glassesStyleOptions.length,
       selectedIndex: _config.glassesStyle,
       builder: (index) {
-        final opt = glassesStyleOptions[index];
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -795,13 +773,12 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                 width: 42,
                 height: 42,
                 child: AvatarWidget(
+                  animateEffects: false,
                   config: _config.copyWith(glassesStyle: index),
                   size: 42,
                   showBackground: false,
                 ),
               ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
           ],
         );
       },
@@ -816,7 +793,6 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
       itemCount: facePaintOptions.length,
       selectedIndex: _config.facePaint,
       builder: (index) {
-        final opt = facePaintOptions[index];
         return Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
@@ -829,13 +805,12 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                 width: 42,
                 height: 42,
                 child: AvatarWidget(
+                  animateEffects: false,
                   config: _config.copyWith(facePaint: index),
                   size: 42,
                   showBackground: false,
                 ),
               ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
           ],
         );
       },
@@ -880,14 +855,12 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                   width: 42,
                   height: 42,
                   child: AvatarWidget(
+                  animateEffects: false,
                     config: _config.copyWith(accessory: index),
                     size: 42,
                     showBackground: false,
                   ),
                 ),
-              const SizedBox(height: 4),
-              Text(opt.label, style: _optLabelStyle,
-                  overflow: TextOverflow.ellipsis),
             ],
           ),
         );
@@ -924,8 +897,6 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                 ),
               ),
             ),
-            const SizedBox(height: 4),
-            Text(opt.label, style: _optLabelStyle),
           ],
         );
       },
@@ -942,12 +913,12 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
     required void Function(int index) onTap,
   }) {
     return GridView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 4,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 0.82,
+        crossAxisCount: 5,
+        mainAxisSpacing: 8,
+        crossAxisSpacing: 8,
+        childAspectRatio: 1.0,
       ),
       itemCount: itemCount,
       itemBuilder: (context, index) {
@@ -960,7 +931,7 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
               color: selected
                   ? AppColors.violet.withValues(alpha: 0.20)
                   : AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
+              borderRadius: BorderRadius.circular(12),
               border: Border.all(
                 color: selected ? AppColors.violet : AppColors.border,
                 width: selected ? 2.5 : 1,
@@ -969,7 +940,7 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                   ? [
                       BoxShadow(
                         color: AppColors.violet.withValues(alpha: 0.30),
-                        blurRadius: 12,
+                        blurRadius: 10,
                         spreadRadius: 1,
                       ),
                     ]
@@ -979,9 +950,9 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                 ? builder(index)
                     .animate()
                     .scale(
-                      begin: const Offset(0.85, 0.85),
+                      begin: const Offset(0.88, 0.88),
                       end: const Offset(1.0, 1.0),
-                      duration: 350.ms,
+                      duration: 320.ms,
                       curve: Curves.elasticOut,
                     )
                 : builder(index),
@@ -994,41 +965,36 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
   // ── Done Button ────────────────────────────────────────────────────
 
   Widget _buildDoneButton() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 32),
-      child: SizedBox(
-        width: double.infinity,
-        height: 52,
-        child: ElevatedButton(
-          onPressed: _save,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.violet,
-            foregroundColor: Colors.white,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(18),
-            ),
-            elevation: 0,
+    return Center(
+      child: GestureDetector(
+        onTap: _save,
+        child: Container(
+          width: 56,
+          height: 56,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.success,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.success.withValues(alpha: 0.4),
+                blurRadius: 16,
+                spreadRadius: 2,
+              ),
+            ],
           ),
-          child: Text(
-            'Done',
-            style: AppFonts.fredoka(
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
+          child: const Icon(
+            Icons.check_rounded,
+            color: Colors.white,
+            size: 32,
           ),
         ),
       ),
     )
         .animate()
         .fadeIn(delay: 200.ms, duration: 300.ms)
-        .slideY(begin: 0.2, end: 0, duration: 300.ms);
+        .scale(begin: const Offset(0.8, 0.8), end: const Offset(1.0, 1.0), duration: 300.ms, curve: Curves.elasticOut);
   }
 
-  TextStyle get _optLabelStyle => AppFonts.fredoka(
-        fontSize: 10,
-        fontWeight: FontWeight.w400,
-        color: AppColors.secondaryText,
-      );
 }
 
 // ── Category data ───────────────────────────────────────────────────
@@ -1057,6 +1023,11 @@ class _OptionTileContent extends StatelessWidget {
   Widget build(BuildContext context) {
     if (!locked) return child;
 
+    // Extract number from hint (e.g. "25 words!" → 25) for star display
+    final starCount = hint != null
+        ? RegExp(r'\d+').firstMatch(hint!)?.group(0)
+        : null;
+
     return Stack(
       children: [
         Opacity(opacity: 0.3, child: child),
@@ -1065,20 +1036,31 @@ class _OptionTileContent extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(
-                Icons.lock,
-                size: 20,
+                Icons.lock_rounded,
+                size: 18,
                 color: AppColors.secondaryText.withValues(alpha: 0.7),
               ),
-              if (hint != null) ...[
+              if (starCount != null) ...[
                 const SizedBox(height: 2),
-                Text(
-                  hint!,
-                  style: AppFonts.fredoka(
-                    fontSize: 9,
-                    color: AppColors.starGold.withValues(alpha: 0.8),
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      Icons.star_rounded,
+                      size: 12,
+                      color: AppColors.starGold.withValues(alpha: 0.8),
+                    ),
+                    const SizedBox(width: 1),
+                    Text(
+                      starCount,
+                      style: AppFonts.fredoka(
+                        fontSize: 10,
+                        color: AppColors.starGold.withValues(alpha: 0.8),
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ],

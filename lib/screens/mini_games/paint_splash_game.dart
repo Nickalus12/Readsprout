@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../data/dolch_words.dart';
 import '../../data/sticker_definitions.dart';
 import '../../models/player_profile.dart';
@@ -126,6 +125,7 @@ class _PaintSplashGameState extends State<PaintSplashGame>
   // Game state
   bool _gameStarted = false;
   bool _gameOver = false;
+  bool _introPlayed = false;
   int _score = 0;
   int _combo = 0;
   int _bestCombo = 0;
@@ -601,9 +601,12 @@ class _PaintSplashGameState extends State<PaintSplashGame>
   }
 
   Widget _buildStartScreen() {
-    Future.delayed(const Duration(milliseconds: 800), () {
-      if (mounted && !_gameStarted) _playIntro();
-    });
+    if (!_introPlayed) {
+      _introPlayed = true;
+      Future.delayed(const Duration(milliseconds: 800), () {
+        if (mounted && !_gameStarted) _playIntro();
+      });
+    }
 
     return Stack(
       children: [
@@ -719,9 +722,11 @@ class _PaintSplashGameState extends State<PaintSplashGame>
         _buildCanvasBackground(),
 
         // Canvas splats (paint marks)
-        CustomPaint(
-          size: _screenSize,
-          painter: _CanvasSplatsPainter(splats: _canvasSplats),
+        RepaintBoundary(
+          child: CustomPaint(
+            size: _screenSize,
+            painter: _CanvasSplatsPainter(splats: _canvasSplats),
+          ),
         ),
 
         // Paint blobs
@@ -740,10 +745,12 @@ class _PaintSplashGameState extends State<PaintSplashGame>
         ),
 
         // Splash drops overlay
-        IgnorePointer(
-          child: CustomPaint(
-            size: _screenSize,
-            painter: _SplashDropsPainter(drops: _splashDrops),
+        RepaintBoundary(
+          child: IgnorePointer(
+            child: CustomPaint(
+              size: _screenSize,
+              painter: _SplashDropsPainter(drops: _splashDrops),
+            ),
           ),
         ),
 

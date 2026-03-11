@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../data/dolch_words.dart';
 import '../../data/sticker_definitions.dart';
 import '../../models/player_profile.dart';
@@ -258,6 +257,7 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
     widget.audioService.playSuccess();
     Haptics.success();
     await Future.delayed(const Duration(milliseconds: 200));
+    if (!mounted) return;
     widget.audioService.playWord(_cards[firstIdx].word);
 
     _matchGlowController.forward(from: 0.0);
@@ -279,6 +279,7 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
         _gameComplete = true;
       });
       await Future.delayed(const Duration(milliseconds: 400));
+      if (!mounted) return;
       widget.audioService.playLevelCompleteEffect();
       _starsController.forward(from: 0.0);
     }

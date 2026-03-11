@@ -2,7 +2,6 @@ import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
-import 'package:google_fonts/google_fonts.dart';
 import '../../data/dolch_words.dart';
 import '../../data/sticker_definitions.dart';
 import '../../models/player_profile.dart';
@@ -395,7 +394,7 @@ class _FallingLettersGameState extends State<FallingLettersGame>
   // ── Game tick ──────────────────────────────────────────────────────────
 
   void _onTick(Duration elapsed) {
-    if (!_gameStarted || _gameOver) return;
+    if (!mounted || !_gameStarted || _gameOver) return;
 
     final dt = _lastTick == Duration.zero
         ? 0.016
@@ -1074,11 +1073,13 @@ class _FallingLettersGameState extends State<FallingLettersGame>
           child: Stack(
             children: [
               // Stars background
-              CustomPaint(
-                size: size,
-                painter: _StarFieldPainter(
-                  stars: _stars,
-                  shootingStar: _shootingStar,
+              RepaintBoundary(
+                child: CustomPaint(
+                  size: size,
+                  painter: _StarFieldPainter(
+                    stars: _stars,
+                    shootingStar: _shootingStar,
+                  ),
                 ),
               ),
 
@@ -1096,15 +1097,17 @@ class _FallingLettersGameState extends State<FallingLettersGame>
                     (item) => _buildFallingItem(item, size)),
 
               // All particles + shockwaves in one painter (avoids per-particle widgets)
-              IgnorePointer(
-                child: CustomPaint(
-                  size: size,
-                  painter: _EffectsPainter(
-                    fragments: _fragments,
-                    dustParticles: _dustParticles,
-                    sparkles: _sparkles,
-                    disintegrationParticles: _disintegrationParticles,
-                    shockwaves: _shockwaves,
+              RepaintBoundary(
+                child: IgnorePointer(
+                  child: CustomPaint(
+                    size: size,
+                    painter: _EffectsPainter(
+                      fragments: _fragments,
+                      dustParticles: _dustParticles,
+                      sparkles: _sparkles,
+                      disintegrationParticles: _disintegrationParticles,
+                      shockwaves: _shockwaves,
+                    ),
                   ),
                 ),
               ),

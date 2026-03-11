@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:forge2d/forge2d.dart' hide Transform;
 
 import '../../data/dolch_words.dart';
@@ -408,7 +407,7 @@ class _LetterDropGameState extends State<LetterDropGame>
 
     final worldW = _areaWidth / _scale;
     // Start below HUD + target word area (~120px from top)
-    final floatTop = 120.0 / _scale;
+    const floatTop = 120.0 / _scale;
     final floatHeight = _floatZoneBottom - floatTop;
 
     for (int i = 0; i < allLetters.length && _letterBodies.length < _maxDynamicBodies; i++) {
@@ -581,7 +580,7 @@ class _LetterDropGameState extends State<LetterDropGame>
       }
     }
 
-    setState(() {});
+    if (mounted) setState(() {});
   }
 
   void _checkSlotCollisions() {
@@ -882,27 +881,31 @@ class _LetterDropGameState extends State<LetterDropGame>
         return Stack(
           children: [
             // Background stars (IgnorePointer so taps pass through)
-            IgnorePointer(
-              child: CustomPaint(
-                size: Size(_areaWidth, _areaHeight),
-                painter: _StarFieldPainter(seed: 77),
+            RepaintBoundary(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  size: Size(_areaWidth, _areaHeight),
+                  painter: _StarFieldPainter(seed: 77),
+                ),
               ),
             ),
 
             // Slot shelf + particles + trails
-            IgnorePointer(
-              child: CustomPaint(
-                size: Size(_areaWidth, _areaHeight),
-                painter: _ShelfPainter(
-                  slots: _slots,
-                  currentWord: _currentWord,
-                  slotShelfY: _slotShelfY,
-                  scale: _scale,
-                  areaWidth: _areaWidth,
-                  themeColor: _themeColors[0],
-                  particles: _particles,
-                  trails: _trails,
-                  hintsEnabled: widget.hintsEnabled,
+            RepaintBoundary(
+              child: IgnorePointer(
+                child: CustomPaint(
+                  size: Size(_areaWidth, _areaHeight),
+                  painter: _ShelfPainter(
+                    slots: _slots,
+                    currentWord: _currentWord,
+                    slotShelfY: _slotShelfY,
+                    scale: _scale,
+                    areaWidth: _areaWidth,
+                    themeColor: _themeColors[0],
+                    particles: _particles,
+                    trails: _trails,
+                    hintsEnabled: widget.hintsEnabled,
+                  ),
                 ),
               ),
             ),

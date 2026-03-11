@@ -1,6 +1,5 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../data/dolch_words.dart';
@@ -145,16 +144,18 @@ class _ConstellationMapState extends State<_ConstellationMap>
               builder: (context, _) {
                 final t = _twinkleController.value;
                 final positions = _getNodePositions(mapWidth, mapHeight);
-                return CustomPaint(
-                  painter: _BackgroundPainter(
-                    time: t,
-                    nodePositions: positions,
-                    progressService: widget.progressService,
-                  ),
-                  child: Stack(
-                    clipBehavior: Clip.none,
-                    children: _buildAllWidgets(
-                        positions, mapWidth, mapHeight, t),
+                return RepaintBoundary(
+                  child: CustomPaint(
+                    painter: _BackgroundPainter(
+                      time: t,
+                      nodePositions: positions,
+                      progressService: widget.progressService,
+                    ),
+                    child: Stack(
+                      clipBehavior: Clip.none,
+                      children: _buildAllWidgets(
+                          positions, mapWidth, mapHeight, t),
+                    ),
                   ),
                 );
               },
