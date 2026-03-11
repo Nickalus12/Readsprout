@@ -508,7 +508,6 @@ class _ElementLabGameState extends State<ElementLabGame>
     Future.delayed(const Duration(milliseconds: 200), () {
       if (mounted) setState(() => _shakeOffset = Offset.zero);
     });
-    setState(() {});
   }
 
   // ── Physics simulation (single pass) ────────────────────────────────────
@@ -650,15 +649,16 @@ class _ElementLabGameState extends State<ElementLabGame>
       }
     }
 
-    // Water + Oil: if water is directly above oil, swap them (oil floats)
-    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.oil) {
-      final bi = by * _gridW + x;
+    // Water + Oil: oil floats — only swap if water is BELOW oil (water sinks under oil)
+    // The oil sim handles rising through water, so water just needs to sink past oil above it.
+    final uy2 = y - _gravityDir;
+    if (_inBounds(x, uy2) && _grid[uy2 * _gridW + x] == El.oil && !(_flags[uy2 * _gridW + x] == 1)) {
+      final ui2 = uy2 * _gridW + x;
       _grid[idx] = El.oil;
-      _life[idx] = 0;
-      _grid[bi] = El.water;
-      _life[bi] = 0;
+      _grid[ui2] = El.water;
+      _life[ui2] = 0;
       _flags[idx] = 1;
-      _flags[bi] = 1;
+      _flags[ui2] = 1;
       return;
     }
 
@@ -702,22 +702,33 @@ class _ElementLabGameState extends State<ElementLabGame>
       }
     }
 
-    // ── Water pressure and depth ────────────────────────────────────────
-    int depth = 0;
-    for (int cy = y - g; _inBounds(x, cy) && depth < 8; cy -= g) {
-      final cellAbove = _grid[cy * _gridW + x];
-      if (cellAbove == El.water || cellAbove == El.oil) {
-        depth++;
+    // ── Water column height (for leveling) ──────────────────────────────
+    // Count how tall this water column is (downward from this cell)
+    int colHeight = 1;
+    for (int cy = y + g; _inBounds(x, cy) && colHeight < 12; cy += g) {
+      final c = _grid[cy * _gridW + x];
+      if (c == El.water) {
+        colHeight++;
       } else {
         break;
       }
     }
+    // Count water above too for total column
+    int above = 0;
+    for (int cy = y - g; _inBounds(x, cy) && above < 12; cy -= g) {
+      final c = _grid[cy * _gridW + x];
+      if (c == El.water || c == El.oil) {
+        above++;
+      } else {
+        break;
+      }
+    }
+    final totalCol = colHeight + above;
 
-    // ── Movement with momentum ──────────────────────────────────────────
+    // ── Movement ──────────────────────────────────────────────────────
 
     // Fall in gravity direction
     if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
-      // Track fall distance for splash (use velY)
       _velY[idx] = (_velY[idx] + 1).clamp(0, 10).toInt();
       _swap(idx, by * _gridW + x);
       return;
@@ -739,10 +750,10 @@ class _ElementLabGameState extends State<ElementLabGame>
         }
       }
     }
-    _velY[idx] = 0; // reset fall velocity when not falling
+    _velY[idx] = 0;
 
     // Use momentum: prefer previous flow direction
-    final momentum = _velX[idx]; // -1 or 1 from previous flow
+    final momentum = _velX[idx];
     final dl = momentum != 0 ? (momentum > 0) : _rng.nextBool();
     final x1 = dl ? x + 1 : x - 1;
     final x2 = dl ? x - 1 : x + 1;
@@ -759,8 +770,8 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Flow sideways — pressure increases flow distance
-    final flowDist = 1 + (depth ~/ 2).clamp(0, 4);
+    // Flow sideways — base 2 + pressure from column height
+    final flowDist = 2 + (totalCol ~/ 2).clamp(0, 5);
     for (int d = 1; d <= flowDist; d++) {
       final sx1 = dl ? x + d : x - d;
       final sx2 = dl ? x - d : x + d;
@@ -773,6 +784,65 @@ class _ElementLabGameState extends State<ElementLabGame>
         _velX[idx] = dl ? -1 : 1;
         _swap(idx, y * _gridW + sx2);
         return;
+      }
+    }
+
+    // ── Surface leveling — actively seek lower adjacent columns ────────
+    // If this cell is at the surface (empty above), check if adjacent
+    // columns are shorter. If so, move there to equalize water level.
+    final aboveIdx = _inBounds(x, uy) ? _grid[uy * _gridW + x] : -1;
+    if (aboveIdx == El.empty || aboveIdx == -1) {
+      // We're at the water surface — count adjacent column heights
+      for (final dir in [1, -1]) {
+        final nx = x + dir;
+        if (!_inBounds(nx, y)) continue;
+        final nIdx = y * _gridW + nx;
+        // Adjacent cell at same level must be empty (we'd flow there)
+        if (_grid[nIdx] != El.empty) continue;
+        // Check: is there a solid or water below that empty cell?
+        final belowNx = y + g;
+        if (!_inBounds(nx, belowNx)) continue;
+        final belowCell = _grid[belowNx * _gridW + nx];
+        if (belowCell == El.empty) continue; // would fall, not level
+        // Count adjacent column height
+        int adjCol = 0;
+        for (int cy = y + g; _inBounds(nx, cy) && adjCol < 12; cy += g) {
+          if (_grid[cy * _gridW + nx] == El.water) {
+            adjCol++;
+          } else {
+            break;
+          }
+        }
+        // Move if our column is taller
+        if (totalCol > adjCol + 1) {
+          _velX[idx] = dir;
+          _swap(idx, nIdx);
+          return;
+        }
+      }
+      // Also try 2-3 cells out for faster leveling on flat surfaces
+      for (final dir in [1, -1]) {
+        for (int d = 2; d <= 3; d++) {
+          final nx = x + dir * d;
+          if (!_inBounds(nx, y)) continue;
+          // All cells between must be empty
+          bool pathClear = true;
+          for (int pd = 1; pd < d; pd++) {
+            final px = x + dir * pd;
+            if (!_inBounds(px, y) || _grid[y * _gridW + px] != El.empty) {
+              pathClear = false;
+              break;
+            }
+          }
+          if (!pathClear) continue;
+          if (_grid[y * _gridW + nx] != El.empty) continue;
+          final belowNx = y + g;
+          if (!_inBounds(nx, belowNx)) continue;
+          if (_grid[belowNx * _gridW + nx] == El.empty) continue;
+          _velX[idx] = dir;
+          _swap(idx, y * _gridW + nx);
+          return;
+        }
       }
     }
 
@@ -959,7 +1029,7 @@ class _ElementLabGameState extends State<ElementLabGame>
   void _setPlantData(int idx, int t, int s) => _velX[idx] = ((s & 0xF) << 4) | (t & 0xF);
   static const _plantMaxH = [0, 3, 6, 15, 3, 12];
   static const _plantMinMoist = [0, 1, 2, 3, 4, 2];
-  static const _plantGrowRate = [0, 25, 35, 60, 40, 30];
+  static const _plantGrowRate = [0, 25, 35, 20, 40, 30];
   int _selectedSeedType = 1; // kPlantGrass
 
   void _simSeed(int x, int y, int idx) {
@@ -1342,22 +1412,39 @@ class _ElementLabGameState extends State<ElementLabGame>
         final ni = uy * _gridW + x;
         _grid[ni] = El.plant; _life[ni] = _life[idx];
         final newSize = curSize + 1;
-        // Canopy starts at ~60% height
-        final isTrunk = newSize < (15 * 0.6).round();
+        // Canopy starts at ~50% height
+        final isTrunk = newSize < 7;
         _setPlantData(ni, kPlantTree, isTrunk ? kStGrowing : kStMature);
         _velY[ni] = newSize;
         _flags[ni] = 1;
         _velY[idx] = newSize;
       }
-      // Canopy: spread sideways at top
-      if (curSize >= 8 && _rng.nextInt(3) == 0) {
-        final side = _rng.nextBool() ? x - 1 : x + 1;
-        final uy2 = y - _gravityDir;
-        if (_inBounds(side, uy2) && _grid[uy2 * _gridW + side] == El.empty) {
-          final ni = uy2 * _gridW + side;
-          _grid[ni] = El.plant; _life[ni] = _life[idx];
-          _setPlantData(ni, kPlantTree, kStMature); _velY[ni] = curSize;
-          _flags[ni] = 1;
+      // Canopy: spread sideways — wider spread at greater height
+      if (curSize >= 6) {
+        // Try both sides for a fuller canopy
+        for (final side in [x - 1, x + 1]) {
+          if (_rng.nextInt(2) == 0) continue; // 50% chance each side
+          // Spread at current level and one above
+          for (final sy in [y, y - _gravityDir]) {
+            if (_inBounds(side, sy) && _grid[sy * _gridW + side] == El.empty) {
+              final ni = sy * _gridW + side;
+              _grid[ni] = El.plant; _life[ni] = _life[idx];
+              _setPlantData(ni, kPlantTree, kStMature); _velY[ni] = curSize;
+              _flags[ni] = 1;
+              break; // one per side per tick
+            }
+          }
+        }
+        // At tall heights, spread 2 cells wide for a rounder canopy
+        if (curSize >= 10 && _rng.nextInt(3) == 0) {
+          for (final side in [x - 2, x + 2]) {
+            if (_inBounds(side, y) && _grid[y * _gridW + side] == El.empty) {
+              final ni = y * _gridW + side;
+              _grid[ni] = El.plant; _life[ni] = _life[idx];
+              _setPlantData(ni, kPlantTree, kStMature); _velY[ni] = curSize;
+              _flags[ni] = 1;
+            }
+          }
         }
       }
     }
@@ -2107,73 +2194,110 @@ class _ElementLabGameState extends State<ElementLabGame>
   void _simAnt(int x, int y, int idx) {
     if (_frameCount % 2 != 0) return;
 
-    // Acid kills ants
+    final g = _gravityDir;
+    final by = y + g;
+    final uy = y - g;
+
+    // Acid kills ants instantly
     if (_checkAdjacent(x, y, El.acid)) {
       _grid[idx] = El.empty;
       _life[idx] = 0;
       return;
     }
 
-    // Drowning in water: ants struggle and slowly sink
-    if (_checkAdjacent(x, y, El.water)) {
-      // Try to swim upward (opposite gravity)
-      final uy = y - _gravityDir;
-      if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.water && _rng.nextInt(3) == 0) {
-        _swap(idx, uy * _gridW + x);
-        return;
+    // Fire kills ants — try to flee first
+    if (_checkAdjacent(x, y, El.fire)) {
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          final nx2 = x + dx;
+          final ny2 = y + dy;
+          if (!_inBounds(nx2, ny2)) continue;
+          final c = _grid[ny2 * _gridW + nx2];
+          if (c == El.empty && !_checkAdjacent(nx2, ny2, El.fire)) {
+            _swap(idx, ny2 * _gridW + nx2);
+            return;
+          }
+        }
       }
-      // Sink 1 cell every ~15 frames
-      _velY[idx] = (_velY[idx] + 1).toInt();
-      if (_velY[idx] >= 15) {
-        _velY[idx] = 0;
-        final by2 = y + _gravityDir;
-        if (_inBounds(x, by2) && _grid[by2 * _gridW + x] == El.water) {
-          _swap(idx, by2 * _gridW + x);
+      // Can't escape — die
+      _grid[idx] = El.empty;
+      _life[idx] = 0;
+      return;
+    }
+
+    // Drowning: ants in water struggle upward, eventually drown
+    final inWater = _grid[idx] == El.ant && _checkAdjacent(x, y, El.water);
+    if (inWater) {
+      // Try to swim upward
+      if (_inBounds(x, uy) && _rng.nextInt(3) == 0) {
+        final aboveCell = _grid[uy * _gridW + x];
+        if (aboveCell == El.empty || aboveCell == El.water) {
+          _swap(idx, uy * _gridW + x);
           return;
         }
       }
-      // Drown after ~90 frames submerged
+      // Try to reach dry land sideways
+      for (final dir in [1, -1]) {
+        final sx = x + dir;
+        if (_inBounds(sx, y) && _grid[y * _gridW + sx] == El.empty) {
+          _swap(idx, y * _gridW + sx);
+          return;
+        }
+      }
+      // Sink slowly
+      _velY[idx] = (_velY[idx] + 1).toInt();
+      if (_velY[idx] >= 15) {
+        _velY[idx] = 0;
+        if (_inBounds(x, by) && _grid[by * _gridW + x] == El.water) {
+          _swap(idx, by * _gridW + x);
+          return;
+        }
+      }
+      // Drown after ~90 frames
       _life[idx]++;
       if (_life[idx] > 90) {
         _grid[idx] = El.empty;
         _life[idx] = 0;
         _velY[idx] = 0;
-        return;
-      }
-      return; // skip normal ant movement while in water
-    } else {
-      // Reset drowning counter when not touching water
-      if (_life[idx] > 0) _life[idx] = 0;
-      _velY[idx] = 0;
-    }
-    if (_checkAdjacent(x, y, El.fire)) {
-      _life[idx] = 0;
-      for (int dy = -1; dy <= 1; dy++) {
-        for (int dx = -1; dx <= 1; dx++) {
-          final nx = x + dx;
-          final ny = y + dy;
-          if (!_inBounds(nx, ny)) continue;
-          if (!_checkAdjacent(nx, ny, El.fire) &&
-              _grid[ny * _gridW + nx] == El.empty) {
-            _swap(idx, ny * _gridW + nx);
-            return;
-          }
-        }
       }
       return;
     }
+    // Reset drowning counter on dry land
+    if (_life[idx] > 0) _life[idx] = 0;
+    _velY[idx] = 0;
 
     if (_velX[idx] == 0) _velX[idx] = _rng.nextBool() ? 1 : -1;
 
-    // Apply gravity if no ground
-    final by = y + _gravityDir;
-    final uy = y - _gravityDir;
+    // Gravity — fall if no ground
     if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
       _swap(idx, by * _gridW + x);
       return;
     }
 
-    // Trail-following: check if other ants are nearby and tend toward them
+    // ── Dirt preference: steer toward nearby dirt ──
+    // Scan ahead for dirt — ants love dirt and will seek it out
+    int dirtDir = 0;
+    for (int scanD = 1; scanD <= 6; scanD++) {
+      for (final dir in [_velX[idx], -_velX[idx]]) {
+        final sx = x + dir * scanD;
+        if (!_inBounds(sx, y)) continue;
+        final sc = _grid[y * _gridW + sx];
+        if (sc == El.dirt || sc == El.mud) {
+          dirtDir = dir;
+          break;
+        }
+        // Avoid walking toward water
+        if (sc == El.water || sc == El.acid || sc == El.lava) {
+          if (dir == _velX[idx]) {
+            _velX[idx] = -_velX[idx]; // reverse away from danger
+          }
+          break;
+        }
+      }
+      if (dirtDir != 0) break;
+    }
+
+    // Trail-following: check if other ants are nearby
     bool foundFriend = false;
     for (int scanD = 1; scanD <= 5; scanD++) {
       final scanX = x + _velX[idx] * scanD;
@@ -2183,20 +2307,25 @@ class _ElementLabGameState extends State<ElementLabGame>
       }
     }
 
+    // Prefer dirt direction over random, friends over dirt
+    final moveDir = foundFriend ? _velX[idx] : (dirtDir != 0 ? dirtDir : _velX[idx]);
+
     // Walk along surfaces
-    final nx = x + _velX[idx];
+    final nx = x + moveDir;
     if (_inBounds(nx, y) && _grid[y * _gridW + nx] == El.empty) {
+      _velX[idx] = moveDir;
       _swap(idx, y * _gridW + nx);
       return;
     }
 
-    // Try climbing 1 cell (opposite to gravity)
+    // Climb up 1 cell (step over obstacle)
     if (_inBounds(nx, uy) && _grid[uy * _gridW + nx] == El.empty) {
+      _velX[idx] = moveDir;
       _swap(idx, uy * _gridW + nx);
       return;
     }
 
-    // Try climbing straight up (wall climb)
+    // Climb straight up along a wall
     if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
       if (!_inBounds(nx, y) || _grid[y * _gridW + nx] != El.empty) {
         _swap(idx, uy * _gridW + x);
@@ -2204,7 +2333,17 @@ class _ElementLabGameState extends State<ElementLabGame>
       }
     }
 
-    // Reverse direction (but if following a friend trail, less random)
+    // ── Colonize: dig into dirt to build tunnels ──
+    // If ant is on dirt, occasionally dig (convert dirt to empty, ant moves in)
+    if (_inBounds(nx, y) && _grid[y * _gridW + nx] == El.dirt && _rng.nextInt(8) == 0) {
+      _grid[y * _gridW + nx] = El.empty;
+      _life[y * _gridW + nx] = 0;
+      _velX[idx] = moveDir;
+      _swap(idx, y * _gridW + nx);
+      return;
+    }
+
+    // Reverse direction
     if (!foundFriend) {
       _velX[idx] = -_velX[idx];
       if (_rng.nextInt(5) == 0) _velX[idx] = _rng.nextBool() ? 1 : -1;
@@ -2227,14 +2366,15 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Float on water: swap oil and water (oil rises through water)
-    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.water) {
-      final bi = by * _gridW + x;
-      _grid[bi] = El.oil;
-      _life[bi] = _life[idx];
+    // Float on water: if oil is sitting ON water (water is above), rise upward
+    final uy = y - _gravityDir;
+    if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.water && _flags[uy * _gridW + x] != 1) {
+      final ui = uy * _gridW + x;
+      _grid[ui] = El.oil;
+      _life[ui] = _life[idx];
       _grid[idx] = El.water;
       _life[idx] = 0;
-      _flags[bi] = 1;
+      _flags[ui] = 1;
       _flags[idx] = 1;
       return;
     }
@@ -2516,29 +2656,30 @@ class _ElementLabGameState extends State<ElementLabGame>
       final el = _grid[i];
       final pi4 = i * 4;
       if (el == El.empty) {
-        // Check for fire/lava glow from neighbors
+        // Check for fire/lava glow from immediate neighbors only (3x3 not 5x5)
+        // Only update glow every other frame to reduce flicker
         final x = i % _gridW;
         final y = i ~/ _gridW;
         int glowR = 0, glowG = 0;
-        for (int dy = -2; dy <= 2; dy++) {
-          for (int dx = -2; dx <= 2; dx++) {
-            final nx = x + dx;
-            final ny = y + dy;
-            if (_inBounds(nx, ny)) {
-              final ni = ny * _gridW + nx;
-              final nel = _grid[ni];
-              if (nel == El.fire || nel == El.lava) {
-                final dist = dx.abs() + dy.abs();
-                final intensity = ((3 - dist).clamp(0, 3) * 8 * glowMul).round();
-                glowR += intensity;
-                if (nel == El.fire) glowG += (intensity * 0.3).round();
+        if (_frameCount % 2 == 0) {
+          for (int dy = -1; dy <= 1; dy++) {
+            for (int dx = -1; dx <= 1; dx++) {
+              if (dx == 0 && dy == 0) continue;
+              final nx = x + dx;
+              final ny = y + dy;
+              if (_inBounds(nx, ny)) {
+                final nel = _grid[ny * _gridW + nx];
+                if (nel == El.fire || nel == El.lava) {
+                  glowR += (12 * glowMul).round();
+                  if (nel == El.fire) glowG += (4 * glowMul).round();
+                }
               }
             }
           }
         }
         if (glowR > 0) {
-          glowR = glowR.clamp(0, 120);
-          glowG = glowG.clamp(0, 40);
+          glowR = glowR.clamp(0, 80);
+          glowG = glowG.clamp(0, 25);
           _pixels[pi4] = (bgR + glowR).clamp(0, 255);
           _pixels[pi4 + 1] = (bgG + glowG).clamp(0, 255);
           _pixels[pi4 + 2] = bgB;
@@ -2952,6 +3093,18 @@ class _ElementLabGameState extends State<ElementLabGame>
     final gx = ((pos.dx - _canvasLeft) / _cellSize).floor();
     final gy = ((pos.dy - _canvasTop) / _cellSize).floor();
 
+    // Seeds always place a single cell (no brush size scaling)
+    if (_selectedElement == El.seed) {
+      if (!_inBounds(gx, gy)) return;
+      final ni = gy * _gridW + gx;
+      if (_grid[ni] != El.empty) return;
+      _grid[ni] = El.seed;
+      _life[ni] = 0;
+      _velX[ni] = _selectedSeedType;
+      _velY[ni] = 0;
+      return;
+    }
+
     final radius = burst ? _brushSize + 2 : _brushSize;
     final halfR = radius ~/ 2;
 
@@ -2980,7 +3133,6 @@ class _ElementLabGameState extends State<ElementLabGame>
 
         _grid[ni] = _selectedElement;
         _life[ni] = 0;
-        _velX[ni] = _selectedElement == El.seed ? _selectedSeedType : 0;
         _velY[ni] = 0;
       }
     }
@@ -3014,6 +3166,18 @@ class _ElementLabGameState extends State<ElementLabGame>
 
   /// Place element at a single grid cell (for line drawing).
   void _placeAt(int gx, int gy) {
+    // Seeds always place a single cell
+    if (_selectedElement == El.seed) {
+      if (!_inBounds(gx, gy)) return;
+      final ni = gy * _gridW + gx;
+      if (_grid[ni] != El.empty) return;
+      _grid[ni] = El.seed;
+      _life[ni] = 0;
+      _velX[ni] = _selectedSeedType;
+      _velY[ni] = 0;
+      return;
+    }
+
     final halfR = _brushSize ~/ 2;
     for (int dy = -halfR; dy <= halfR; dy++) {
       for (int dx = -halfR; dx <= halfR; dx++) {
@@ -3032,7 +3196,6 @@ class _ElementLabGameState extends State<ElementLabGame>
         if (_grid[ni] != El.empty && _selectedElement != El.lightning) continue;
         _grid[ni] = _selectedElement;
         _life[ni] = 0;
-        _velX[ni] = _selectedElement == El.seed ? _selectedSeedType : 0;
         _velY[ni] = 0;
       }
     }
@@ -3572,7 +3735,7 @@ class _ElementLabGameState extends State<ElementLabGame>
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  seedNames[_selectedSeedType.clamp(1, 5)],
+                  'Seed',
                   style: AppFonts.fredoka(fontSize: 9, fontWeight: FontWeight.w500,
                     color: isSelected ? color : AppColors.secondaryText),
                 ),
