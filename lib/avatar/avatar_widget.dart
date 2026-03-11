@@ -29,19 +29,21 @@ import 'animation/skeleton.dart';
 /// Layer order (bottom → top):
 ///   1. Background circle
 ///   2. Golden glow aura (GoldenGlowPainter)
-///   3. Hair back layer (HairBackPainter)
-///   4. Face (3D skin gradient, ears, chin shadow, nose-bridge AO)
-///   5. Nose (with breathing nostril micro-anim)
-///   6. Cheeks (gaussian radial blush)
-///   7. Eyes (full iris detail, eyelid-sweep blink, pupil tracking)
-///   8. Eyelashes (curved strokes)
-///   9. Eyebrows (gradient fill)
-///  10. Mouth (gradient lips, individual teeth, tongue center-line)
-///  11. Face paint (FacePaintPainter)
-///  12. Hair front layer (HairFrontPainter)
-///  13. Glasses (GlassesPainter)
-///  14. Accessories (accessoryPainter dispatcher)
-///  15. Sparkle effects (SparklePainter)
+///   3. Body (neck, torso, shoulders, arms, hands)
+///   4. Hair back layer (HairBackPainter)
+///   5. Hair front layer (HairFrontPainter) — behind face so face is always visible
+///   6. Head bone group (face + all features, sway-rotated together):
+///      a. Face (3D skin gradient, ears, chin shadow, nose-bridge AO)
+///      b. Nose (with breathing nostril micro-anim)
+///      c. Cheeks (gaussian radial blush)
+///      d. Eyes (full iris detail, eyelid-sweep blink, pupil tracking)
+///      e. Eyelashes (curved strokes)
+///      f. Eyebrows (gradient fill)
+///      g. Mouth (gradient lips, individual teeth, tongue center-line)
+///      h. Face paint (FacePaintPainter)
+///      i. Glasses (GlassesPainter)
+///   7. Accessories (accessoryPainter dispatcher)
+///   8. Sparkle effects (SparklePainter)
 // ═══════════════════════════════════════════════════════════════════════
 //  AVATAR EXPRESSION SYSTEM
 // ═══════════════════════════════════════════════════════════════════════
@@ -608,7 +610,28 @@ class _AvatarWidgetState extends State<AvatarWidget>
                 ),
               ),
 
-              // 5. Head bone: unified sway rotation for all face features
+              // 5. Hair front layer — rendered AFTER hair back but BEFORE
+              // the head bone so face + all features paint on top of hair.
+              Positioned(
+                left: 0,
+                top: 0,
+                width: widgetW,
+                height: widgetW,
+                child: CustomPaint(
+                  isComplex: true,
+                  willChange: widget.animateEffects,
+                  painter: HairFrontPainter(
+                    style: config.hairStyle,
+                    color: _hairColor,
+                    isRainbow: isRainbowHair(config.hairColor),
+                    faceShape: config.faceShape,
+                    swayValue: _idleSwayValue,
+                    repaint: _repaintNotifier,
+                  ),
+                ),
+              ),
+
+              // 6. Head bone: unified sway rotation for all face features
               // Scaled down from full widgetW to avoid oversized head
               Positioned(
                 left: widgetW * 0.09,
@@ -616,13 +639,12 @@ class _AvatarWidgetState extends State<AvatarWidget>
                 width: widgetW * 0.82,
                 height: widgetW * 0.82,
                 child: Transform(
-                  alignment: Alignment.center,
                   transform: Matrix4.identity()
                     ..translateByDouble(
-                        widgetW * 0.82 / 2, widgetW * 0.82 / 4, 0, 0)
+                        widgetW * 0.82 / 2, widgetW * 0.82 / 4, 0, 1.0)
                     ..rotateZ(swayAngle)
                     ..translateByDouble(
-                        -widgetW * 0.82 / 2, -widgetW * 0.82 / 4, 0, 0),
+                        -widgetW * 0.82 / 2, -widgetW * 0.82 / 4, 0, 1.0),
                   child: Stack(
                     clipBehavior: Clip.none,
                     children: [
@@ -645,31 +667,7 @@ class _AvatarWidgetState extends State<AvatarWidget>
                         ),
                       ),
 
-                      // Hair front layer — rendered AFTER face but BEFORE
-                      // eyes/nose/mouth so face features are visible on top
-                      // of the hair fringe (bangs). The offset compensates
-                      // for the head bone's Positioned inset so hair paints
-                      // in the original full-widget coordinate space.
-                      Positioned(
-                        left: -widgetW * 0.09,
-                        top: widgetW * 0.04,
-                        width: widgetW,
-                        height: widgetW,
-                        child: CustomPaint(
-                          isComplex: true,
-                          willChange: widget.animateEffects,
-                          painter: HairFrontPainter(
-                            style: config.hairStyle,
-                            color: _hairColor,
-                            isRainbow: isRainbowHair(config.hairColor),
-                            faceShape: config.faceShape,
-                            swayValue: _idleSwayValue,
-                            repaint: _repaintNotifier,
-                          ),
-                        ),
-                      ),
-
-                      // Nose (renders ON TOP of hair front layer)
+                      // Nose
                       Positioned(
                         left: _headSize(size) * 0.44,
                         top: _headSize(size) *

@@ -1,7 +1,6 @@
 import 'dart:async';
 import 'dart:math';
 import 'package:flutter/material.dart';
-import '../../data/dolch_words.dart';
 import '../../services/audio_service.dart';
 import '../../services/high_score_service.dart';
 import '../../services/progress_service.dart';
@@ -9,7 +8,51 @@ import '../../theme/app_theme.dart';
 import '../../utils/haptics.dart';
 
 // ---------------------------------------------------------------------------
-// Sight Word Safari -- animals hold word cards, tap the correct animal
+// Sight Word Safari -- hear an animal name, tap the matching animal card.
+// Each animal IS the word: the child hears "tiger" and taps the tiger.
+// ---------------------------------------------------------------------------
+
+/// An animal with its display name used as the target word.
+class _SafariAnimal {
+  final String name; // also the target word
+  final String emoji;
+  final Color color;
+
+  const _SafariAnimal(this.name, this.emoji, this.color);
+}
+
+/// All available safari animals. Each animal's name is the sight word.
+const _allAnimals = <_SafariAnimal>[
+  _SafariAnimal('tiger', '\u{1F42F}', Color(0xFFFF8C42)),
+  _SafariAnimal('elephant', '\u{1F418}', Color(0xFF8E8E8E)),
+  _SafariAnimal('monkey', '\u{1F435}', Color(0xFFCD853F)),
+  _SafariAnimal('parrot', '\u{1F99C}', Color(0xFF00E68A)),
+  _SafariAnimal('frog', '\u{1F438}', Color(0xFF4CAF50)),
+  _SafariAnimal('toucan', '\u{1F426}', Color(0xFFFFD700)),
+  _SafariAnimal('lion', '\u{1F981}', Color(0xFFE8A317)),
+  _SafariAnimal('bear', '\u{1F43B}', Color(0xFF8B5E3C)),
+  _SafariAnimal('snake', '\u{1F40D}', Color(0xFF66BB6A)),
+  _SafariAnimal('owl', '\u{1F989}', Color(0xFFAB8D6B)),
+  _SafariAnimal('rabbit', '\u{1F430}', Color(0xFFE8A0BF)),
+  _SafariAnimal('fish', '\u{1F41F}', Color(0xFF42A5F5)),
+  _SafariAnimal('fox', '\u{1F98A}', Color(0xFFFF7043)),
+  _SafariAnimal('bat', '\u{1F987}', Color(0xFF7E57C2)),
+  _SafariAnimal('whale', '\u{1F433}', Color(0xFF5C8FCC)),
+  _SafariAnimal('turtle', '\u{1F422}', Color(0xFF388E3C)),
+];
+
+enum _CardState { idle, correct, wrong }
+
+class _AnimalCard {
+  final _SafariAnimal animal;
+  final double bouncePhase;
+  _CardState state = _CardState.idle;
+
+  _AnimalCard({required this.animal, required this.bouncePhase});
+
+  String get word => animal.name;
+}
+
 // ---------------------------------------------------------------------------
 
 class SightWordSafariGame extends StatefulWidget {
@@ -34,12 +77,9 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
     with TickerProviderStateMixin {
   static const _gameId = 'sight_word_safari';
   static const _roundCount = 12;
-  static const _roundDurationSecs = 8;
+  static const _roundDurationSecs = 10;
 
   final _rng = Random();
-
-  // Word pool
-  List<String> _wordPool = [];
 
   // Round state
   int _round = 0;
@@ -49,6 +89,9 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
   bool _answered = false;
   bool _gameOver = false;
   bool _isNewBest = false;
+
+  // Pool of animals shuffled for this session
+  late List<_SafariAnimal> _animalPool;
 
   // Score
   int _score = 0;
@@ -68,15 +111,6 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
 
   // Jungle particles
   late List<_JungleParticle> _particles;
-
-  static const _animalTypes = [
-    _AnimalType('Elephant', Color(0xFF8E8E8E), Icons.pets),
-    _AnimalType('Monkey', Color(0xFFCD853F), Icons.emoji_nature),
-    _AnimalType('Parrot', Color(0xFF00E68A), Icons.flutter_dash),
-    _AnimalType('Tiger', Color(0xFFFF8C42), Icons.cruelty_free),
-    _AnimalType('Frog', Color(0xFF4CAF50), Icons.pest_control),
-    _AnimalType('Toucan', Color(0xFFFFD700), Icons.air),
-  ];
 
   @override
   void initState() {
@@ -114,21 +148,7 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
   }
 
   void _initGame() {
-    final unlocked = <String>[];
-    for (int level = 1; level <= DolchWords.totalLevels; level++) {
-      if (widget.progressService.isLevelUnlocked(level)) {
-        for (final w in DolchWords.wordsForLevel(level)) {
-          unlocked.add(w.text);
-        }
-      }
-    }
-    if (unlocked.length < 10) {
-      for (final w in DolchWords.wordsForLevel(1)) {
-        unlocked.add(w.text);
-      }
-    }
-    unlocked.shuffle(_rng);
-    _wordPool = unlocked;
+    _animalPool = List<_SafariAnimal>.from(_allAnimals)..shuffle(_rng);
     _round = 0;
     _score = 0;
     _streak = 0;
@@ -138,37 +158,44 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
     _nextRound();
   }
 
+  /// Speak an animal word. Tries bundled word audio first; falls back to
+  /// spelling it out letter-by-letter for animals without audio files.
+  Future<void> _speakAnimalWord(String word) async {
+    final success = await widget.audioService.playWord(word);
+    if (!success) {
+      // Spell it out letter by letter
+      for (int i = 0; i < word.length; i++) {
+        await Future.delayed(const Duration(milliseconds: 350));
+        if (!mounted) return;
+        await widget.audioService.playLetter(word[i]);
+      }
+    }
+  }
+
   void _nextRound() {
     if (_round >= _roundCount) {
       _endGame();
       return;
     }
 
-    // Pick animal count based on round (difficulty ramp)
-    final animalCount = min(3 + (_round ~/ 4), 5);
+    // Difficulty ramp: start with 3 animals, add one every 3 rounds, max 6
+    final animalCount = min(3 + (_round ~/ 3), 6);
 
-    // Choose words
-    final roundWords = <String>[];
-    final usedWords = <String>{};
-    while (roundWords.length < animalCount && usedWords.length < _wordPool.length) {
-      final w = _wordPool[_rng.nextInt(_wordPool.length)];
-      if (!usedWords.contains(w)) {
-        roundWords.add(w);
-        usedWords.add(w);
-      }
-    }
+    // Pick distinct animals for this round
+    final pool = List<_SafariAnimal>.from(_animalPool)..shuffle(_rng);
+    final roundAnimals = pool.take(animalCount).toList();
 
-    _targetWord = roundWords[_rng.nextInt(roundWords.length)];
+    // Target is one of the animals shown
+    final target = roundAnimals[_rng.nextInt(roundAnimals.length)];
+    _targetWord = target.name;
 
-    // Assign animals
-    final shuffledTypes = List<_AnimalType>.from(_animalTypes)..shuffle(_rng);
-    _animals = List.generate(animalCount, (i) {
+    _animals = roundAnimals.map((a) {
       return _AnimalCard(
-        word: roundWords[i],
-        type: shuffledTypes[i % shuffledTypes.length],
+        animal: a,
         bouncePhase: _rng.nextDouble() * 2 * pi,
       );
-    });
+    }).toList()
+      ..shuffle(_rng);
 
     _selectedIndex = null;
     _answered = false;
@@ -190,7 +217,7 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
     });
 
     _entranceController.forward(from: 0.0);
-    widget.audioService.playWord(_targetWord);
+    _speakAnimalWord(_targetWord);
 
     if (mounted) setState(() {});
   }
@@ -327,7 +354,7 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
               Column(
                 children: [
                   _buildHeader(),
-                  if (!_gameOver) _buildTargetWord(),
+                  if (!_gameOver) _buildTargetPrompt(),
                   if (!_gameOver) Expanded(child: _buildAnimalGrid()),
                   if (_gameOver) Expanded(child: _buildGameOver()),
                 ],
@@ -422,7 +449,7 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
     );
   }
 
-  Widget _buildTargetWord() {
+  Widget _buildTargetPrompt() {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 12),
       child: Column(
@@ -436,7 +463,7 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
           ),
           const SizedBox(height: 8),
           GestureDetector(
-            onTap: () => widget.audioService.playWord(_targetWord),
+            onTap: () => _speakAnimalWord(_targetWord),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
               decoration: BoxDecoration(
@@ -463,7 +490,7 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
                   ),
                   const SizedBox(width: 10),
                   Text(
-                    'Find: "$_targetWord"',
+                    'Find the $_targetWord!',
                     style: AppFonts.fredoka(
                       fontSize: 22,
                       fontWeight: FontWeight.w600,
@@ -533,7 +560,7 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
         borderColor = AppColors.error;
         bgColor = AppColors.error.withValues(alpha: 0.1);
       case _CardState.idle:
-        borderColor = animal.type.color.withValues(alpha: 0.5);
+        borderColor = animal.animal.color.withValues(alpha: 0.5);
         bgColor = AppColors.surface;
     }
 
@@ -541,7 +568,7 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
       onTap: () => _onAnimalTap(index),
       child: Container(
         width: 140,
-        height: 160,
+        height: 170,
         decoration: BoxDecoration(
           color: bgColor,
           borderRadius: BorderRadius.circular(20),
@@ -554,7 +581,7 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
                 spreadRadius: 4,
               ),
             BoxShadow(
-              color: animal.type.color.withValues(alpha: 0.1),
+              color: animal.animal.color.withValues(alpha: 0.1),
               blurRadius: 12,
             ),
           ],
@@ -562,43 +589,29 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Animal icon
-            Container(
-              width: 56,
-              height: 56,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: animal.type.color.withValues(alpha: 0.2),
-              ),
-              child: Icon(
-                animal.type.icon,
-                size: 32,
-                color: animal.type.color,
-              ),
-            ),
-            const SizedBox(height: 4),
+            // Animal emoji
             Text(
-              animal.type.name,
-              style: AppFonts.nunito(
-                fontSize: 11,
-                color: AppColors.secondaryText,
-              ),
+              animal.animal.emoji,
+              style: const TextStyle(fontSize: 48),
             ),
             const SizedBox(height: 8),
-            // Word card
+            // Animal name = the word
             Container(
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha: 0.9),
+                color: animal.animal.color.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: animal.animal.color.withValues(alpha: 0.3),
+                ),
               ),
               child: Text(
                 animal.word,
                 style: AppFonts.fredoka(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: const Color(0xFF2A2A4A),
+                  color: AppColors.primaryText,
                 ),
               ),
             ),
@@ -745,29 +758,7 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
   }
 }
 
-// ---- Data ----
-
-enum _CardState { idle, correct, wrong }
-
-class _AnimalType {
-  final String name;
-  final Color color;
-  final IconData icon;
-  const _AnimalType(this.name, this.color, this.icon);
-}
-
-class _AnimalCard {
-  final String word;
-  final _AnimalType type;
-  final double bouncePhase;
-  _CardState state = _CardState.idle;
-
-  _AnimalCard({
-    required this.word,
-    required this.type,
-    required this.bouncePhase,
-  });
-}
+// ---- Jungle particle background ----
 
 class _JungleParticle {
   final double x, y, size, speed, phase;
@@ -779,11 +770,11 @@ class _JungleParticle {
         size = 2 + rng.nextDouble() * 4,
         speed = 0.3 + rng.nextDouble() * 0.5,
         phase = rng.nextDouble() * 2 * pi,
-        color = [
-          const Color(0xFF10B981),
-          const Color(0xFF059669),
-          const Color(0xFF34D399),
-          const Color(0xFFFFD700),
+        color = const [
+          Color(0xFF10B981),
+          Color(0xFF059669),
+          Color(0xFF34D399),
+          Color(0xFFFFD700),
         ][rng.nextInt(4)];
 }
 

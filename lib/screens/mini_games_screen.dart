@@ -24,6 +24,8 @@ import 'mini_games/sight_word_safari_game.dart';
 import 'mini_games/word_ninja_game.dart';
 import 'mini_games/spelling_bee_game.dart';
 import 'mini_games/word_train_game.dart';
+import 'mini_games/ladybug_game.dart';
+import 'mini_games/element_lab_game.dart';
 import '../services/adaptive_difficulty_service.dart';
 
 class MiniGamesScreen extends StatefulWidget {
@@ -285,6 +287,21 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
                             playerName: widget.playerName,
                           ),
                         ),
+                        _buildGameBtn(
+                          context, 'Ladybug Letters',
+                          const _LadybugIconPainter(), AppColors.error, 15,
+                          LadybugGame(
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            highScoreService: widget.highScoreService,
+                            playerName: widget.playerName,
+                          ),
+                        ),
+                        _buildCoinGameBtn(
+                          context, 'Element Lab',
+                          const BeakerIconPainter(), AppColors.emerald, 16,
+                          kElementLabCost,
+                        ),
                       ],
                     ),
                   ),
@@ -347,7 +364,7 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
     'memory_match', 'falling_letters', 'cat_letter_toss',
     'letter_drop', 'rhyme_time', 'star_catcher', 'paint_splash',
     'word_rocket', 'sight_word_safari', 'word_ninja',
-    'spelling_bee', 'word_train',
+    'spelling_bee', 'word_train', 'ladybug_letters', 'element_lab',
   ];
 
   Widget _buildGameBtn(BuildContext context, String label,
@@ -364,6 +381,88 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
           widget.personalityService?.onMiniGamePlayed(widget.profileId, index);
         }
         // Record mini game play in stats
+        if (index < _gameIds.length) {
+          widget.statsService?.recordMiniGamePlayed(_gameIds[index], 0);
+        }
+      },
+    )
+        .animate()
+        .fadeIn(delay: (index * 80).ms, duration: 400.ms)
+        .scale(
+          begin: const Offset(0.8, 0.8),
+          curve: Curves.easeOutBack,
+          delay: (index * 80).ms,
+          duration: 500.ms,
+        );
+  }
+
+  /// Builds a game button that requires star coins to enter.
+  Widget _buildCoinGameBtn(BuildContext context, String label,
+      CustomPainter painter, Color glow, int index, int cost) {
+    return _GameButton(
+      label: label,
+      painter: painter,
+      glowColor: glow,
+      coinCost: cost,
+      coinBalance: widget.progressService.starCoins,
+      onTap: () async {
+        final balance = widget.progressService.starCoins;
+        if (balance < cost) {
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: AppColors.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Text(
+                'Not Enough Coins!',
+                style: AppFonts.fredoka(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryText,
+                ),
+              ),
+              content: Text(
+                'You need $cost star coins to play.\n'
+                'You have $balance — earn ${cost - balance} more by completing words!',
+                style: AppFonts.fredoka(
+                  fontSize: 14,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(
+                    'OK',
+                    style: AppFonts.fredoka(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.electricBlue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+        // Spend the coins
+        widget.progressService.spendStarCoins(cost);
+        if (!mounted) return;
+        final game = ElementLabGame(
+          progressService: widget.progressService,
+          audioService: widget.audioService,
+          playerName: widget.playerName,
+        );
+        await Navigator.push(context, _smoothRoute(game));
+        if (!mounted) return;
+        setState(() {}); // refresh coin display
+        if (widget.profileId.isNotEmpty) {
+          widget.personalityService?.onMiniGamePlayed(widget.profileId, index);
+        }
         if (index < _gameIds.length) {
           widget.statsService?.recordMiniGamePlayed(_gameIds[index], 0);
         }
@@ -401,12 +500,16 @@ class _GameButton extends StatefulWidget {
   final CustomPainter painter;
   final Color glowColor;
   final VoidCallback onTap;
+  final int? coinCost;
+  final int? coinBalance;
 
   const _GameButton({
     required this.label,
     required this.painter,
     required this.glowColor,
     required this.onTap,
+    this.coinCost,
+    this.coinBalance,
   });
 
   @override
@@ -436,30 +539,74 @@ class _GameButtonState extends State<_GameButton> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Icon circle
-              Container(
-                width: 68,
-                height: 68,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.surface,
-                  border: Border.all(
-                    color: widget.glowColor.withValues(alpha: _hovering ? 0.8 : 0.4),
-                    width: 2,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: widget.glowColor
-                          .withValues(alpha: _hovering ? 0.4 : 0.15),
-                      blurRadius: _hovering ? 24 : 12,
-                      spreadRadius: _hovering ? 4 : 1,
+              // Icon circle (with optional coin badge)
+              Stack(
+                clipBehavior: Clip.none,
+                children: [
+                  Container(
+                    width: 68,
+                    height: 68,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: AppColors.surface,
+                      border: Border.all(
+                        color: widget.glowColor.withValues(alpha: _hovering ? 0.8 : 0.4),
+                        width: 2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: widget.glowColor
+                              .withValues(alpha: _hovering ? 0.4 : 0.15),
+                          blurRadius: _hovering ? 24 : 12,
+                          spreadRadius: _hovering ? 4 : 1,
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                child: CustomPaint(
-                  painter: widget.painter,
-                  size: const Size(68, 68),
-                ),
+                    child: CustomPaint(
+                      painter: widget.painter,
+                      size: const Size(68, 68),
+                    ),
+                  ),
+                  if (widget.coinCost != null)
+                    Positioned(
+                      top: -4,
+                      right: -4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 5, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.surface,
+                          borderRadius: BorderRadius.circular(10),
+                          border: Border.all(
+                            color: AppColors.starGold.withValues(alpha: 0.6),
+                            width: 1,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppColors.starGold.withValues(alpha: 0.3),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.star_rounded,
+                                color: AppColors.starGold, size: 10),
+                            const SizedBox(width: 2),
+                            Text(
+                              '${widget.coinCost}',
+                              style: AppFonts.fredoka(
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.starGold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                ],
               ),
               const SizedBox(height: 6),
               // Label
@@ -1873,6 +2020,95 @@ class _TrainIconPainter extends CustomPainter {
         ..color = const Color(0xFF666666)
         ..strokeWidth = 1.5,
     );
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+// ── Ladybug icon painter (compact, fits 88x88 circle) ─────────────────────
+
+class _LadybugIconPainter extends CustomPainter {
+  const _LadybugIconPainter();
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final cx = size.width / 2;
+    final cy = size.height / 2;
+
+    // Legs
+    final legPaint = Paint()
+      ..color = const Color(0xFF1A1A1A)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round;
+    for (int i = 0; i < 3; i++) {
+      final yOff = cy - 6.0 + i * 6.0;
+      canvas.drawLine(Offset(cx - 10, yOff), Offset(cx - 16, yOff + 3), legPaint);
+      canvas.drawLine(Offset(cx + 10, yOff), Offset(cx + 16, yOff + 3), legPaint);
+    }
+
+    // Shell
+    canvas.drawOval(
+      Rect.fromCenter(center: Offset(cx, cy + 2), width: 24, height: 28),
+      Paint()
+        ..shader = const RadialGradient(
+          center: Alignment(-0.3, -0.3),
+          colors: [Color(0xFFFF3333), Color(0xFFCC1111)],
+        ).createShader(
+          Rect.fromCenter(center: Offset(cx, cy + 2), width: 24, height: 28),
+        ),
+    );
+
+    // Center line
+    canvas.drawLine(
+      Offset(cx, cy - 10),
+      Offset(cx, cy + 14),
+      Paint()
+        ..color = const Color(0xFF1A1A1A)
+        ..strokeWidth = 1,
+    );
+
+    // Spots
+    final spotPaint = Paint()..color = const Color(0xFF1A1A1A);
+    canvas.drawCircle(Offset(cx - 4, cy - 2), 2.5, spotPaint);
+    canvas.drawCircle(Offset(cx + 4, cy - 2), 2.5, spotPaint);
+    canvas.drawCircle(Offset(cx - 5, cy + 6), 2, spotPaint);
+    canvas.drawCircle(Offset(cx + 5, cy + 6), 2, spotPaint);
+
+    // Head
+    canvas.drawCircle(
+      Offset(cx, cy - 12),
+      7,
+      Paint()..color = const Color(0xFF1A1A1A),
+    );
+
+    // Eyes
+    canvas.drawCircle(Offset(cx - 2.5, cy - 13), 1.5, Paint()..color = Colors.white);
+    canvas.drawCircle(Offset(cx + 2.5, cy - 13), 1.5, Paint()..color = Colors.white);
+
+    // Antennae
+    final antennaePaint = Paint()
+      ..color = const Color(0xFF1A1A1A)
+      ..strokeWidth = 1.2
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+    final leftA = Path()
+      ..moveTo(cx - 2, cy - 18)
+      ..quadraticBezierTo(cx - 8, cy - 26, cx - 6, cy - 28);
+    canvas.drawPath(leftA, antennaePaint);
+    canvas.drawCircle(Offset(cx - 6, cy - 28), 1.5, Paint()..color = const Color(0xFF1A1A1A));
+    final rightA = Path()
+      ..moveTo(cx + 2, cy - 18)
+      ..quadraticBezierTo(cx + 8, cy - 26, cx + 6, cy - 28);
+    canvas.drawPath(rightA, antennaePaint);
+    canvas.drawCircle(Offset(cx + 6, cy - 28), 1.5, Paint()..color = const Color(0xFF1A1A1A));
+
+    // Leaf
+    final leafPath = Path()
+      ..moveTo(cx + 18, cy + 8)
+      ..quadraticBezierTo(cx + 26, cy + 2, cx + 22, cy - 4)
+      ..quadraticBezierTo(cx + 14, cy + 2, cx + 18, cy + 8);
+    canvas.drawPath(leafPath, Paint()..color = const Color(0xFF40916C).withValues(alpha: 0.7));
   }
 
   @override

@@ -147,6 +147,14 @@ class GameDifficultyParams {
           wordCount: lerpInt(6, 12, difficulty),
           distractorCount: lerpInt(2, 5, difficulty),
         );
+      case 'ladybug_letters':
+        return GameDifficultyParams(
+          difficulty: difficulty,
+          lives: lerpInt(5, 2, difficulty),
+          gameDurationSeconds: lerp(75, 40, difficulty),
+          distractorCount: lerpInt(3, 7, difficulty),
+          wordCount: lerpInt(8, 18, difficulty),
+        );
       default:
         return GameDifficultyParams(difficulty: difficulty);
     }

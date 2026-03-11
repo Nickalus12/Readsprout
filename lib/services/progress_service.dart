@@ -7,11 +7,38 @@ import '../data/dolch_words.dart';
 
 class ProgressService {
   static const _baseKey = 'sight_words_progress';
+  static const _starCoinsKey = 'star_coins';
   late SharedPreferences _prefs;
   late Map<int, LevelProgress> _progress;
   String _profileId = '';
 
   String get _key => _profileId.isEmpty ? _baseKey : '${_baseKey}_$_profileId';
+  String get _coinsKey => _profileId.isEmpty
+      ? _starCoinsKey
+      : '${_starCoinsKey}_$_profileId';
+
+  // ── Star Coins ──────────────────────────────────────────────────────────
+
+  /// Current star coin balance for the active profile.
+  int get starCoins => _prefs.getInt(_coinsKey) ?? 0;
+
+  /// Set star coin balance directly.
+  set starCoins(int value) => _prefs.setInt(_coinsKey, value);
+
+  /// Add coins (e.g. reward). Returns the new balance.
+  int addStarCoins(int amount) {
+    final newBalance = starCoins + amount;
+    starCoins = newBalance;
+    return newBalance;
+  }
+
+  /// Spend coins if affordable. Returns true if successful.
+  bool spendStarCoins(int amount) {
+    final current = starCoins;
+    if (current < amount) return false;
+    starCoins = current - amount;
+    return true;
+  }
 
   Map<int, LevelProgress> get progress => Map.unmodifiable(_progress);
 
@@ -281,6 +308,10 @@ class ProgressService {
         }
       }
     }
+
+    // Award star coins: 1 per word completed, 5 bonus per tier completed
+    if (wordCountsAsComplete) addStarCoins(1);
+    if (tierComplete) addStarCoins(5);
 
     await _save();
     return tierComplete;
