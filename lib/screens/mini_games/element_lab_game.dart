@@ -2191,141 +2191,329 @@ class _ElementLabGameState extends State<ElementLabGame>
     }
   }
 
+  // Ant states stored in _velY:
+  //   0 = explorer/forager (searching for dirt or food)
+  //   1 = digger (actively tunneling into dirt)
+  //   2 = carrier (carrying dirt to surface to build mound)
+  //   3 = returning (heading back to colony after depositing)
+  //  10+ = drowning counter (in water)
+  // _life stores "home X" coordinate (0-159) so ants remember their colony.
+  // _velX stores movement direction (-1 or 1).
+
+  /// Check if a cell is "underground" (has solid above it, toward surface).
+  bool _isUnderground(int x, int y) {
+    final g = _gravityDir;
+    final aboveY = y - g;
+    if (!_inBounds(x, aboveY)) return false;
+    final above = _grid[aboveY * _gridW + x];
+    return above == El.dirt || above == El.mud || above == El.stone ||
+           above == El.sand || above == El.ant;
+  }
+
   void _simAnt(int x, int y, int idx) {
     if (_frameCount % 2 != 0) return;
 
     final g = _gravityDir;
     final by = y + g;
     final uy = y - g;
+    int state = _velY[idx];
+    final homeX = _life[idx]; // colony X position
 
-    // Acid kills ants instantly
+    // ── Hazards ──────────────────────────────────────────────────────
+
+    // Acid kills instantly
     if (_checkAdjacent(x, y, El.acid)) {
-      _grid[idx] = El.empty;
-      _life[idx] = 0;
+      _grid[idx] = El.empty; _life[idx] = 0; _velY[idx] = 0;
       return;
     }
 
-    // Fire kills ants — try to flee first
+    // Fire — flee or die
     if (_checkAdjacent(x, y, El.fire)) {
       for (int dy = -1; dy <= 1; dy++) {
         for (int dx = -1; dx <= 1; dx++) {
-          final nx2 = x + dx;
-          final ny2 = y + dy;
+          final nx2 = x + dx, ny2 = y + dy;
           if (!_inBounds(nx2, ny2)) continue;
-          final c = _grid[ny2 * _gridW + nx2];
-          if (c == El.empty && !_checkAdjacent(nx2, ny2, El.fire)) {
+          if (_grid[ny2 * _gridW + nx2] == El.empty && !_checkAdjacent(nx2, ny2, El.fire)) {
             _swap(idx, ny2 * _gridW + nx2);
             return;
           }
         }
       }
-      // Can't escape — die
-      _grid[idx] = El.empty;
-      _life[idx] = 0;
+      _grid[idx] = El.empty; _life[idx] = 0; _velY[idx] = 0;
       return;
     }
 
-    // Drowning: ants in water struggle upward, eventually drown
-    final inWater = _grid[idx] == El.ant && _checkAdjacent(x, y, El.water);
-    if (inWater) {
-      // Try to swim upward
-      if (_inBounds(x, uy) && _rng.nextInt(3) == 0) {
-        final aboveCell = _grid[uy * _gridW + x];
-        if (aboveCell == El.empty || aboveCell == El.water) {
-          _swap(idx, uy * _gridW + x);
-          return;
-        }
+    // Drowning in water
+    if (_checkAdjacent(x, y, El.water)) {
+      if (state < 10) {
+        _velY[idx] = 10; // enter drowning state
+        state = 10;
       }
-      // Try to reach dry land sideways
+      // Swim upward
+      if (_inBounds(x, uy) && _rng.nextInt(3) == 0) {
+        final ac = _grid[uy * _gridW + x];
+        if (ac == El.empty || ac == El.water) { _swap(idx, uy * _gridW + x); return; }
+      }
+      // Try sideways escape
       for (final dir in [1, -1]) {
         final sx = x + dir;
         if (_inBounds(sx, y) && _grid[y * _gridW + sx] == El.empty) {
-          _swap(idx, y * _gridW + sx);
-          return;
+          _swap(idx, y * _gridW + sx); return;
         }
       }
-      // Sink slowly
-      _velY[idx] = (_velY[idx] + 1).toInt();
-      if (_velY[idx] >= 15) {
-        _velY[idx] = 0;
-        if (_inBounds(x, by) && _grid[by * _gridW + x] == El.water) {
-          _swap(idx, by * _gridW + x);
-          return;
-        }
-      }
-      // Drown after ~90 frames
-      _life[idx]++;
-      if (_life[idx] > 90) {
-        _grid[idx] = El.empty;
-        _life[idx] = 0;
-        _velY[idx] = 0;
+      _velY[idx] = (state + 1);
+      if (_velY[idx] > 100) {
+        _grid[idx] = El.empty; _life[idx] = 0; _velY[idx] = 0;
       }
       return;
     }
-    // Reset drowning counter on dry land
-    if (_life[idx] > 0) _life[idx] = 0;
-    _velY[idx] = 0;
+    // Exited water — restore previous state
+    if (state >= 10) { _velY[idx] = 0; state = 0; }
 
+    // ── Initialize home position ──────────────────────────────────────
+    if (_life[idx] == 0) {
+      // New ant — set home X to current position
+      _life[idx] = x.clamp(1, 255);
+    }
     if (_velX[idx] == 0) _velX[idx] = _rng.nextBool() ? 1 : -1;
 
-    // Gravity — fall if no ground
+    // ── Gravity — fall if no ground ───────────────────────────────────
     if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
       _swap(idx, by * _gridW + x);
       return;
     }
 
-    // ── Dirt preference: steer toward nearby dirt ──
-    // Scan ahead for dirt — ants love dirt and will seek it out
-    int dirtDir = 0;
-    for (int scanD = 1; scanD <= 6; scanD++) {
-      for (final dir in [_velX[idx], -_velX[idx]]) {
-        final sx = x + dir * scanD;
+    // ── STATE MACHINE ─────────────────────────────────────────────────
+
+    final underground = _isUnderground(x, y);
+    final nearDirt = _checkAdjacent(x, y, El.dirt);
+
+    switch (state) {
+      case 0: // EXPLORER — search for dirt to dig
+        _antExplore(x, y, idx, homeX, nearDirt, underground);
+      case 1: // DIGGER — tunnel into dirt, pick up material
+        _antDig(x, y, idx, underground);
+      case 2: // CARRIER — bring dirt to surface, build mound
+        _antCarry(x, y, idx, homeX);
+      case 3: // RETURNING — head back to colony entrance, then explore again
+        _antReturn(x, y, idx, homeX);
+    }
+  }
+
+  void _antExplore(int x, int y, int idx, int homeX, bool nearDirt, bool underground) {
+    final dir = _velX[idx];
+
+    // If adjacent to dirt and not too many ants nearby, start digging
+    if (nearDirt && _rng.nextInt(4) == 0) {
+      // Count nearby ants — don't overcrowd one dig site
+      int nearbyAnts = 0;
+      for (int dy = -2; dy <= 2; dy++) {
+        for (int dx = -2; dx <= 2; dx++) {
+          if (_inBounds(x + dx, y + dy) && _grid[(y + dy) * _gridW + (x + dx)] == El.ant) nearbyAnts++;
+        }
+      }
+      if (nearbyAnts < 5) {
+        _velY[idx] = 1; // switch to digger
+        return;
+      }
+    }
+
+    // Scan for dirt — prefer it over empty space
+    int targetDir = dir;
+    bool foundTarget = false;
+    for (int scanD = 1; scanD <= 8; scanD++) {
+      for (final sd in [dir, -dir]) {
+        final sx = x + sd * scanD;
         if (!_inBounds(sx, y)) continue;
         final sc = _grid[y * _gridW + sx];
         if (sc == El.dirt || sc == El.mud) {
-          dirtDir = dir;
+          targetDir = sd;
+          foundTarget = true;
           break;
         }
-        // Avoid walking toward water
-        if (sc == El.water || sc == El.acid || sc == El.lava) {
-          if (dir == _velX[idx]) {
-            _velX[idx] = -_velX[idx]; // reverse away from danger
+        // Also follow other ants (social behavior)
+        if (sc == El.ant && _rng.nextInt(3) == 0) {
+          targetDir = sd;
+          foundTarget = true;
+          break;
+        }
+        // Avoid hazards
+        if (sc == El.water || sc == El.acid || sc == El.lava || sc == El.fire) {
+          if (sd == dir) targetDir = -dir;
+          break;
+        }
+      }
+      if (foundTarget) break;
+    }
+
+    _antMove(x, y, idx, targetDir);
+  }
+
+  void _antDig(int x, int y, int idx, bool underground) {
+    final g = _gravityDir;
+    final by = y + g;
+    final dir = _velX[idx];
+
+    // Try to dig downward first (create vertical shafts)
+    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.dirt) {
+      if (_rng.nextInt(3) == 0) {
+        _grid[by * _gridW + x] = El.empty;
+        _life[by * _gridW + x] = 0;
+        _swap(idx, by * _gridW + x);
+        _velY[idx] = 2; // picked up dirt, now carry it
+        return;
+      }
+    }
+
+    // Dig sideways (create horizontal tunnels)
+    final nx = x + dir;
+    if (_inBounds(nx, y) && _grid[y * _gridW + nx] == El.dirt) {
+      if (_rng.nextInt(4) == 0) {
+        _grid[y * _gridW + nx] = El.empty;
+        _life[y * _gridW + nx] = 0;
+        _swap(idx, y * _gridW + nx);
+        _velY[idx] = 2; // carrying dirt
+        return;
+      }
+    }
+
+    // Dig diagonally down (creates branching tunnels)
+    if (_inBounds(nx, by) && _grid[by * _gridW + nx] == El.dirt && _rng.nextInt(5) == 0) {
+      _grid[by * _gridW + nx] = El.empty;
+      _life[by * _gridW + nx] = 0;
+      _swap(idx, by * _gridW + nx);
+      _velY[idx] = 2; // carrying dirt
+      return;
+    }
+
+    // Create chambers — occasionally dig a wider space
+    if (underground && _rng.nextInt(12) == 0) {
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          final cx = x + dx, cy = y + dy;
+          if (_inBounds(cx, cy) && _grid[cy * _gridW + cx] == El.dirt) {
+            _grid[cy * _gridW + cx] = El.empty;
+            _life[cy * _gridW + cx] = 0;
           }
-          break;
         }
       }
-      if (dirtDir != 0) break;
     }
 
-    // Trail-following: check if other ants are nearby
-    bool foundFriend = false;
-    for (int scanD = 1; scanD <= 5; scanD++) {
-      final scanX = x + _velX[idx] * scanD;
-      if (_inBounds(scanX, y) && _grid[y * _gridW + scanX] == El.ant) {
-        foundFriend = true;
-        break;
+    // No dirt to dig — either explore for more or switch to carrier
+    if (!_checkAdjacent(x, y, El.dirt)) {
+      _velY[idx] = 0; // back to explorer
+    }
+
+    _antMove(x, y, idx, dir);
+  }
+
+  void _antCarry(int x, int y, int idx, int homeX) {
+    final g = _gravityDir;
+    final uy = y - g;
+
+    // Head toward surface (move upward)
+    if (_inBounds(x, uy)) {
+      final aboveCell = _grid[uy * _gridW + x];
+      if (aboveCell == El.empty) {
+        _swap(idx, uy * _gridW + x);
+        return;
       }
     }
 
-    // Prefer dirt direction over random, friends over dirt
-    final moveDir = foundFriend ? _velX[idx] : (dirtDir != 0 ? dirtDir : _velX[idx]);
+    // At surface or can't go higher — deposit dirt
+    final atSurface = !_inBounds(x, uy) ||
+        (_grid[uy * _gridW + x] == El.empty && !_isUnderground(x, y));
 
-    // Walk along surfaces
+    if (atSurface || !_inBounds(x, uy)) {
+      // Build mound: deposit dirt near the colony entrance
+      // Try to place dirt beside or above current position (building up)
+      final depositY = uy; // place above ant
+      // Try placing at the mound center (home X) first
+      final toHome = (homeX - x).sign;
+      for (final depositX in [x + toHome, x, x - toHome]) {
+        if (_inBounds(depositX, depositY) && _grid[depositY * _gridW + depositX] == El.empty) {
+          _grid[depositY * _gridW + depositX] = El.dirt;
+          _life[depositY * _gridW + depositX] = 0;
+          _velY[idx] = 3; // switch to returning
+          return;
+        }
+      }
+      // Can't place above, try sideways
+      for (final dx in [1, -1]) {
+        final sx = x + dx;
+        if (_inBounds(sx, y) && _grid[y * _gridW + sx] == El.empty) {
+          _grid[y * _gridW + sx] = El.dirt;
+          _life[y * _gridW + sx] = 0;
+          _velY[idx] = 3;
+          return;
+        }
+      }
+      // Stuck with dirt — just drop state
+      _velY[idx] = 0;
+      return;
+    }
+
+    // Move toward home X while heading up
+    final toHome = (homeX - x).sign;
+    final moveDir = toHome != 0 ? toHome : _velX[idx];
+    _antMove(x, y, idx, moveDir);
+  }
+
+  void _antReturn(int x, int y, int idx, int homeX) {
+    final g = _gravityDir;
+    final by = y + g;
+
+    // Head back toward home X and down into the colony
+    final toHome = (homeX - x).sign;
+
+    // If near home X, head back underground
+    if ((x - homeX).abs() <= 2) {
+      // Try to go down into the tunnels
+      if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
+        _swap(idx, by * _gridW + x);
+        _velY[idx] = 0; // back to explorer once underground
+        return;
+      }
+      // Look for a tunnel entrance nearby
+      for (final dx in [0, 1, -1, 2, -2]) {
+        final tx = x + dx;
+        if (_inBounds(tx, by) && _grid[by * _gridW + tx] == El.empty) {
+          if (_inBounds(tx, y) && _grid[y * _gridW + tx] == El.empty) {
+            _swap(idx, y * _gridW + tx);
+            return;
+          }
+        }
+      }
+      _velY[idx] = 0; // can't find tunnel, explore again
+      return;
+    }
+
+    // Walk toward home
+    final moveDir = toHome != 0 ? toHome : _velX[idx];
+    _antMove(x, y, idx, moveDir);
+  }
+
+  /// Shared ant movement: walk, climb, reverse. Avoids hazards.
+  void _antMove(int x, int y, int idx, int moveDir) {
+    final g = _gravityDir;
+    final uy = y - g;
     final nx = x + moveDir;
+
+    // Walk along surface
     if (_inBounds(nx, y) && _grid[y * _gridW + nx] == El.empty) {
       _velX[idx] = moveDir;
       _swap(idx, y * _gridW + nx);
       return;
     }
 
-    // Climb up 1 cell (step over obstacle)
+    // Step up 1 cell (climb over obstacle)
     if (_inBounds(nx, uy) && _grid[uy * _gridW + nx] == El.empty) {
       _velX[idx] = moveDir;
       _swap(idx, uy * _gridW + nx);
       return;
     }
 
-    // Climb straight up along a wall
+    // Wall climb straight up
     if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
       if (!_inBounds(nx, y) || _grid[y * _gridW + nx] != El.empty) {
         _swap(idx, uy * _gridW + x);
@@ -2333,21 +2521,9 @@ class _ElementLabGameState extends State<ElementLabGame>
       }
     }
 
-    // ── Colonize: dig into dirt to build tunnels ──
-    // If ant is on dirt, occasionally dig (convert dirt to empty, ant moves in)
-    if (_inBounds(nx, y) && _grid[y * _gridW + nx] == El.dirt && _rng.nextInt(8) == 0) {
-      _grid[y * _gridW + nx] = El.empty;
-      _life[y * _gridW + nx] = 0;
-      _velX[idx] = moveDir;
-      _swap(idx, y * _gridW + nx);
-      return;
-    }
-
-    // Reverse direction
-    if (!foundFriend) {
-      _velX[idx] = -_velX[idx];
-      if (_rng.nextInt(5) == 0) _velX[idx] = _rng.nextBool() ? 1 : -1;
-    }
+    // Blocked — reverse direction
+    _velX[idx] = -moveDir;
+    if (_rng.nextInt(6) == 0) _velX[idx] = _rng.nextBool() ? 1 : -1;
   }
 
   void _simOil(int x, int y, int idx) {
@@ -2829,7 +3005,17 @@ class _ElementLabGameState extends State<ElementLabGame>
         return Color.fromARGB(255, (204 + variation).clamp(180, 230), (34 + variation).clamp(10, 60), (34 + variation).clamp(10, 60));
 
       case El.ant:
-        return (_life[idx] % 3 == 0)
+        final antState = _velY[idx];
+        if (antState == 2) {
+          // Carrier — brownish tint (carrying dirt)
+          return const Color(0xFF3D2B1F);
+        }
+        if (antState == 1) {
+          // Digger — slightly reddish (active worker)
+          return const Color(0xFF2A1111);
+        }
+        // Explorer/returning — normal dark ant
+        return (idx % 3 == 0)
             ? const Color(0xFF333333)
             : const Color(0xFF111111);
 
