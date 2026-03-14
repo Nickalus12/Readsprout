@@ -729,44 +729,57 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                         Expanded(child: _buildLevelComplete())
                       else
                         Expanded(
-                          child: Column(
-                            children: [
-                              const SizedBox(height: 8),
-                              // Progress dots
-                              _buildProgressDots(levelColors),
-                              const Spacer(flex: 2),
+                          child: LayoutBuilder(
+                            builder: (context, constraints) {
+                              // Adapt spacing based on available height
+                              final availH = constraints.maxHeight;
+                              final tight = availH < 420;
+                              final veryTight = availH < 340;
+                              final gap1 = veryTight ? 6.0 : tight ? 10.0 : 20.0;
+                              final gap2 = veryTight ? 6.0 : tight ? 10.0 : 20.0;
+                              final topGap = veryTight ? 2.0 : tight ? 4.0 : 8.0;
 
-                              // Champion: "Keep practicing!" message for failed words
-                              if (_isChampion && _championWordFailed)
-                                Padding(
-                                  padding: const EdgeInsets.only(bottom: 8),
-                                  child: Text(
-                                    'Keep practicing!',
-                                    style: AppFonts.fredoka(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.w500,
-                                      color: AppColors.secondaryText,
+                              return Column(
+                                children: [
+                                  SizedBox(height: topGap),
+                                  // Progress dots
+                                  _buildProgressDots(levelColors),
+                                  const Spacer(flex: 2),
+
+                                  // Champion: "Keep practicing!" message for failed words
+                                  if (_isChampion && _championWordFailed)
+                                    Padding(
+                                      padding: const EdgeInsets.only(bottom: 8),
+                                      child: Text(
+                                        'Keep practicing!',
+                                        style: AppFonts.fredoka(
+                                          fontSize: tight ? 14 : 16,
+                                          fontWeight: FontWeight.w500,
+                                          color: AppColors.secondaryText,
+                                        ),
+                                      ),
                                     ),
-                                  ),
-                                ),
 
-                              // Hear word button
-                              _buildHearButton(),
-                              const SizedBox(height: 20),
+                                  // Hear word button
+                                  _buildHearButton(),
+                                  SizedBox(height: gap1),
 
-                              // Letter tiles
-                              _buildLetterTiles(),
-                              const SizedBox(height: 20),
+                                  // Letter tiles
+                                  _buildLetterTiles(),
+                                  SizedBox(height: gap2),
 
-                              // On-screen keyboard or letter tracing canvas
-                              if (_tracingActive &&
-                                  _tracingLetterIndex < _targetText.length &&
-                                  !_showingCelebration)
-                                _buildTracingArea()
-                              else
-                                _buildKeyboard(levelColors),
-                              const Spacer(flex: 1),
-                            ],
+                                  // On-screen keyboard or letter tracing canvas
+                                  if (_tracingActive &&
+                                      _tracingLetterIndex < _targetText.length &&
+                                      !_showingCelebration)
+                                    _buildTracingArea()
+                                  else
+                                    _buildKeyboard(levelColors),
+                                  SizedBox(height: veryTight ? 2 : tight ? 4 : 0),
+                                  if (!veryTight) const Spacer(flex: 1),
+                                ],
+                              );
+                            },
                           ),
                         ),
                     ],
@@ -1060,11 +1073,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   // ── Hear Word Button ────────────────────────────────────────────
 
   Widget _buildHearButton() {
+    final screenH = MediaQuery.of(context).size.height;
+    final compact = screenH < 600;
+    final hPad = compact ? 16.0 : 24.0;
+    final vPad = compact ? 8.0 : 12.0;
+    final iconSz = compact ? 20.0 : 24.0;
+    final fontSz = compact ? 15.0 : 18.0;
+
     final button = GestureDetector(
       onTap: _announceCurrentWord,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+        padding: EdgeInsets.symmetric(horizontal: hPad, vertical: vPad),
         decoration: BoxDecoration(
           color: _isPlayingAudio
               ? AppColors.electricBlue.withValues(alpha: 0.15)
@@ -1091,13 +1111,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ? Icons.hearing_rounded
                   : Icons.volume_up_rounded,
               color: AppColors.electricBlue,
-              size: 24,
+              size: iconSz,
             ),
-            const SizedBox(width: 10),
+            SizedBox(width: compact ? 6 : 10),
             Text(
               _isPlayingAudio ? 'Listen...' : 'Hear Word',
               style: AppFonts.fredoka(
-                fontSize: 18,
+                fontSize: fontSz,
                 fontWeight: FontWeight.w500,
                 color: AppColors.electricBlue,
               ),
@@ -1193,12 +1213,17 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       ['z', 'x', 'c', 'v', 'b', 'n', 'm'],
     ];
 
+    final screenH = MediaQuery.of(context).size.height;
+    final shortScreen = screenH < 600;
+    final rowGap = shortScreen ? 3.0 : 6.0;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 4),
       child: Column(
+        mainAxisSize: MainAxisSize.min,
         children: rows.map((row) {
           return Padding(
-            padding: const EdgeInsets.only(bottom: 6),
+            padding: EdgeInsets.only(bottom: rowGap),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: row.map((letter) {
@@ -1673,13 +1698,16 @@ class _KeyboardKeyState extends State<_KeyboardKey> {
     final showHighlight = widget.isExpected;
     final showNudge = nudgeGlowAlpha > 0;
 
-    // Dynamic key sizing based on screen width
+    // Dynamic key sizing based on screen width AND height
     // 10 keys per row + margins = need to fit within screen width - padding
     final screenW = MediaQuery.of(context).size.width;
+    final screenH = MediaQuery.of(context).size.height;
+    final shortScreen = screenH < 600;
     final keyMargin = (screenW / 200).clamp(1.5, 3.0);
     final keyWidth = ((screenW - 16) / 10 - keyMargin * 2).clamp(24.0, 38.0);
-    final keyHeight = (keyWidth * 1.3).clamp(32.0, 50.0);
-    final fontSize = (keyWidth * 0.5).clamp(13.0, 20.0);
+    final maxKeyH = shortScreen ? 38.0 : 50.0;
+    final keyHeight = (keyWidth * 1.3).clamp(28.0, maxKeyH);
+    final fontSize = (keyWidth * 0.5).clamp(12.0, 20.0);
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),

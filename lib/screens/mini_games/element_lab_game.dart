@@ -321,16 +321,18 @@ class _ElementLabGameState extends State<ElementLabGame>
   bool _gridInitialized = false;
 
   void _initGrid(double canvasW, double canvasH) {
-    _cellSize = (canvasW / 160).clamp(1.0, 4.0);
-    _gridW = (canvasW / _cellSize).floor();
-    _gridH = (canvasH / _cellSize).floor();
-    if (_gridW < 40) _gridW = 40;
-    if (_gridH < 60) _gridH = 60;
+    // Compute a cell size that gives ~160 columns, clamped for readability
+    final baseCellSize = (canvasW / 160).clamp(1.0, 4.0);
+    _gridW = (canvasW / baseCellSize).floor().clamp(40, 400);
+    _gridH = (canvasH / baseCellSize).floor().clamp(40, 600);
 
-    _canvasPixelW = _gridW * _cellSize;
-    _canvasPixelH = _gridH * _cellSize;
+    // Display values will be computed dynamically in _buildCanvas each frame,
+    // but set initial values for the first tick before build runs.
+    _cellSize = baseCellSize;
+    _canvasPixelW = _gridW * baseCellSize;
+    _canvasPixelH = _gridH * baseCellSize;
     _canvasLeft = (canvasW - _canvasPixelW) / 2;
-    _canvasTop = 0;
+    _canvasTop = (canvasH - _canvasPixelH) / 2;
 
     final totalCells = _gridW * _gridH;
     _grid = Uint8List(totalCells);
@@ -3516,31 +3518,42 @@ class _ElementLabGameState extends State<ElementLabGame>
   Widget _buildTopBar() {
     final timerColor = _timerColor();
     final isPulsing = _remainingSeconds <= 30 && !_sessionExpired;
+    final screenW = MediaQuery.of(context).size.width;
+    final compact = screenW < 400;
+    final iconSz = compact ? 18.0 : 22.0;
+    final btnSz = compact ? 32.0 : 40.0;
+    final fontSz = compact ? 14.0 : 18.0;
+    final smallFont = compact ? 11.0 : 14.0;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: EdgeInsets.symmetric(horizontal: compact ? 4 : 8, vertical: 2),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back_rounded),
-            color: AppColors.primaryText,
-            iconSize: 24,
-          ),
-          const SizedBox(width: 4),
-          Text(
-            'Element Lab',
-            style: AppFonts.fredoka(
-              fontSize: 18,
-              fontWeight: FontWeight.w600,
+          SizedBox(
+            width: btnSz,
+            height: btnSz,
+            child: IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.arrow_back_rounded),
               color: AppColors.primaryText,
+              iconSize: iconSz,
+              padding: EdgeInsets.zero,
             ),
           ),
-          const SizedBox(width: 4),
-          // Speaker / mute toggle
+          if (!compact) ...[
+            const SizedBox(width: 2),
+            Text(
+              'Element Lab',
+              style: AppFonts.fredoka(
+                fontSize: fontSz,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primaryText,
+              ),
+            ),
+          ],
           SizedBox(
-            width: 40,
-            height: 40,
+            width: btnSz,
+            height: btnSz,
             child: IconButton(
               onPressed: _toggleMute,
               icon: Icon(
@@ -3549,15 +3562,14 @@ class _ElementLabGameState extends State<ElementLabGame>
                     ? AppColors.secondaryText.withValues(alpha: 0.5)
                     : AppColors.electricBlue,
               ),
-              iconSize: 22,
+              iconSize: iconSz,
               padding: EdgeInsets.zero,
               tooltip: _isMuted ? 'Sound on' : 'Sound off',
             ),
           ),
-          // Day/Night toggle
           SizedBox(
-            width: 40,
-            height: 40,
+            width: btnSz,
+            height: btnSz,
             child: IconButton(
               onPressed: _toggleDayNight,
               icon: AnimatedSwitcher(
@@ -3574,7 +3586,7 @@ class _ElementLabGameState extends State<ElementLabGame>
                       : const Color(0xFFFFAA33),
                 ),
               ),
-              iconSize: 22,
+              iconSize: iconSz,
               padding: EdgeInsets.zero,
               tooltip: _isNight ? 'Switch to day' : 'Switch to night',
             ),
@@ -3593,7 +3605,7 @@ class _ElementLabGameState extends State<ElementLabGame>
               );
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              padding: EdgeInsets.symmetric(horizontal: compact ? 6 : 10, vertical: 3),
               decoration: BoxDecoration(
                 color: timerColor.withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(16),
@@ -3604,12 +3616,12 @@ class _ElementLabGameState extends State<ElementLabGame>
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(Icons.timer_rounded, color: timerColor, size: 16),
-                  const SizedBox(width: 4),
+                  Icon(Icons.timer_rounded, color: timerColor, size: compact ? 13 : 16),
+                  const SizedBox(width: 3),
                   Text(
                     _formatTime(_remainingSeconds),
                     style: AppFonts.fredoka(
-                      fontSize: 14,
+                      fontSize: smallFont,
                       fontWeight: FontWeight.w700,
                       color: timerColor,
                     ),
@@ -3618,10 +3630,10 @@ class _ElementLabGameState extends State<ElementLabGame>
               ),
             ),
           ),
-          const SizedBox(width: 8),
+          SizedBox(width: compact ? 4 : 8),
           // Star coin balance
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            padding: EdgeInsets.symmetric(horizontal: compact ? 5 : 8, vertical: 3),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(16),
@@ -3632,13 +3644,13 @@ class _ElementLabGameState extends State<ElementLabGame>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(Icons.star_rounded,
-                    color: AppColors.starGold, size: 16),
-                const SizedBox(width: 4),
+                Icon(Icons.star_rounded,
+                    color: AppColors.starGold, size: compact ? 13 : 16),
+                const SizedBox(width: 3),
                 Text(
                   '${widget.progressService.starCoins}',
                   style: AppFonts.fredoka(
-                    fontSize: 14,
+                    fontSize: smallFont,
                     fontWeight: FontWeight.w600,
                     color: AppColors.starGold,
                   ),
@@ -3652,6 +3664,27 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   Widget _buildCanvas(BoxConstraints constraints) {
+    // Dynamically compute display rect so the grid scales to fit any layout size.
+    // The grid dimensions (_gridW x _gridH) stay fixed after init, but the display
+    // cell size and offsets adapt to current constraints (handles window resize,
+    // orientation change, etc.).
+    final viewW = constraints.maxWidth;
+    final viewH = constraints.maxHeight;
+    final displayCellW = viewW / _gridW;
+    final displayCellH = viewH / _gridH;
+    final displayCell = displayCellW < displayCellH ? displayCellW : displayCellH;
+    final displayW = _gridW * displayCell;
+    final displayH = _gridH * displayCell;
+    final displayLeft = (viewW - displayW) / 2;
+    final displayTop = (viewH - displayH) / 2;
+
+    // Keep _cellSize/_canvasLeft/_canvasTop in sync for touch mapping
+    _cellSize = displayCell;
+    _canvasLeft = displayLeft;
+    _canvasTop = displayTop;
+    _canvasPixelW = displayW;
+    _canvasPixelH = displayH;
+
     return GestureDetector(
       onPanStart: _handlePanStart,
       onPanUpdate: _handlePanUpdate,
@@ -3662,21 +3695,21 @@ class _ElementLabGameState extends State<ElementLabGame>
       onLongPressEnd: _handleLongPressEnd,
       child: Container(
         color: AppColors.background,
-        width: constraints.maxWidth,
-        height: constraints.maxHeight,
+        width: viewW,
+        height: viewH,
         child: ValueListenableBuilder<ui.Image?>(
           valueListenable: _frameImageNotifier,
           builder: (context, frameImage, _) {
             return CustomPaint(
               painter: _GridPainter(
                 image: frameImage,
-                canvasLeft: _canvasLeft,
-                canvasTop: _canvasTop,
-                canvasPixelW: _canvasPixelW,
-                canvasPixelH: _canvasPixelH,
+                canvasLeft: displayLeft,
+                canvasTop: displayTop,
+                canvasPixelW: displayW,
+                canvasPixelH: displayH,
                 lightningFlash: _lightningFlashFrames > 0,
               ),
-              size: Size(constraints.maxWidth, constraints.maxHeight),
+              size: Size(viewW, viewH),
             );
           },
         ),
@@ -3686,6 +3719,12 @@ class _ElementLabGameState extends State<ElementLabGame>
 
   Widget _buildPalette() {
     final tabElements = _tabElements[_selectedTab];
+    final screenW = MediaQuery.of(context).size.width;
+    final compact = screenW < 400;
+    final tabH = compact ? 26.0 : 32.0;
+    final chipH = compact ? 48.0 : 60.0;
+    final tabIconSz = compact ? 13.0 : 16.0;
+
     return Container(
       decoration: BoxDecoration(
         color: AppColors.surface,
@@ -3700,7 +3739,7 @@ class _ElementLabGameState extends State<ElementLabGame>
         children: [
           // Tab bar
           SizedBox(
-            height: 32,
+            height: tabH,
             child: Row(
               children: [
                 for (int i = 0; i < _tabIcons.length; i++)
@@ -3724,17 +3763,14 @@ class _ElementLabGameState extends State<ElementLabGame>
                             ),
                           ),
                         ),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              _tabIcons[i],
-                              size: 16,
-                              color: _selectedTab == i
-                                  ? AppColors.electricBlue
-                                  : AppColors.secondaryText,
-                            ),
-                          ],
+                        child: Center(
+                          child: Icon(
+                            _tabIcons[i],
+                            size: tabIconSz,
+                            color: _selectedTab == i
+                                ? AppColors.electricBlue
+                                : AppColors.secondaryText,
+                          ),
                         ),
                       ),
                     ),
@@ -3742,20 +3778,24 @@ class _ElementLabGameState extends State<ElementLabGame>
               ],
             ),
           ),
-          // Element chips for selected tab
+          // Element chips for selected tab — scrollable
           SizedBox(
-            height: 60,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (final elType in tabElements)
-                  if (elType == El.eraser)
-                    _buildEraserChip()
-                  else if (elType == El.seed)
-                    _buildSeedChip()
-                  else
-                    _buildElementChip(elType),
-              ],
+            height: chipH,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  for (final elType in tabElements)
+                    if (elType == El.eraser)
+                      _buildEraserChip()
+                    else if (elType == El.seed)
+                      _buildSeedChip()
+                    else
+                      _buildElementChip(elType),
+                ],
+              ),
             ),
           ),
         ],
@@ -3767,6 +3807,12 @@ class _ElementLabGameState extends State<ElementLabGame>
     final isSelected = _selectedElement == elType;
     final color = _baseColors[elType.clamp(0, _baseColors.length - 1)];
     final name = _elementNames[elType.clamp(0, _elementNames.length - 1)];
+    final screenW = MediaQuery.of(context).size.width;
+    final compact = screenW < 400;
+    final dotSz = compact ? 18.0 : 24.0;
+    final labelSz = compact ? 8.0 : 9.0;
+    final hPad = compact ? 4.0 : 6.0;
+    final hMargin = compact ? 2.0 : 4.0;
 
     return GestureDetector(
       onTap: () {
@@ -3784,8 +3830,8 @@ class _ElementLabGameState extends State<ElementLabGame>
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        margin: EdgeInsets.symmetric(horizontal: hMargin),
+        padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 2),
         decoration: BoxDecoration(
           color: isSelected
               ? color.withValues(alpha: 0.3)
@@ -3810,8 +3856,8 @@ class _ElementLabGameState extends State<ElementLabGame>
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 24,
-              height: 24,
+              width: dotSz,
+              height: dotSz,
               decoration: BoxDecoration(
                 color: color,
                 shape: BoxShape.circle,
@@ -3825,7 +3871,7 @@ class _ElementLabGameState extends State<ElementLabGame>
             Text(
               name,
               style: AppFonts.fredoka(
-                fontSize: 9,
+                fontSize: labelSz,
                 fontWeight: FontWeight.w500,
                 color: isSelected ? color : AppColors.secondaryText,
               ),
@@ -3838,6 +3884,14 @@ class _ElementLabGameState extends State<ElementLabGame>
 
   Widget _buildEraserChip() {
     final isSelected = _selectedElement == El.eraser;
+    final screenW = MediaQuery.of(context).size.width;
+    final compact = screenW < 400;
+    final dotSz = compact ? 18.0 : 24.0;
+    final iconSz = compact ? 11.0 : 14.0;
+    final labelSz = compact ? 8.0 : 9.0;
+    final hPad = compact ? 4.0 : 6.0;
+    final hMargin = compact ? 2.0 : 4.0;
+
     return GestureDetector(
       onTap: () {
         setState(() => _selectedElement = El.eraser);
@@ -3845,8 +3899,8 @@ class _ElementLabGameState extends State<ElementLabGame>
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
-        margin: const EdgeInsets.symmetric(horizontal: 4),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+        margin: EdgeInsets.symmetric(horizontal: hMargin),
+        padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 2),
         decoration: BoxDecoration(
           color: isSelected
               ? AppColors.error.withValues(alpha: 0.2)
@@ -3862,8 +3916,8 @@ class _ElementLabGameState extends State<ElementLabGame>
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 24,
-              height: 24,
+              width: dotSz,
+              height: dotSz,
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 shape: BoxShape.circle,
@@ -3872,9 +3926,9 @@ class _ElementLabGameState extends State<ElementLabGame>
                   width: 1,
                 ),
               ),
-              child: const Icon(
+              child: Icon(
                 Icons.cleaning_services_rounded,
-                size: 14,
+                size: iconSz,
                 color: AppColors.error,
               ),
             ),
@@ -3882,7 +3936,7 @@ class _ElementLabGameState extends State<ElementLabGame>
             Text(
               'Erase',
               style: AppFonts.fredoka(
-                fontSize: 9,
+                fontSize: labelSz,
                 fontWeight: FontWeight.w500,
                 color:
                     isSelected ? AppColors.error : AppColors.secondaryText,
@@ -3908,6 +3962,15 @@ class _ElementLabGameState extends State<ElementLabGame>
       Color(0xFFCC4444), // mushroom
       Color(0xFF33AA33), // vine
     ];
+    final screenW = MediaQuery.of(context).size.width;
+    final compact = screenW < 400;
+    final dotSz = compact ? 18.0 : 24.0;
+    final iconSz = compact ? 11.0 : 14.0;
+    final labelSz = compact ? 8.0 : 9.0;
+    final hPad = compact ? 4.0 : 6.0;
+    final hMargin = compact ? 2.0 : 4.0;
+    final popupItemW = compact ? 34.0 : 40.0;
+    final popupItemH = compact ? 40.0 : 48.0;
 
     return GestureDetector(
       onTap: () {
@@ -3927,8 +3990,8 @@ class _ElementLabGameState extends State<ElementLabGame>
         children: [
           AnimatedContainer(
             duration: const Duration(milliseconds: 150),
-            margin: const EdgeInsets.symmetric(horizontal: 4),
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+            margin: EdgeInsets.symmetric(horizontal: hMargin),
+            padding: EdgeInsets.symmetric(horizontal: hPad, vertical: 2),
             decoration: BoxDecoration(
               color: isSelected ? color.withValues(alpha: 0.3) : AppColors.surfaceVariant,
               borderRadius: BorderRadius.circular(12),
@@ -3943,30 +4006,30 @@ class _ElementLabGameState extends State<ElementLabGame>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Container(
-                  width: 24, height: 24,
+                  width: dotSz, height: dotSz,
                   decoration: BoxDecoration(
                     color: seedColors[_selectedSeedType.clamp(1, 5)],
                     shape: BoxShape.circle,
                     border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
                   ),
-                  child: const Icon(Icons.eco_rounded, size: 14, color: Colors.white),
+                  child: Icon(Icons.eco_rounded, size: iconSz, color: Colors.white),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   'Seed',
-                  style: AppFonts.fredoka(fontSize: 9, fontWeight: FontWeight.w500,
+                  style: AppFonts.fredoka(fontSize: labelSz, fontWeight: FontWeight.w500,
                     color: isSelected ? color : AppColors.secondaryText),
                 ),
               ],
             ),
           ),
-          // Seed type popup
+          // Seed type popup — use OverlayEntry-style approach via Positioned
           if (_showSeedPopup && isSelected)
             Positioned(
-              bottom: 64,
-              left: -40,
+              bottom: compact ? 52 : 64,
+              right: 0,
               child: Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(compact ? 6 : 8),
                 decoration: BoxDecoration(
                   color: AppColors.surface,
                   borderRadius: BorderRadius.circular(16),
@@ -3983,8 +4046,8 @@ class _ElementLabGameState extends State<ElementLabGame>
                           Haptics.tap();
                         },
                         child: Container(
-                          width: 40, height: 48,
-                          margin: const EdgeInsets.symmetric(horizontal: 3),
+                          width: popupItemW, height: popupItemH,
+                          margin: EdgeInsets.symmetric(horizontal: compact ? 2 : 3),
                           decoration: BoxDecoration(
                             color: _selectedSeedType == st
                                 ? seedColors[st].withValues(alpha: 0.25)
@@ -3999,12 +4062,12 @@ class _ElementLabGameState extends State<ElementLabGame>
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               CustomPaint(
-                                size: const Size(24, 24),
+                                size: Size(compact ? 18 : 24, compact ? 18 : 24),
                                 painter: _SeedIconPainter(st),
                               ),
                               Text(
                                 seedNames[st],
-                                style: AppFonts.fredoka(fontSize: 7, fontWeight: FontWeight.w500,
+                                style: AppFonts.fredoka(fontSize: compact ? 6 : 7, fontWeight: FontWeight.w500,
                                   color: _selectedSeedType == st ? seedColors[st] : AppColors.secondaryText),
                               ),
                             ],
@@ -4021,210 +4084,215 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   Widget _buildBottomBar() {
-    return Container(
-      height: 44,
-      color: AppColors.surface,
-      padding: const EdgeInsets.symmetric(horizontal: 12),
-      child: Row(
-        children: [
-          // Brush size controls
-          Text(
-            'Brush:',
-            style: AppFonts.fredoka(
-              fontSize: 12,
-              color: AppColors.secondaryText,
+    final screenW = MediaQuery.of(context).size.width;
+    final compact = screenW < 400;
+    final btnBox = compact ? 26.0 : 32.0;
+    final btnIcon = compact ? 15.0 : 18.0;
+    final smallBtnBox = compact ? 22.0 : 28.0;
+    final smallBtnIcon = compact ? 13.0 : 16.0;
+    final chipSz = compact ? 22.0 : 26.0;
+    final brushChipIcon = compact ? 12.0 : 14.0;
+    final barH = compact ? 36.0 : 44.0;
+    final hPad = compact ? 6.0 : 12.0;
+
+    Widget buildBrushSizeBtn(int size) {
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 3),
+        child: GestureDetector(
+          onTap: () {
+            setState(() => _brushSize = size);
+            Haptics.tap();
+          },
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            width: chipSz,
+            height: chipSz,
+            decoration: BoxDecoration(
+              color: _brushSize == size
+                  ? AppColors.electricBlue.withValues(alpha: 0.2)
+                  : AppColors.surfaceVariant,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: _brushSize == size
+                    ? AppColors.electricBlue
+                    : AppColors.border,
+                width: _brushSize == size ? 2 : 1,
+              ),
+            ),
+            child: Center(
+              child: Container(
+                width: size.toDouble() * 2 + 2,
+                height: size.toDouble() * 2 + 2,
+                decoration: BoxDecoration(
+                  color: _brushSize == size
+                      ? AppColors.electricBlue
+                      : AppColors.secondaryText,
+                  shape: BoxShape.circle,
+                ),
+              ),
             ),
           ),
-          const SizedBox(width: 8),
-          for (final size in const [1, 3, 5])
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 3),
-              child: GestureDetector(
-                onTap: () {
-                  setState(() => _brushSize = size);
-                  Haptics.tap();
-                },
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 150),
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: _brushSize == size
-                        ? AppColors.electricBlue.withValues(alpha: 0.2)
-                        : AppColors.surfaceVariant,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: _brushSize == size
-                          ? AppColors.electricBlue
-                          : AppColors.border,
-                      width: _brushSize == size ? 2 : 1,
-                    ),
-                  ),
-                  child: Center(
-                    child: Container(
-                      width: size.toDouble() * 2 + 2,
-                      height: size.toDouble() * 2 + 2,
-                      decoration: BoxDecoration(
-                        color: _brushSize == size
-                            ? AppColors.electricBlue
-                            : AppColors.secondaryText,
-                        shape: BoxShape.circle,
-                      ),
-                    ),
-                  ),
-                ),
+        ),
+      );
+    }
+
+    Widget buildBrushModeBtn(int mode, IconData icon) {
+      return Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 1),
+        child: GestureDetector(
+          onTap: () {
+            setState(() => _brushMode = mode);
+            Haptics.tap();
+          },
+          child: Container(
+            width: chipSz,
+            height: chipSz,
+            decoration: BoxDecoration(
+              color: _brushMode == mode
+                  ? AppColors.electricBlue.withValues(alpha: 0.2)
+                  : Colors.transparent,
+              borderRadius: BorderRadius.circular(6),
+              border: Border.all(
+                color: _brushMode == mode
+                    ? AppColors.electricBlue
+                    : AppColors.border.withValues(alpha: 0.3),
+                width: _brushMode == mode ? 2 : 1,
               ),
             ),
-          const SizedBox(width: 6),
-          // Brush mode toggles
-          for (final entry in const [
-            [0, Icons.circle, 'Circle'],
-            [1, Icons.horizontal_rule_rounded, 'Line'],
-            [2, Icons.grain_rounded, 'Spray'],
-          ])
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 1),
-              child: GestureDetector(
-                onTap: () {
-                  setState(() => _brushMode = entry[0] as int);
-                  Haptics.tap();
-                },
-                child: Container(
-                  width: 26,
-                  height: 26,
-                  decoration: BoxDecoration(
-                    color: _brushMode == entry[0]
-                        ? AppColors.electricBlue.withValues(alpha: 0.2)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(
-                      color: _brushMode == entry[0]
-                          ? AppColors.electricBlue
-                          : AppColors.border.withValues(alpha: 0.3),
-                      width: _brushMode == entry[0] ? 2 : 1,
-                    ),
-                  ),
-                  child: Icon(
-                    entry[1] as IconData,
-                    size: 14,
-                    color: _brushMode == entry[0]
-                        ? AppColors.electricBlue
-                        : AppColors.secondaryText,
-                  ),
-                ),
-              ),
+            child: Icon(
+              icon,
+              size: brushChipIcon,
+              color: _brushMode == mode
+                  ? AppColors.electricBlue
+                  : AppColors.secondaryText,
             ),
-          const SizedBox(width: 4),
-          // Gravity flip
-          IconButton(
-            onPressed: () {
-              setState(() => _gravityDir = -_gravityDir);
-              Haptics.tap();
-            },
-            icon: Icon(
-              Icons.swap_vert_rounded,
+          ),
+        ),
+      );
+    }
+
+    Widget buildIconBtn({
+      required VoidCallback? onPressed,
+      required IconData icon,
+      required Color color,
+      double? size,
+      double? box,
+    }) {
+      final bSz = box ?? btnBox;
+      final iSz = size ?? btnIcon;
+      return SizedBox(
+        width: bSz,
+        height: bSz,
+        child: IconButton(
+          onPressed: onPressed,
+          icon: Icon(icon, color: color),
+          iconSize: iSz,
+          padding: EdgeInsets.zero,
+        ),
+      );
+    }
+
+    return Container(
+      height: barH,
+      color: AppColors.surface,
+      padding: EdgeInsets.symmetric(horizontal: hPad),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            // Brush sizes
+            for (final size in const [1, 3, 5])
+              buildBrushSizeBtn(size),
+            SizedBox(width: compact ? 4 : 6),
+            // Brush modes
+            buildBrushModeBtn(0, Icons.circle),
+            buildBrushModeBtn(1, Icons.horizontal_rule_rounded),
+            buildBrushModeBtn(2, Icons.grain_rounded),
+            SizedBox(width: compact ? 3 : 4),
+            // Gravity flip
+            buildIconBtn(
+              onPressed: () {
+                setState(() => _gravityDir = -_gravityDir);
+                Haptics.tap();
+              },
+              icon: Icons.swap_vert_rounded,
               color: _gravityDir == -1
                   ? AppColors.starGold
                   : AppColors.secondaryText,
             ),
-            iconSize: 18,
-            tooltip: 'Flip gravity',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          ),
-          // Wind left
-          IconButton(
-            onPressed: () {
-              setState(() => _windForce = (_windForce - 1).clamp(-3, 3));
-              Haptics.tap();
-            },
-            icon: Icon(
-              Icons.arrow_back_rounded,
+            // Wind left
+            buildIconBtn(
+              onPressed: () {
+                setState(() => _windForce = (_windForce - 1).clamp(-3, 3));
+                Haptics.tap();
+              },
+              icon: Icons.arrow_back_rounded,
               color: _windForce < 0
                   ? AppColors.electricBlue
                   : AppColors.secondaryText.withValues(alpha: 0.4),
+              size: smallBtnIcon,
+              box: smallBtnBox,
             ),
-            iconSize: 16,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            tooltip: 'Wind left',
-          ),
-          // Wind indicator
-          Text(
-            _windForce == 0 ? '0' : '${_windForce > 0 ? "+" : ""}$_windForce',
-            style: AppFonts.fredoka(
-              fontSize: 10,
-              fontWeight: FontWeight.w600,
-              color: _windForce != 0
-                  ? AppColors.electricBlue
-                  : AppColors.secondaryText.withValues(alpha: 0.5),
+            // Wind indicator
+            SizedBox(
+              width: compact ? 16 : 20,
+              child: Center(
+                child: Text(
+                  _windForce == 0 ? '0' : '${_windForce > 0 ? "+" : ""}$_windForce',
+                  style: AppFonts.fredoka(
+                    fontSize: compact ? 9 : 10,
+                    fontWeight: FontWeight.w600,
+                    color: _windForce != 0
+                        ? AppColors.electricBlue
+                        : AppColors.secondaryText.withValues(alpha: 0.5),
+                  ),
+                ),
+              ),
             ),
-          ),
-          // Wind right
-          IconButton(
-            onPressed: () {
-              setState(() => _windForce = (_windForce + 1).clamp(-3, 3));
-              Haptics.tap();
-            },
-            icon: Icon(
-              Icons.arrow_forward_rounded,
+            // Wind right
+            buildIconBtn(
+              onPressed: () {
+                setState(() => _windForce = (_windForce + 1).clamp(-3, 3));
+                Haptics.tap();
+              },
+              icon: Icons.arrow_forward_rounded,
               color: _windForce > 0
                   ? AppColors.electricBlue
                   : AppColors.secondaryText.withValues(alpha: 0.4),
+              size: smallBtnIcon,
+              box: smallBtnBox,
             ),
-            iconSize: 16,
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 28, minHeight: 28),
-            tooltip: 'Wind right',
-          ),
-          // Shake
-          IconButton(
-            onPressed: _shakeCooldown <= 0 ? _doShake : null,
-            icon: Icon(
-              Icons.vibration_rounded,
+            // Shake
+            buildIconBtn(
+              onPressed: _shakeCooldown <= 0 ? _doShake : null,
+              icon: Icons.vibration_rounded,
               color: _shakeCooldown <= 0
                   ? AppColors.electricBlue
                   : AppColors.secondaryText.withValues(alpha: 0.3),
             ),
-            iconSize: 18,
-            tooltip: 'Shake',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          ),
-          const Spacer(),
-          // Undo button
-          IconButton(
-            onPressed: _undoHistory.isNotEmpty ? _undo : null,
-            icon: const Icon(Icons.undo_rounded),
-            color: _undoHistory.isNotEmpty
-                ? AppColors.electricBlue
-                : AppColors.secondaryText.withValues(alpha: 0.3),
-            iconSize: 20,
-            tooltip: 'Undo',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          ),
-          // Pause/Play button
-          IconButton(
-            onPressed: _togglePause,
-            icon: Icon(_isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded),
-            color: AppColors.electricBlue,
-            iconSize: 20,
-            tooltip: _isPaused ? 'Resume' : 'Pause',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          ),
-          // Clear button
-          IconButton(
-            onPressed: _clearGrid,
-            icon: const Icon(Icons.delete_outline_rounded),
-            color: AppColors.error.withValues(alpha: 0.8),
-            iconSize: 20,
-            tooltip: 'Clear all',
-            padding: EdgeInsets.zero,
-            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-          ),
-        ],
+            SizedBox(width: compact ? 4 : 8),
+            // Undo
+            buildIconBtn(
+              onPressed: _undoHistory.isNotEmpty ? _undo : null,
+              icon: Icons.undo_rounded,
+              color: _undoHistory.isNotEmpty
+                  ? AppColors.electricBlue
+                  : AppColors.secondaryText.withValues(alpha: 0.3),
+            ),
+            // Pause/Play
+            buildIconBtn(
+              onPressed: _togglePause,
+              icon: _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
+              color: AppColors.electricBlue,
+            ),
+            // Clear
+            buildIconBtn(
+              onPressed: _clearGrid,
+              icon: Icons.delete_outline_rounded,
+              color: AppColors.error.withValues(alpha: 0.8),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -4232,11 +4300,13 @@ class _ElementLabGameState extends State<ElementLabGame>
   // ── Overlay widgets ────────────────────────────────────────────────────
 
   Widget _buildTimeWarningOverlay() {
+    final screenW = MediaQuery.of(context).size.width;
+    final compact = screenW < 400;
     return Positioned.fill(
       child: IgnorePointer(
         child: Center(
           child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 16),
+            padding: EdgeInsets.symmetric(horizontal: compact ? 20 : 32, vertical: compact ? 10 : 16),
             decoration: BoxDecoration(
               color: AppColors.background.withValues(alpha: 0.85),
               borderRadius: BorderRadius.circular(20),
@@ -4248,7 +4318,7 @@ class _ElementLabGameState extends State<ElementLabGame>
             child: Text(
               _timeWarningText,
               style: AppFonts.fredoka(
-                fontSize: 28,
+                fontSize: compact ? 20 : 28,
                 fontWeight: FontWeight.w700,
                 color: _timerColor(),
               ),
@@ -4261,14 +4331,19 @@ class _ElementLabGameState extends State<ElementLabGame>
 
   Widget _buildSessionExpiredOverlay() {
     final canAfford = widget.progressService.starCoins >= kExtensionCost;
+    final screenW = MediaQuery.of(context).size.width;
+    final compact = screenW < 400;
+    final hMargin = compact ? 16.0 : 32.0;
+    final pad = compact ? 16.0 : 24.0;
 
     return Positioned.fill(
       child: Container(
         color: AppColors.background.withValues(alpha: 0.9),
         child: Center(
           child: Container(
-            margin: const EdgeInsets.symmetric(horizontal: 32),
-            padding: const EdgeInsets.all(24),
+            margin: EdgeInsets.symmetric(horizontal: hMargin),
+            padding: EdgeInsets.all(pad),
+            constraints: const BoxConstraints(maxWidth: 400),
             decoration: BoxDecoration(
               color: AppColors.surface,
               borderRadius: BorderRadius.circular(24),
@@ -4287,52 +4362,52 @@ class _ElementLabGameState extends State<ElementLabGame>
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                const Icon(
+                Icon(
                   Icons.timer_off_rounded,
                   color: AppColors.starGold,
-                  size: 48,
+                  size: compact ? 36 : 48,
                 ),
-                const SizedBox(height: 12),
+                SizedBox(height: compact ? 8 : 12),
                 Text(
                   "Time's Up!",
                   style: AppFonts.fredoka(
-                    fontSize: 28,
+                    fontSize: compact ? 22 : 28,
                     fontWeight: FontWeight.w700,
                     color: AppColors.primaryText,
                   ),
                 ),
-                const SizedBox(height: 8),
+                SizedBox(height: compact ? 6 : 8),
                 Text(
                   'Your Element Lab session has ended.',
                   textAlign: TextAlign.center,
                   style: AppFonts.fredoka(
-                    fontSize: 14,
+                    fontSize: compact ? 12 : 14,
                     color: AppColors.secondaryText,
                   ),
                 ),
-                const SizedBox(height: 20),
+                SizedBox(height: compact ? 14 : 20),
                 // Add More Time button
                 SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
                     onPressed: canAfford ? _addMoreTime : null,
-                    icon: const Icon(Icons.add_rounded, size: 20),
+                    icon: Icon(Icons.add_rounded, size: compact ? 16 : 20),
                     label: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          'Add 2 Minutes  ',
+                          'Add 2 Min  ',
                           style: AppFonts.fredoka(
-                            fontSize: 15,
+                            fontSize: compact ? 13 : 15,
                             fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const Icon(Icons.star_rounded,
-                            color: AppColors.starGold, size: 16),
+                        Icon(Icons.star_rounded,
+                            color: AppColors.starGold, size: compact ? 14 : 16),
                         Text(
                           ' $kExtensionCost',
                           style: AppFonts.fredoka(
-                            fontSize: 14,
+                            fontSize: compact ? 12 : 14,
                             fontWeight: FontWeight.w600,
                             color: AppColors.starGold,
                           ),
@@ -4344,7 +4419,7 @@ class _ElementLabGameState extends State<ElementLabGame>
                           ? AppColors.electricBlue
                           : AppColors.surfaceVariant,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: EdgeInsets.symmetric(vertical: compact ? 8 : 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -4357,12 +4432,12 @@ class _ElementLabGameState extends State<ElementLabGame>
                     'Complete words in Adventure Mode\nto earn more Star Coins!',
                     textAlign: TextAlign.center,
                     style: AppFonts.fredoka(
-                      fontSize: 12,
+                      fontSize: compact ? 10 : 12,
                       color: AppColors.starGold.withValues(alpha: 0.8),
                     ),
                   ),
                 ],
-                const SizedBox(height: 12),
+                SizedBox(height: compact ? 8 : 12),
                 // Exit button
                 SizedBox(
                   width: double.infinity,
@@ -4373,7 +4448,7 @@ class _ElementLabGameState extends State<ElementLabGame>
                       side: BorderSide(
                         color: AppColors.border.withValues(alpha: 0.5),
                       ),
-                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      padding: EdgeInsets.symmetric(vertical: compact ? 8 : 12),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(16),
                       ),
@@ -4381,7 +4456,7 @@ class _ElementLabGameState extends State<ElementLabGame>
                     child: Text(
                       'Exit',
                       style: AppFonts.fredoka(
-                        fontSize: 15,
+                        fontSize: compact ? 13 : 15,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -4400,6 +4475,9 @@ class _ElementLabGameState extends State<ElementLabGame>
     final color = _baseColors[elType.clamp(0, _baseColors.length - 1)];
     final name = _elementNames[elType.clamp(0, _elementNames.length - 1)];
     final desc = _elementDescriptions[elType] ?? 'A mysterious element.';
+    final screenW = MediaQuery.of(context).size.width;
+    final compact = screenW < 400;
+    final hMargin = compact ? 24.0 : 48.0;
 
     return Positioned.fill(
       child: GestureDetector(
@@ -4408,8 +4486,9 @@ class _ElementLabGameState extends State<ElementLabGame>
           color: AppColors.background.withValues(alpha: 0.7),
           child: Center(
             child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 48),
-              padding: const EdgeInsets.all(20),
+              margin: EdgeInsets.symmetric(horizontal: hMargin),
+              padding: EdgeInsets.all(compact ? 14 : 20),
+              constraints: const BoxConstraints(maxWidth: 360),
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(20),
@@ -4429,8 +4508,8 @@ class _ElementLabGameState extends State<ElementLabGame>
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Container(
-                    width: 40,
-                    height: 40,
+                    width: compact ? 30 : 40,
+                    height: compact ? 30 : 40,
                     decoration: BoxDecoration(
                       color: color,
                       shape: BoxShape.circle,
@@ -4440,30 +4519,30 @@ class _ElementLabGameState extends State<ElementLabGame>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  SizedBox(height: compact ? 6 : 10),
                   Text(
                     name,
                     style: AppFonts.fredoka(
-                      fontSize: 22,
+                      fontSize: compact ? 18 : 22,
                       fontWeight: FontWeight.w700,
                       color: color,
                     ),
                   ),
-                  const SizedBox(height: 8),
+                  SizedBox(height: compact ? 6 : 8),
                   Text(
                     desc,
                     textAlign: TextAlign.center,
                     style: AppFonts.fredoka(
-                      fontSize: 13,
+                      fontSize: compact ? 11 : 13,
                       color: AppColors.secondaryText,
                       height: 1.4,
                     ),
                   ),
-                  const SizedBox(height: 16),
+                  SizedBox(height: compact ? 10 : 16),
                   Text(
                     'Tap anywhere to close',
                     style: AppFonts.fredoka(
-                      fontSize: 11,
+                      fontSize: compact ? 9 : 11,
                       color: AppColors.secondaryText.withValues(alpha: 0.5),
                     ),
                   ),
@@ -4477,6 +4556,8 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   Widget _buildPauseOverlay() {
+    final screenW = MediaQuery.of(context).size.width;
+    final compact = screenW < 400;
     return Positioned.fill(
       child: Container(
         color: AppColors.background.withValues(alpha: 0.85),
@@ -4484,58 +4565,58 @@ class _ElementLabGameState extends State<ElementLabGame>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.pause_circle_filled_rounded,
                 color: AppColors.electricBlue,
-                size: 64,
+                size: compact ? 48 : 64,
               ),
-              const SizedBox(height: 16),
+              SizedBox(height: compact ? 10 : 16),
               Text(
                 'Paused',
                 style: AppFonts.fredoka(
-                  fontSize: 32,
+                  fontSize: compact ? 24 : 32,
                   fontWeight: FontWeight.w700,
                   color: AppColors.primaryText,
                 ),
               ),
-              const SizedBox(height: 8),
+              SizedBox(height: compact ? 6 : 8),
               Text(
                 '${_formatTime(_remainingSeconds)} remaining',
                 style: AppFonts.fredoka(
-                  fontSize: 16,
+                  fontSize: compact ? 13 : 16,
                   color: AppColors.secondaryText,
                 ),
               ),
-              const SizedBox(height: 24),
+              SizedBox(height: compact ? 16 : 24),
               ElevatedButton.icon(
                 onPressed: _togglePause,
                 icon: const Icon(Icons.play_arrow_rounded),
                 label: Text(
                   'Resume',
                   style: AppFonts.fredoka(
-                    fontSize: 16,
+                    fontSize: compact ? 14 : 16,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.electricBlue,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 32,
-                    vertical: 12,
+                  padding: EdgeInsets.symmetric(
+                    horizontal: compact ? 24 : 32,
+                    vertical: compact ? 8 : 12,
                   ),
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(16),
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              SizedBox(height: compact ? 8 : 12),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(),
                 child: Text(
                   'Exit Lab',
                   style: AppFonts.fredoka(
-                    fontSize: 14,
+                    fontSize: compact ? 12 : 14,
                     color: AppColors.secondaryText,
                   ),
                 ),

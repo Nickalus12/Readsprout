@@ -183,8 +183,10 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen>
               final newName = renameController.text.trim();
               if (newName.isNotEmpty) {
                 await widget.settingsService.renameProfile(profile.id, newName);
-                if (mounted) {
+                if (ctx.mounted) {
                   Navigator.pop(ctx);
+                }
+                if (mounted) {
                   setState(() {});
                 }
               }
@@ -244,8 +246,10 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen>
           TextButton(
             onPressed: () async {
               await widget.settingsService.removeProfile(profile.id);
-              if (mounted) {
+              if (ctx.mounted) {
                 Navigator.pop(ctx);
+              }
+              if (mounted) {
                 setState(() {});
               }
             },
