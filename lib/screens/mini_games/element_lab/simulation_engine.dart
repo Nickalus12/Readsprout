@@ -315,21 +315,43 @@ class SimulationEngine {
   void processExplosions() {
     if (pendingExplosions.isEmpty) return;
     recentExplosions.clear();
+
+    // Collect debris from destroyed cells to scatter outward
+    final debris = <int>[]; // [el, targetX, targetY, ...]
+
     for (final exp in pendingExplosions) {
       recentExplosions.add(exp);
       final r = exp.radius;
       for (int dy = -r; dy <= r; dy++) {
         for (int dx = -r; dx <= r; dx++) {
-          if (dx * dx + dy * dy > r * r) continue;
+          final dist2 = dx * dx + dy * dy;
+          if (dist2 > r * r) continue;
           final nx = exp.x + dx;
           final ny = exp.y + dy;
           if (!inBounds(nx, ny)) continue;
           final ni = ny * gridW + nx;
-          if (grid[ni] != El.stone && grid[ni] != El.glass && grid[ni] != El.metal) {
-            grid[ni] = El.empty;
-            life[ni] = 0;
-            markDirty(nx, ny);
+          final el = grid[ni];
+          if (el == El.stone || el == El.glass || el == El.metal) continue;
+
+          // Scatter particles at the blast edge outward
+          if (el != El.empty && el != El.tnt && dist2 > (r * r * 0.3).round()) {
+            // Fling this element outward from the blast center
+            final flingDist = r + 2 + rng.nextInt(r);
+            final normDx = dx == 0 ? 0 : (dx > 0 ? 1 : -1);
+            final normDy = dy == 0 ? 0 : (dy > 0 ? 1 : -1);
+            final targetX = nx + normDx * (flingDist ~/ 2 + rng.nextInt(3));
+            final targetY = ny + normDy * (flingDist ~/ 2 + rng.nextInt(3));
+            // Convert flammable debris to fire
+            final debrisEl = (el == El.oil || el == El.plant || el == El.seed || el == El.wood)
+                ? El.fire : (el == El.sand || el == El.dirt || el == El.snow) ? el : El.ash;
+            if (debris.length < 60) { // limit debris count
+              debris.addAll([debrisEl, targetX, targetY]);
+            }
           }
+
+          grid[ni] = El.empty;
+          life[ni] = 0;
+          markDirty(nx, ny);
         }
       }
       // Create some fire around the edges
@@ -348,6 +370,22 @@ class SimulationEngine {
         }
       }
     }
+
+    // Scatter debris particles to their flung positions
+    for (int i = 0; i < debris.length; i += 3) {
+      final el = debris[i];
+      final tx = debris[i + 1];
+      final ty = debris[i + 2];
+      if (inBounds(tx, ty)) {
+        final ti = ty * gridW + tx;
+        if (grid[ti] == El.empty) {
+          grid[ti] = el;
+          life[ti] = 0;
+          markDirty(tx, ty);
+        }
+      }
+    }
+
     pendingExplosions.clear();
   }
 
