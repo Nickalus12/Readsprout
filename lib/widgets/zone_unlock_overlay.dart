@@ -391,24 +391,49 @@ class _ZoneUnlockOverlayState extends State<ZoneUnlockOverlay>
 
                       SizedBox(height: 40 * sf),
 
-                      // ── Tap to continue hint ──
+                      // ── Tap to continue hint with hand pointer ──
                       if (_canDismiss)
-                        Text(
-                          'Tap to continue',
-                          style: AppFonts.nunito(
-                            fontSize: 14 * sf,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white.withValues(alpha: 0.4),
-                          ),
-                        )
-                            .animate(
-                              onPlay: (c) => c.repeat(reverse: true),
+                        Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.touch_app_rounded,
+                              size: 32 * sf,
+                              color: Colors.white.withValues(alpha: 0.5),
                             )
-                            .fade(
-                              begin: 0.3,
-                              end: 1.0,
-                              duration: 1200.ms,
-                            ),
+                                .animate(
+                                  onPlay: (c) => c.repeat(reverse: true),
+                                )
+                                .scaleXY(
+                                  begin: 0.9,
+                                  end: 1.1,
+                                  duration: 1000.ms,
+                                  curve: Curves.easeInOut,
+                                )
+                                .fade(
+                                  begin: 0.3,
+                                  end: 0.8,
+                                  duration: 1000.ms,
+                                ),
+                            SizedBox(height: 4 * sf),
+                            Text(
+                              'Tap to continue',
+                              style: AppFonts.nunito(
+                                fontSize: 14 * sf,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.white.withValues(alpha: 0.4),
+                              ),
+                            )
+                                .animate(
+                                  onPlay: (c) => c.repeat(reverse: true),
+                                )
+                                .fade(
+                                  begin: 0.3,
+                                  end: 1.0,
+                                  duration: 1200.ms,
+                                ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
