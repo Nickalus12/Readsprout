@@ -613,7 +613,9 @@ class _HomeScreenState extends State<HomeScreen>
                                   ),
                                 ),
                                 Text(
-                                  'Begin your word journey',
+                                  widget.settingsService?.hasContinue == true
+                                      ? 'Browse all levels'
+                                      : 'Begin your word journey',
                                   style: AppFonts.nunito(
                                     fontSize: 10 * sf,
                                     color: AppColors.emerald
