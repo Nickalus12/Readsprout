@@ -129,41 +129,30 @@ extension AntColonyAI on SimulationEngine {
            above == El.sand || above == El.ant;
   }
 
-  /// Choose direction using weighted pheromone sampling.
+  /// Choose direction using weighted pheromone sampling (zero-allocation).
   int _antPheromoneDir(int x, int y, int dir, Uint8List pheroGrid) {
     final w = gridW;
     if (rng.nextInt(20) == 0) return rng.nextBool() ? 1 : -1;
 
-    final candidates = <int, int>{};
+    int bestDir = dir;
+    int bestScore = -1;
+
     final fwdX = x + dir;
     if (inBounds(fwdX, y)) {
-      final fi = y * w + fwdX;
-      candidates[dir] = pheroGrid[fi] + rng.nextInt(10);
+      final score = pheroGrid[y * w + fwdX] + rng.nextInt(10);
+      if (score > bestScore) { bestScore = score; bestDir = dir; }
     }
     final uy = y - gravityDir;
     if (inBounds(fwdX, uy)) {
-      final fi = uy * w + fwdX;
-      final score = pheroGrid[fi] + rng.nextInt(10);
-      if (!candidates.containsKey(dir) || score > candidates[dir]!) {
-        candidates[dir] = score;
-      }
+      final score = pheroGrid[uy * w + fwdX] + rng.nextInt(10);
+      if (score > bestScore) { bestScore = score; bestDir = dir; }
     }
     final bwdX = x - dir;
     if (inBounds(bwdX, y)) {
-      final fi = y * w + bwdX;
-      candidates[-dir] = pheroGrid[fi] + rng.nextInt(10);
+      final score = pheroGrid[y * w + bwdX] + rng.nextInt(10);
+      if (score > bestScore) { bestScore = score; bestDir = -dir; }
     }
 
-    if (candidates.isEmpty) return dir;
-
-    int bestDir = dir;
-    int bestScore = -1;
-    for (final entry in candidates.entries) {
-      if (entry.value > bestScore) {
-        bestScore = entry.value;
-        bestDir = entry.key;
-      }
-    }
     return bestScore > 5 ? bestDir : dir;
   }
 
