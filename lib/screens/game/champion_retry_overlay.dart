@@ -93,16 +93,16 @@ class ChampionRetryOverlay extends StatelessWidget {
 
               const SizedBox(height: 28),
 
-              // Action buttons
+              // Action buttons - large and clear for a 4-year-old
               Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Skip / Continue button
+                  // Skip / Continue button (smaller, secondary)
                   GestureDetector(
                     onTap: onSkip,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 24, vertical: 14),
+                          horizontal: 24, vertical: 16),
                       decoration: BoxDecoration(
                         color: AppColors.surface.withValues(alpha: 0.6),
                         borderRadius: BorderRadius.circular(24),
@@ -115,14 +115,14 @@ class ChampionRetryOverlay extends StatelessWidget {
                         children: [
                           const Icon(
                             Icons.skip_next_rounded,
-                            size: 26,
+                            size: 28,
                             color: AppColors.secondaryText,
                           ),
                           const SizedBox(width: 6),
                           Text(
                             'Skip',
                             style: AppFonts.fredoka(
-                              fontSize: 16,
+                              fontSize: 17,
                               fontWeight: FontWeight.w500,
                               color: AppColors.secondaryText,
                             ),
@@ -139,31 +139,32 @@ class ChampionRetryOverlay extends StatelessWidget {
                           delay: 500.ms,
                           duration: 300.ms),
 
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 20),
 
-                  // Try Again button (prominent)
+                  // Try Again button (prominent, pulsing)
                   GestureDetector(
                     onTap: onRetry,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                          horizontal: 28, vertical: 14),
+                          horizontal: 32, vertical: 16),
                       decoration: BoxDecoration(
                         gradient: LinearGradient(
                           colors: [
-                            AppColors.electricBlue.withValues(alpha: 0.2),
-                            AppColors.violet.withValues(alpha: 0.15),
+                            AppColors.electricBlue.withValues(alpha: 0.25),
+                            AppColors.violet.withValues(alpha: 0.18),
                           ],
                         ),
-                        borderRadius: BorderRadius.circular(20),
+                        borderRadius: BorderRadius.circular(24),
                         border: Border.all(
-                          color: AppColors.electricBlue.withValues(alpha: 0.5),
-                          width: 1.5,
+                          color: AppColors.electricBlue.withValues(alpha: 0.6),
+                          width: 2,
                         ),
                         boxShadow: [
                           BoxShadow(
                             color:
-                                AppColors.electricBlue.withValues(alpha: 0.15),
-                            blurRadius: 12,
+                                AppColors.electricBlue.withValues(alpha: 0.2),
+                            blurRadius: 16,
+                            spreadRadius: 2,
                           ),
                         ],
                       ),
@@ -172,15 +173,15 @@ class ChampionRetryOverlay extends StatelessWidget {
                         children: [
                           const Icon(
                             Icons.refresh_rounded,
-                            size: 26,
+                            size: 28,
                             color: AppColors.electricBlue,
                           ),
-                          const SizedBox(width: 6),
+                          const SizedBox(width: 8),
                           Text(
                             'Try Again',
                             style: AppFonts.fredoka(
-                              fontSize: 18,
-                              fontWeight: FontWeight.w600,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w700,
                               color: AppColors.electricBlue,
                             ),
                           ),
@@ -194,7 +195,15 @@ class ChampionRetryOverlay extends StatelessWidget {
                           begin: 0.2,
                           end: 0,
                           delay: 600.ms,
-                          duration: 300.ms),
+                          duration: 300.ms)
+                      .then(delay: 500.ms)
+                      .animate(onPlay: (c) => c.repeat(reverse: true))
+                      .scaleXY(
+                        begin: 1.0,
+                        end: 1.04,
+                        duration: 1200.ms,
+                        curve: Curves.easeInOut,
+                      ),
                 ],
               ),
             ],
