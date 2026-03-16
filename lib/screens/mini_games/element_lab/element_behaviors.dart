@@ -1744,13 +1744,27 @@ extension ElementBehaviors on SimulationEngine {
   }
 
   void simSteam(int x, int y, int idx) {
-    life[idx]++;
+    final lifeVal = life[idx];
+    // Prevent Uint8 overflow (wraps at 255 -> 0, making steam immortal)
+    if (lifeVal < 250) life[idx] = lifeVal + 1;
     final uy = y - gravityDir;
     final atEdge = gravityDir == 1 ? y <= 2 : y >= gridH - 3;
     final steamLife = isNight ? 40 + rng.nextInt(20) : 80 + rng.nextInt(40);
-    if (atEdge || life[idx] > steamLife) {
-      final waterChance = isNight ? 2 : 3;
-      grid[idx] = rng.nextInt(waterChance) == 0 ? El.water : El.empty;
+    if (life[idx] > steamLife) {
+      // Expired steam: condense to water only if not at edge (ceiling water stays forever)
+      if (!atEdge && rng.nextInt(isNight ? 2 : 3) == 0) {
+        grid[idx] = El.water;
+        life[idx] = 100;
+      } else {
+        grid[idx] = El.empty;
+        life[idx] = 0;
+      }
+      markProcessed(idx);
+      return;
+    }
+    if (atEdge) {
+      // At ceiling/floor edge: always dissipate (never condense to water here)
+      grid[idx] = El.empty;
       life[idx] = 0;
       markProcessed(idx);
       return;
