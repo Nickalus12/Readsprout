@@ -549,7 +549,13 @@ class _ElementLabGameState extends State<ElementLabGame>
         if (_flags[idx] == 1) continue; // already moved this frame
 
         final el = _grid[idx];
-        if (el == El.empty) continue;
+        if (el == El.empty) {
+          // Pheromone evaporation for empty cells (every 8 frames)
+          if (_frameCount % 8 == 0 && _life[idx] > 0) {
+            _life[idx]--;
+          }
+          continue;
+        }
 
         switch (el) {
           case El.sand:
@@ -2202,13 +2208,21 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   // Ant states stored in _velY:
-  //   0 = explorer/forager (searching for dirt or food)
+  //   0 = explorer (searching for dirt to dig)
   //   1 = digger (actively tunneling into dirt)
   //   2 = carrier (carrying dirt to surface to build mound)
   //   3 = returning (heading back to colony after depositing)
+  //   4 = forager (found a seed, carrying it to moist dirt to plant)
   //  10+ = drowning counter (in water)
   // _life stores "home X" coordinate (0-159) so ants remember their colony.
   // _velX stores movement direction (-1 or 1).
+  //
+  // Pheromone system: for EMPTY cells, _life[idx] stores pheromone intensity
+  // (0-255). Ants deposit pheromones as they walk; they evaporate over time.
+  // Carriers deposit stronger pheromones (~200) than explorers (~100).
+  //
+  // Colony organization: for DIRT cells at tunnel entrances, _life values
+  // of 250 mark entrance points so returning ants can find tunnels.
 
   /// Check if a cell is "underground" (has solid above it, toward surface).
   bool _isUnderground(int x, int y) {
@@ -2298,6 +2312,10 @@ class _ElementLabGameState extends State<ElementLabGame>
     final underground = _isUnderground(x, y);
     final nearDirt = _checkAdjacent(x, y, El.dirt);
 
+    // Deposit pheromones: leave a trail on the cell we just came from
+    // Carriers/foragers leave stronger pheromones for others to follow
+    _antDepositPheromone(x, y, state);
+
     switch (state) {
       case 0: // EXPLORER — search for dirt to dig
         _antExplore(x, y, idx, homeX, nearDirt, underground);
@@ -2307,39 +2325,75 @@ class _ElementLabGameState extends State<ElementLabGame>
         _antCarry(x, y, idx, homeX);
       case 3: // RETURNING — head back to colony entrance, then explore again
         _antReturn(x, y, idx, homeX);
+      case 4: // FORAGER — carrying a seed to plant in moist dirt
+        _antForage(x, y, idx, homeX);
     }
   }
 
   void _antExplore(int x, int y, int idx, int homeX, bool nearDirt, bool underground) {
     final dir = _velX[idx];
 
+    // Check for nearby seeds — switch to forager if found within 5 cells
+    for (int scanD = 1; scanD <= 5; scanD++) {
+      for (final sd in [dir, -dir]) {
+        final sx = x + sd * scanD;
+        if (!_inBounds(sx, y)) continue;
+        if (_grid[y * _gridW + sx] == El.seed) {
+          // Pick up the seed
+          _grid[y * _gridW + sx] = El.empty;
+          _life[y * _gridW + sx] = 0;
+          _velY[idx] = 4; // switch to forager
+          _velX[idx] = sd;
+          return;
+        }
+        // Also check one row below for seeds
+        final sy = y + _gravityDir;
+        if (_inBounds(sx, sy) && _grid[sy * _gridW + sx] == El.seed) {
+          _grid[sy * _gridW + sx] = El.empty;
+          _life[sy * _gridW + sx] = 0;
+          _velY[idx] = 4;
+          _velX[idx] = sd;
+          return;
+        }
+      }
+    }
+
     // If adjacent to dirt and not too many ants nearby, start digging
     if (nearDirt && _rng.nextInt(4) == 0) {
-      // Count nearby ants — don't overcrowd one dig site
+      // Crowd avoidance: count nearby ants in 3-cell radius
       int nearbyAnts = 0;
-      for (int dy = -2; dy <= 2; dy++) {
-        for (int dx = -2; dx <= 2; dx++) {
+      for (int dy = -3; dy <= 3; dy++) {
+        for (int dx = -3; dx <= 3; dx++) {
           if (_inBounds(x + dx, y + dy) && _grid[(y + dy) * _gridW + (x + dx)] == El.ant) nearbyAnts++;
         }
       }
-      if (nearbyAnts < 5) {
+      if (nearbyAnts < 3) {
         _velY[idx] = 1; // switch to digger
         return;
       }
     }
 
-    // Scan for dirt — prefer it over empty space
+    // Scan for dirt, pheromone trails, and hazards
     int targetDir = dir;
     bool foundTarget = false;
+    int bestPheromone = 0;
+    int pheromoneDir = 0;
+
     for (int scanD = 1; scanD <= 8; scanD++) {
       for (final sd in [dir, -dir]) {
         final sx = x + sd * scanD;
         if (!_inBounds(sx, y)) continue;
-        final sc = _grid[y * _gridW + sx];
+        final si = y * _gridW + sx;
+        final sc = _grid[si];
         if (sc == El.dirt || sc == El.mud) {
           targetDir = sd;
           foundTarget = true;
           break;
+        }
+        // Follow pheromone trails (empty cells with pheromone > 0)
+        if (sc == El.empty && _life[si] > bestPheromone) {
+          bestPheromone = _life[si];
+          pheromoneDir = sd;
         }
         // Also follow other ants (social behavior)
         if (sc == El.ant && _rng.nextInt(3) == 0) {
@@ -2347,13 +2401,24 @@ class _ElementLabGameState extends State<ElementLabGame>
           foundTarget = true;
           break;
         }
-        // Avoid hazards
-        if (sc == El.water || sc == El.acid || sc == El.lava || sc == El.fire) {
+        // Hazard avoidance: look 2 cells ahead for dangers
+        if (sc == El.water || sc == El.acid || sc == El.fire) {
           if (sd == dir) targetDir = -dir;
+          break;
+        }
+        // Lava has larger avoidance radius
+        if (sc == El.lava) {
+          if (sd == dir) targetDir = -dir;
+          foundTarget = true;
           break;
         }
       }
       if (foundTarget) break;
+    }
+
+    // If no dirt found but pheromone trail exists, follow it
+    if (!foundTarget && bestPheromone > 20 && pheromoneDir != 0 && _rng.nextInt(3) != 0) {
+      targetDir = pheromoneDir;
     }
 
     _antMove(x, y, idx, targetDir);
@@ -2364,9 +2429,37 @@ class _ElementLabGameState extends State<ElementLabGame>
     final by = y + g;
     final dir = _velX[idx];
 
+    // Prefer to use existing tunnels (follow pheromone trails) instead of
+    // digging new ones — check if there's a strong trail to follow
+    if (_rng.nextInt(3) == 0) {
+      for (final sd in [dir, -dir]) {
+        final sx = x + sd;
+        if (_inBounds(sx, y) && _grid[y * _gridW + sx] == El.empty) {
+          final pheromone = _life[y * _gridW + sx];
+          if (pheromone > 50) {
+            // Follow existing tunnel instead of digging new one
+            _velX[idx] = sd;
+            _swap(idx, y * _gridW + sx);
+            return;
+          }
+        }
+      }
+    }
+
     // Try to dig downward first (create vertical shafts)
     if (_inBounds(x, by) && _grid[by * _gridW + x] == El.dirt) {
       if (_rng.nextInt(3) == 0) {
+        // Mark entrance if this is near the surface (tunnel entrance marker)
+        final aboveY = y - g;
+        if (_inBounds(x, aboveY) && _grid[aboveY * _gridW + x] == El.empty) {
+          // This dirt cell borders the surface — mark adjacent dirt as entrance
+          for (final edx in [-1, 1]) {
+            final ex = x + edx;
+            if (_inBounds(ex, y) && _grid[y * _gridW + ex] == El.dirt) {
+              _life[y * _gridW + ex] = 250; // entrance marker
+            }
+          }
+        }
         _grid[by * _gridW + x] = El.empty;
         _life[by * _gridW + x] = 0;
         _swap(idx, by * _gridW + x);
