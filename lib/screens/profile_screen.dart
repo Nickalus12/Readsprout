@@ -75,7 +75,15 @@ class _ProfileScreenState extends State<ProfileScreen>
     // Wire amplitude-based lip sync to avatar
     _avatarController.bindAmplitude(widget.audioService.mouthAmplitude);
 
-    // Greet the child when profile opens
+    // Greet the child when profile opens — avatar waves and looks happy
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) {
+        _avatarController.setExpression(
+          AvatarExpression.happy,
+          duration: const Duration(milliseconds: 2500),
+        );
+      }
+    });
     Future.delayed(const Duration(milliseconds: 600), _greetChild);
 
     // Animate counters after a brief delay
