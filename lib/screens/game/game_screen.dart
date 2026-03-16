@@ -204,18 +204,23 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final musicZoneKey = MusicLayers.zoneKeyFromIndex(_zoneIndex);
     widget.musicService?.startZoneMusic(musicZoneKey);
 
-    // Load words for this level, ordered by spaced repetition priority
-    final levelWords = List<Word>.from(DolchWords.wordsForLevel(widget.level));
-    if (widget.reviewService != null) {
-      final wordTexts = levelWords.map((w) => w.text.toLowerCase()).toList();
-      final ordered = widget.reviewService!.orderWordsForPractice(wordTexts);
-      levelWords.sort((a, b) {
-        final ai = ordered.indexOf(a.text.toLowerCase());
-        final bi = ordered.indexOf(b.text.toLowerCase());
-        return ai.compareTo(bi);
-      });
+    // Load words: use review words if provided, otherwise load from level data
+    final List<Word> levelWords;
+    if (widget.reviewWords != null && widget.reviewWords!.isNotEmpty) {
+      levelWords = List<Word>.from(widget.reviewWords!);
     } else {
-      levelWords.shuffle();
+      levelWords = List<Word>.from(DolchWords.wordsForLevel(widget.level));
+      if (widget.reviewService != null) {
+        final wordTexts = levelWords.map((w) => w.text.toLowerCase()).toList();
+        final ordered = widget.reviewService!.orderWordsForPractice(wordTexts);
+        levelWords.sort((a, b) {
+          final ai = ordered.indexOf(a.text.toLowerCase());
+          final bi = ordered.indexOf(b.text.toLowerCase());
+          return ai.compareTo(bi);
+        });
+      } else {
+        levelWords.shuffle();
+      }
     }
     _words = levelWords;
     _initRevealedLetters();
