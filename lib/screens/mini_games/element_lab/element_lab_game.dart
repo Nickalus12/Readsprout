@@ -1033,41 +1033,60 @@ class _ElementLabGameState extends State<ElementLabGame>
     final hPad = compact ? 6.0 : 12.0;
 
     Widget buildBrushSizeBtn(int size) {
-      final label = size == 1 ? 'small' : size == 3 ? 'medium' : 'big';
+      final shortLabel = size == 1 ? 'S' : size == 3 ? 'M' : 'L';
+      final spokenLabel = size == 1 ? 'small' : size == 3 ? 'medium' : 'big';
+      final isSelected = _input.brushSize == size;
       return Padding(
         padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 3),
-        child: GestureDetector(
-          onTap: () {
-            setState(() => _input.brushSize = size);
-            Haptics.tap();
-            _speakLabel(label);
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            width: chipSz,
-            height: chipSz,
-            decoration: BoxDecoration(
-              color: _input.brushSize == size
-                  ? AppColors.electricBlue.withValues(alpha: 0.2)
-                  : AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: _input.brushSize == size
-                    ? AppColors.electricBlue
-                    : AppColors.border,
-                width: _input.brushSize == size ? 2 : 1,
-              ),
-            ),
-            child: Center(
-              child: Container(
-                width: size.toDouble() * 2 + 2,
-                height: size.toDouble() * 2 + 2,
-                decoration: BoxDecoration(
-                  color: _input.brushSize == size
+        child: Tooltip(
+          message: size == 1 ? 'Small brush' : size == 3 ? 'Medium brush' : 'Large brush',
+          child: GestureDetector(
+            onTap: () {
+              setState(() => _input.brushSize = size);
+              Haptics.tap();
+              _speakLabel(spokenLabel);
+            },
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: chipSz,
+              height: chipSz,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.electricBlue.withValues(alpha: 0.2)
+                    : AppColors.surfaceVariant,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: isSelected
                       ? AppColors.electricBlue
-                      : AppColors.secondaryText,
-                  shape: BoxShape.circle,
+                      : AppColors.border,
+                  width: isSelected ? 2 : 1,
                 ),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Container(
+                    width: size.toDouble() * 2 + 2,
+                    height: size.toDouble() * 2 + 2,
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? AppColors.electricBlue
+                          : AppColors.secondaryText,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                  SizedBox(height: compact ? 0 : 1),
+                  Text(
+                    shortLabel,
+                    style: AppFonts.fredoka(
+                      fontSize: compact ? 6 : 7,
+                      fontWeight: FontWeight.w600,
+                      color: isSelected
+                          ? AppColors.electricBlue
+                          : AppColors.secondaryText,
+                    ),
+                  ),
+                ],
               ),
             ),
           ),
@@ -1076,35 +1095,39 @@ class _ElementLabGameState extends State<ElementLabGame>
     }
 
     Widget buildBrushModeBtn(int mode, IconData icon, String label) {
+      final isSelected = _input.brushMode == mode;
       return Padding(
         padding: const EdgeInsets.symmetric(horizontal: 1),
-        child: GestureDetector(
-          onTap: () {
-            setState(() => _input.brushMode = mode);
-            Haptics.tap();
-            _speakLabel(label);
-          },
-          child: Container(
-            width: chipSz,
-            height: chipSz,
-            decoration: BoxDecoration(
-              color: _input.brushMode == mode
-                  ? AppColors.electricBlue.withValues(alpha: 0.2)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: _input.brushMode == mode
-                    ? AppColors.electricBlue
-                    : AppColors.border.withValues(alpha: 0.3),
-                width: _input.brushMode == mode ? 2 : 1,
+        child: Tooltip(
+          message: '${label[0].toUpperCase()}${label.substring(1)} brush',
+          child: GestureDetector(
+            onTap: () {
+              setState(() => _input.brushMode = mode);
+              Haptics.tap();
+              _speakLabel(label);
+            },
+            child: Container(
+              width: chipSz,
+              height: chipSz,
+              decoration: BoxDecoration(
+                color: isSelected
+                    ? AppColors.electricBlue.withValues(alpha: 0.2)
+                    : Colors.transparent,
+                borderRadius: BorderRadius.circular(6),
+                border: Border.all(
+                  color: isSelected
+                      ? AppColors.electricBlue
+                      : AppColors.border.withValues(alpha: 0.3),
+                  width: isSelected ? 2 : 1,
+                ),
               ),
-            ),
-            child: Icon(
-              icon,
-              size: brushChipIcon,
-              color: _input.brushMode == mode
-                  ? AppColors.electricBlue
-                  : AppColors.secondaryText,
+              child: Icon(
+                icon,
+                size: brushChipIcon,
+                color: isSelected
+                    ? AppColors.electricBlue
+                    : AppColors.secondaryText,
+              ),
             ),
           ),
         ),
