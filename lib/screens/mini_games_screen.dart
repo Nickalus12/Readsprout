@@ -374,6 +374,7 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
       label: label,
       painter: painter,
       glowColor: glow,
+      floatIndex: index,
       onTap: () async {
         await Navigator.push(context, _smoothRoute(game));
         if (!mounted) return;
@@ -404,6 +405,7 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
       label: label,
       painter: painter,
       glowColor: glow,
+      floatIndex: index,
       coinCost: widget.progressService.freePlayMode ? null : cost,
       coinBalance: widget.progressService.starCoins,
       onTap: () async {
@@ -507,6 +509,7 @@ class _GameButton extends StatefulWidget {
   final VoidCallback onTap;
   final int? coinCost;
   final int? coinBalance;
+  final int floatIndex;
 
   const _GameButton({
     required this.label,
@@ -515,6 +518,7 @@ class _GameButton extends StatefulWidget {
     required this.onTap,
     this.coinCost,
     this.coinBalance,
+    this.floatIndex = 0,
   });
 
   @override
@@ -544,7 +548,7 @@ class _GameButtonState extends State<_GameButton> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // Icon circle (with optional coin badge)
+              // Icon circle (with optional coin badge + idle float)
               Stack(
                 clipBehavior: Clip.none,
                 children: [
@@ -571,7 +575,17 @@ class _GameButtonState extends State<_GameButton> {
                       painter: widget.painter,
                       size: const Size(68, 68),
                     ),
-                  ),
+                  )
+                      .animate(
+                        onPlay: (c) => c.repeat(reverse: true),
+                        delay: Duration(milliseconds: widget.floatIndex * 200),
+                      )
+                      .slideY(
+                        begin: 0,
+                        end: -0.06,
+                        duration: Duration(milliseconds: 1800 + (widget.floatIndex % 3) * 200),
+                        curve: Curves.easeInOut,
+                      ),
                   if (widget.coinCost != null)
                     Positioned(
                       top: -4,
