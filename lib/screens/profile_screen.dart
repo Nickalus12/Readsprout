@@ -173,8 +173,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                       children: [
                         const SizedBox(height: 8),
                         _buildHeroSection(),
-                        const SizedBox(height: 16),
-                        _buildQuickActions(),
                         const SizedBox(height: 18),
                         _buildCompletionRing(),
                         const SizedBox(height: 18),
@@ -518,53 +516,6 @@ class _ProfileScreenState extends State<ProfileScreen>
     };
   }
 
-  // ── Quick Actions Row ───────────────────────────────────────────────
-
-  Widget _buildQuickActions() {
-    final screenW = MediaQuery.of(context).size.width;
-    final sf = (screenW / 400).clamp(0.7, 1.2);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20 * sf),
-      child: Row(
-        children: [
-          Expanded(
-            child: _QuickActionButton(
-              icon: Icons.play_arrow_rounded,
-              label: 'Continue',
-              gradient: [AppColors.emerald, AppColors.cyan],
-              sf: sf,
-              onTap: () => Navigator.of(context).pop(), // Returns to home where they can navigate to levels
-            ),
-          ),
-          SizedBox(width: 10 * sf),
-          Expanded(
-            child: _QuickActionButton(
-              icon: Icons.sports_esports_rounded,
-              label: 'Games',
-              gradient: [AppColors.violet, AppColors.magenta],
-              sf: sf,
-              onTap: () => Navigator.of(context).pop(), // Returns to home for games
-            ),
-          ),
-          SizedBox(width: 10 * sf),
-          Expanded(
-            child: _QuickActionButton(
-              icon: Icons.face_rounded,
-              label: 'Avatar',
-              gradient: [AppColors.electricBlue, AppColors.violet],
-              sf: sf,
-              onTap: _openAvatarEditor,
-            ),
-          ),
-        ],
-      ),
-    )
-        .animate()
-        .fadeIn(delay: 150.ms, duration: 400.ms)
-        .slideY(begin: 0.08, end: 0, duration: 300.ms);
-  }
-
   // ── Completion Ring ─────────────────────────────────────────────────
 
   Widget _buildCompletionRing() {
@@ -877,60 +828,6 @@ class _ProfileScreenState extends State<ProfileScreen>
         .animate()
         .fadeIn(delay: 200.ms, duration: 400.ms)
         .slideY(begin: 0.05, end: 0, duration: 300.ms);
-  }
-}
-
-// ── Quick Action Button ───────────────────────────────────────────────
-
-class _QuickActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final List<Color> gradient;
-  final double sf;
-  final VoidCallback onTap;
-
-  const _QuickActionButton({
-    required this.icon,
-    required this.label,
-    required this.gradient,
-    required this.sf,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 10 * sf),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              gradient[0].withValues(alpha: 0.15),
-              gradient[1].withValues(alpha: 0.08),
-            ],
-          ),
-          borderRadius: BorderRadius.circular(14 * sf),
-          border: Border.all(
-            color: gradient[0].withValues(alpha: 0.3),
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 22 * sf, color: gradient[0]),
-            SizedBox(height: 4 * sf),
-            Text(
-              label,
-              style: AppFonts.fredoka(
-                fontSize: 11 * sf,
-                fontWeight: FontWeight.w500,
-                color: gradient[0].withValues(alpha: 0.9),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
 
