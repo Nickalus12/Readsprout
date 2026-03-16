@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
-
 import '../data/dolch_words.dart';
 import '../services/high_score_service.dart';
 import '../services/progress_service.dart';
@@ -9,6 +8,7 @@ import '../services/review_service.dart';
 import '../services/stats_service.dart';
 import '../services/streak_service.dart';
 import '../theme/app_theme.dart';
+import 'onboarding_tutorial_screen.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Parent Gate — simple math challenge to keep kids out
@@ -1002,6 +1002,16 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
           ),
           const SizedBox(height: 10),
 
+          // Replay tutorial
+          _SettingsButton(
+            icon: Icons.school_rounded,
+            label: 'Replay Tutorial',
+            color: AppColors.electricBlue,
+            onTap: () => _replayTutorial(context),
+            subtitle: 'Show the onboarding guide again',
+          ),
+          const SizedBox(height: 10),
+
           // Reset progress
           _SettingsButton(
             icon: Icons.restart_alt_rounded,
@@ -1022,6 +1032,17 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
         ],
       ),
     ).animate().fadeIn(delay: 600.ms, duration: 400.ms).slideY(begin: 0.05, end: 0, duration: 300.ms);
+  }
+
+  void _replayTutorial(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => OnboardingTutorialScreen(
+          onComplete: () => Navigator.pop(context),
+        ),
+      ),
+    );
   }
 
   void _confirmReset(BuildContext context) {
