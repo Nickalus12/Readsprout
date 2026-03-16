@@ -80,6 +80,9 @@ class SimulationEngine {
   // -- Explosion queue -------------------------------------------------------
   final List<Explosion> pendingExplosions = [];
 
+  // -- Recent explosion locations (consumed by renderer for particles) ------
+  final List<Explosion> recentExplosions = [];
+
   // -- Rainbow color cycling -------------------------------------------------
   int rainbowHue = 0;
 
@@ -299,7 +302,9 @@ class SimulationEngine {
 
   void processExplosions() {
     if (pendingExplosions.isEmpty) return;
+    recentExplosions.clear();
     for (final exp in pendingExplosions) {
+      recentExplosions.add(exp);
       final r = exp.radius;
       for (int dy = -r; dy <= r; dy++) {
         for (int dx = -r; dx <= r; dx++) {

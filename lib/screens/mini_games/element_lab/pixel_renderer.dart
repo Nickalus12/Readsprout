@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'dart:ui' as ui;
 
@@ -85,7 +86,25 @@ class PixelRenderer {
       p[3] = (p[3] * 220) ~/ 256;
       p[4] = (p[4] * 220) ~/ 256;
     }
+
+    // Spawn explosion micro-particles from recent explosions
+    for (final exp in engine.recentExplosions) {
+      final count = (exp.radius * 3).clamp(6, 30);
+      for (int i = 0; i < count; i++) {
+        final angle = engine.rng.nextDouble() * 6.2832;
+        final dist = exp.radius * 0.3 + engine.rng.nextDouble() * exp.radius * 0.8;
+        final px = exp.x + (dist * math.cos(angle)).round();
+        final py = exp.y + (dist * math.sin(angle)).round();
+        // Hot debris particles: orange-white
+        final pr = 255;
+        final pg = 150 + engine.rng.nextInt(105);
+        final pb = engine.rng.nextInt(100);
+        spawnParticle(px, py, pr, pg, pb, 5 + engine.rng.nextInt(6));
+      }
+    }
+    engine.recentExplosions.clear();
   }
+
 
   /// Linearly interpolate between two RGB colors. [t] ranges 0..255.
   static int _lerpC(int a, int b, int t) => (a + ((b - a) * t) ~/ 255).clamp(0, 255);
@@ -288,11 +307,22 @@ class PixelRenderer {
 
             // Spawn micro-particles from active elements
             if (fc % 2 == 0) {
-              if (el == El.fire || el == El.lava) {
-                if (rng.nextInt(200) < 2 && y > 1) {
-                  final sparkG = el == El.lava ? 160 : 240;
-                  final sparkB = el == El.lava ? 30 : 100;
-                  spawnParticle(x + rng.nextInt(3) - 1, y - 1, 255, sparkG, sparkB, 4 + rng.nextInt(3));
+              if (el == El.fire) {
+                if (rng.nextInt(120) < 2 && y > 1) {
+                  // Brighter, more varied fire sparks
+                  final sparkR = 255;
+                  final sparkG = 180 + rng.nextInt(75);
+                  final sparkB = rng.nextInt(120);
+                  spawnParticle(x + rng.nextInt(3) - 1, y - 1, sparkR, sparkG, sparkB, 4 + rng.nextInt(4));
+                }
+              } else if (el == El.lava) {
+                if (rng.nextInt(150) < 2 && y > 1) {
+                  spawnParticle(x + rng.nextInt(3) - 1, y - 1, 255, 140 + rng.nextInt(60), 20 + rng.nextInt(30), 5 + rng.nextInt(3));
+                }
+              } else if (el == El.lightning) {
+                // Electric sparks from lightning
+                if (rng.nextInt(60) < 3 && y > 1) {
+                  spawnParticle(x + rng.nextInt(5) - 2, y + rng.nextInt(3) - 1, 255, 255, 100 + rng.nextInt(155), 3 + rng.nextInt(2));
                 }
               } else if (el == El.sand) {
                 if (rng.nextInt(400) < 1 && y > 1 && y < h - 1 && g[(y + 1) * w + x] == El.empty) {
@@ -396,28 +426,31 @@ class PixelRenderer {
     switch (el) {
       case El.fire:
         final fireLife = life[idx];
-        final flicker = (frameCount + idx * 3) % 6;
+        // Multi-frequency flicker for organic, alive-looking fire
+        final flicker1 = (frameCount + idx * 3) % 6;       // fast flicker
+        final flicker2 = (frameCount * 2 + idx * 7) % 10;  // medium pulse
+        final flicker3 = (frameCount + idx * 13) % 17;     // slow wave
+        final flickerSum = (flicker1 < 3 ? 20 : 0) + (flicker2 < 4 ? 15 : 0) + (flicker3 < 6 ? 10 : 0);
         if (fireLife < 8) {
-          final wb = flicker < 3 ? 30 : 0;
           _inlineR = 255;
-          _inlineG = (240 + wb + variation).clamp(210, 255);
-          _inlineB = (140 + wb).clamp(100, 180);
+          _inlineG = (230 + flickerSum ~/ 2 + variation).clamp(210, 255);
+          _inlineB = (120 + flickerSum).clamp(100, 180);
           _inlineA = 255;
         } else if (fireLife < 20) {
-          _inlineR = (255 + variation).clamp(230, 255);
-          _inlineG = (130 + variation + (flicker < 3 ? 20 : 0)).clamp(80, 170);
-          _inlineB = 0;
+          _inlineR = (245 + flickerSum ~/ 4 + variation).clamp(230, 255);
+          _inlineG = (120 + variation + flickerSum ~/ 2).clamp(80, 180);
+          _inlineB = (flickerSum ~/ 3).clamp(0, 30);
           _inlineA = 255;
         } else if (fireLife < 35) {
-          _inlineR = (240 + variation).clamp(200, 255);
-          _inlineG = (60 + variation).clamp(20, 90);
-          _inlineB = 0;
+          _inlineR = (230 + flickerSum ~/ 4 + variation).clamp(200, 255);
+          _inlineG = (50 + variation + flickerSum ~/ 3).clamp(20, 100);
+          _inlineB = (flickerSum ~/ 5).clamp(0, 15);
           _inlineA = 255;
         } else {
           final remaining = (80 - fireLife).clamp(1, 45);
           _inlineA = (remaining * 5 + 55).clamp(55, 255);
-          _inlineR = (180 + variation).clamp(140, 210);
-          _inlineG = (20 + variation).clamp(0, 40);
+          _inlineR = (170 + flickerSum ~/ 3 + variation).clamp(140, 220);
+          _inlineG = (15 + variation + flickerSum ~/ 5).clamp(0, 50);
           _inlineB = 0;
         }
 
@@ -471,9 +504,13 @@ class PixelRenderer {
           final isTop = y > 0 && grid[(y - 1) * w + x] != El.water &&
               grid[(y - 1) * w + x] != El.oil;
           if (isTop) {
-            final shimmer = ((frameCount + x * 3) % 10 < 2) ? 20 : 0;
-            _inlineR = (80 + shimmer).clamp(50, 120);
-            _inlineG = (190 + shimmer).clamp(170, 220);
+            // Multi-wave shimmer for realistic water surface
+            final wave1 = ((frameCount + x * 3) % 10 < 2) ? 18 : 0;
+            final wave2 = ((frameCount * 2 + x * 7 + 5) % 14 < 3) ? 12 : 0;
+            final wave3 = ((frameCount + x * 11) % 20 < 2) ? 25 : 0;
+            final shimmer = wave1 + wave2 + wave3;
+            _inlineR = (75 + shimmer).clamp(50, 130);
+            _inlineG = (185 + shimmer).clamp(170, 230);
             _inlineB = 255;
             _inlineA = 255;
           } else {
@@ -697,26 +734,31 @@ class PixelRenderer {
 
       case El.lava:
         final lavaLife = life[idx];
-        final flicker = (frameCount + idx) % 6;
-        final flickerBright = flicker < 3 ? 20 : 0;
-        final isBrightSpot = (idx * 17 + frameCount) % 40 == 0;
-        if (isBrightSpot && lavaLife < 150) {
-          _inlineR = 255; _inlineG = 255; _inlineB = 180; _inlineA = 255;
+        // Multi-frequency lava pulsing for molten look
+        final lFlick1 = (frameCount + idx) % 6;
+        final lFlick2 = (frameCount * 3 + idx * 5) % 11;
+        final lFlick3 = (frameCount + idx * 19) % 23;
+        final lavaFlicker = (lFlick1 < 3 ? 18 : 0) + (lFlick2 < 4 ? 12 : 0) + (lFlick3 < 8 ? 8 : 0);
+        final isBrightSpot = (idx * 17 + frameCount) % 30 == 0;
+        final isSuperBright = (idx * 31 + frameCount * 2) % 80 == 0;
+        if ((isBrightSpot || isSuperBright) && lavaLife < 150) {
+          final spotB = isSuperBright ? 220 : 180;
+          _inlineR = 255; _inlineG = 255; _inlineB = spotB; _inlineA = 255;
         } else if (lavaLife < 40) {
           _inlineR = 255;
-          _inlineG = (220 + flickerBright).clamp(200, 255);
-          _inlineB = (100 + flickerBright).clamp(80, 140);
+          _inlineG = (210 + lavaFlicker ~/ 2).clamp(200, 255);
+          _inlineB = (90 + lavaFlicker).clamp(80, 150);
           _inlineA = 255;
         } else if (lavaLife < 120) {
           final t2 = ((lavaLife - 40) * 255 ~/ 80).clamp(0, 255);
           _inlineR = 255;
-          _inlineG = _lerpC(180, 69, t2) + flickerBright;
-          _inlineB = flickerBright;
+          _inlineG = (_lerpC(180, 69, t2) + lavaFlicker ~/ 2).clamp(0, 255);
+          _inlineB = (lavaFlicker ~/ 2).clamp(0, 40);
           _inlineA = 255;
         } else {
           final t2 = ((lavaLife - 120) * 255 ~/ 80).clamp(0, 255);
           _inlineR = _lerpC(255, 140, t2);
-          _inlineG = _lerpC(69, 30, t2) + flickerBright;
+          _inlineG = (_lerpC(69, 30, t2) + lavaFlicker ~/ 3).clamp(0, 100);
           _inlineB = 0;
           _inlineA = 255;
         }
