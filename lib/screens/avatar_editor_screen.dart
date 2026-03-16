@@ -249,7 +249,7 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
 
   Widget _buildCategoryTabs() {
     return SizedBox(
-      height: 46,
+      height: 56,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 10),
@@ -262,10 +262,9 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
             onTap: () => _selectCategory(index),
             child: AnimatedContainer(
               duration: const Duration(milliseconds: 200),
-              width: 42,
-              height: 42,
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(16),
                 color: selected
                     ? AppColors.violet.withValues(alpha: 0.30)
                     : AppColors.surface,
@@ -283,10 +282,24 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
                       ]
                     : null,
               ),
-              child: Icon(
-                cat.icon,
-                size: 20,
-                color: selected ? AppColors.violet : AppColors.secondaryText,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    cat.icon,
+                    size: 20,
+                    color: selected ? AppColors.violet : AppColors.secondaryText,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    cat.label,
+                    style: AppFonts.fredoka(
+                      fontSize: 9,
+                      color: selected ? AppColors.violet : AppColors.secondaryText,
+                      fontWeight: selected ? FontWeight.w600 : FontWeight.w400,
+                    ),
+                  ),
+                ],
               ),
             ),
           );
@@ -977,11 +990,11 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen> {
     required void Function(int index) onTap,
   }) {
     return GridView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 5,
-        mainAxisSpacing: 8,
-        crossAxisSpacing: 8,
+        crossAxisCount: 4,
+        mainAxisSpacing: 10,
+        crossAxisSpacing: 10,
         childAspectRatio: 1.0,
       ),
       itemCount: itemCount,
