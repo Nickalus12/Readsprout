@@ -1555,6 +1555,8 @@ extension ElementBehaviors on SimulationEngine {
           markProcessed(ni);
           grid[idx] = El.empty;
           life[idx] = 0;
+          // Toxic green corrosion bubbles
+          queueReactionFlash(nx, ny, 50, 255, 50, 5);
           return;
         }
         if (neighbor == El.glass && rng.nextInt(10) == 0) {
@@ -1563,7 +1565,23 @@ extension ElementBehaviors on SimulationEngine {
           markProcessed(ni);
           grid[idx] = El.empty;
           life[idx] = 0;
+          queueReactionFlash(nx, ny, 100, 255, 100, 4);
           return;
+        }
+        if (neighbor == El.metal && rng.nextInt(20) == 0) {
+          // Acid corrodes metal slowly — eats through eventually
+          life[ni] = (life[ni] + 15).clamp(0, 255);
+          if (life[ni] > 120) {
+            grid[ni] = El.empty;
+            life[ni] = 0;
+            markProcessed(ni);
+            grid[idx] = El.empty;
+            life[idx] = 0;
+            queueReactionFlash(nx, ny, 80, 200, 80, 6);
+            return;
+          }
+          // Sizzle particles as acid works on metal
+          queueReactionFlash(nx, ny, 60, 230, 60, 2);
         }
         if (neighbor == El.ant) {
           grid[ni] = El.empty;
@@ -1580,6 +1598,7 @@ extension ElementBehaviors on SimulationEngine {
           grid[ni] = El.empty;
           life[ni] = 0;
           markProcessed(ni);
+          queueReactionFlash(nx, ny, 40, 200, 40, 2);
         }
         if (neighbor == El.wood && rng.nextInt(12) == 0) {
           grid[ni] = El.empty;
@@ -1587,6 +1606,7 @@ extension ElementBehaviors on SimulationEngine {
           markProcessed(ni);
           grid[idx] = El.empty;
           life[idx] = 0;
+          queueReactionFlash(nx, ny, 60, 220, 40, 4);
           return;
         }
         if (neighbor == El.water && rng.nextInt(20) == 0) {
