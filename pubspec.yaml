@@ -21,6 +21,7 @@ dependencies:
   hive_flutter: ^1.1.0           # Platform-agnostic Hive initialization
   forge2d: ^0.14.2               # 2D physics engine
   sensors_plus: ^5.0.0            # Accelerometer/gyroscope for avatar head tilt
+  flutter_svg: ^2.0.16             # SVG rendering for element palette icons
 
 dev_dependencies:
   flutter_test:
@@ -43,6 +44,7 @@ flutter:
     - assets/audio/effects/
     - assets/audio/phrases/
     - assets/audio/music/
+    - assets/icons/elements/
     - assets/google_fonts/
   fonts:
     - family: Fredoka
