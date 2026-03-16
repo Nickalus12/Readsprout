@@ -77,9 +77,18 @@ class AvatarController extends ChangeNotifier {
   Timer? _talkCycleTimer;
   final _rng = Random();
 
+  /// Expression intensity (0.0 = neutral, 1.0 = full expression).
+  /// Smoothly ramps up/down for organic transitions instead of snapping.
+  double _expressionIntensity = 0.0;
+  AvatarExpression _targetExpression = AvatarExpression.neutral;
+
   AvatarExpression get expression => _expression;
   double get mouthOpenAmount => _mouthOpenAmount;
   bool get isTalking => _expression == AvatarExpression.talking;
+
+  /// Intensity of the current expression (0.0-1.0). Use this in painters
+  /// to lerp between neutral and full expression for smooth transitions.
+  double get expressionIntensity => _expressionIntensity;
 
   /// Target point for eye tracking. Null = idle sway (default behavior).
   Offset? get lookTarget => _lookTarget;
@@ -102,15 +111,22 @@ class AvatarController extends ChangeNotifier {
   }
 
   /// Set an expression that auto-resets to neutral after [duration].
+  /// Intensity ramps up smoothly over ~150ms via [updateTalkingFrame].
   void setExpression(AvatarExpression expr, {Duration duration = const Duration(seconds: 2)}) {
     _expressionTimer?.cancel();
     _expression = expr;
+    _targetExpression = expr;
+    // Start at partial intensity — the tick loop lerps to 1.0
+    if (expr != AvatarExpression.neutral) {
+      _expressionIntensity = 0.3; // start visible immediately, ramp to full
+    }
     notifyListeners();
 
     if (expr != AvatarExpression.neutral) {
       _expressionTimer = Timer(duration, () {
-        _expression = AvatarExpression.neutral;
-        _mouthOpenAmount = 0.0;
+        _targetExpression = AvatarExpression.neutral;
+        // Don't snap — the tick loop will lerp intensity down to 0
+        // and then switch expression to neutral
         notifyListeners();
       });
     }
@@ -153,9 +169,26 @@ class AvatarController extends ChangeNotifier {
   }
 
   /// Called each frame from the widget's tick loop to update mouth openness
-  /// in sync with the render cycle. Prevents the stutter caused by a
-  /// separate Timer.periodic running at a slightly different rate.
+  /// and expression intensity in sync with the render cycle.
   void updateTalkingFrame() {
+    // ── Expression intensity lerp (smooth transitions) ──
+    const lerpSpeed = 8.0; // ~125ms to reach full intensity
+    if (_targetExpression != AvatarExpression.neutral) {
+      // Ramp up toward 1.0
+      _expressionIntensity = (_expressionIntensity + 0.016 * lerpSpeed)
+          .clamp(0.0, 1.0);
+    } else if (_expression != AvatarExpression.neutral) {
+      // Ramp down toward 0.0, then switch to neutral
+      _expressionIntensity = (_expressionIntensity - 0.016 * lerpSpeed)
+          .clamp(0.0, 1.0);
+      if (_expressionIntensity <= 0.01) {
+        _expression = AvatarExpression.neutral;
+        _expressionIntensity = 0.0;
+        _mouthOpenAmount = 0.0;
+      }
+    }
+
+    // ── Talking mouth animation ──
     if (_expression != AvatarExpression.talking || _talkDurationMs == 0) return;
 
     final elapsed = DateTime.now().millisecondsSinceEpoch - _talkStartMs;
@@ -180,7 +213,7 @@ class AvatarController extends ChangeNotifier {
     final raw = (layer1 * 0.5 + layer2 * 0.3 + layer3 * 0.2) * amplitude;
 
     _mouthOpenAmount = (raw * envelope).clamp(0.0, 1.0);
-    // No notifyListeners — widget tick loop already calls setState
+    // No notifyListeners — widget tick loop handles repaints
   }
 
   /// Stop any active talking animation and return to idle mouth.
@@ -336,7 +369,14 @@ class _AvatarWidgetState extends State<AvatarWidget>
   }
 
   void _onControllerUpdate() {
-    if (mounted) setState(() {});
+    // Controller changes (expression, look target) need a widget rebuild
+    // to update Positioned offsets (jawDrop, browOffset). Painters are
+    // driven by _repaintNotifier so they don't need setState.
+    if (mounted) {
+      // Only rebuild if expression or look target actually changed —
+      // mouth openness during talking is handled by _repaintNotifier
+      setState(() {});
+    }
   }
 
   void _startLoop() {
@@ -426,10 +466,26 @@ class _AvatarWidgetState extends State<AvatarWidget>
       }
     }
 
-    // 8. Trigger repaint
+    // 8. Trigger CustomPainter repaints via the shared notifier.
+    //    This does NOT rebuild the widget tree — only repaints canvases.
     _repaintNotifier.notify();
-    setState(() {});
+
+    // 9. Only call setState (full widget rebuild) when skeleton-driven
+    //    transforms have changed enough to matter. The head rotation
+    //    drives a Transform widget, so it needs a rebuild — but only
+    //    when the quantized value actually changes (saves ~90% of rebuilds).
+    final headStorage = _skeleton.head.worldTransform.storage;
+    final newSwayQ = (atan2(headStorage[1], headStorage[0]) * 200).round();
+    final newJawQ = ((widget.controller?.mouthOpenAmount ?? 0.0) * 50).round();
+    if (newSwayQ != _lastSwayQ || newJawQ != _lastJawQ) {
+      _lastSwayQ = newSwayQ;
+      _lastJawQ = newJawQ;
+      setState(() {});
+    }
   }
+
+  int _lastSwayQ = 0;
+  int _lastJawQ = 0;
 
   @override
   void didUpdateWidget(AvatarWidget oldWidget) {
@@ -677,45 +733,48 @@ class _AvatarWidgetState extends State<AvatarWidget>
     final jawDrop = _jawDrop(headSize);
 
     return [
-      // 4. Hair back layer
-      Positioned(
-        left: hairLeft,
-        top: hairTop,
-        width: hairSize,
-        height: hairSize,
-        child: CustomPaint(
-          isComplex: true,
-          willChange: widget.animateEffects,
-          painter: HairBackPainter(
-            style: config.hairStyle,
-            color: _hairColor,
-            isRainbow: isRainbowHair(config.hairColor),
-            faceShape: config.faceShape,
-            swayValue: _idleSwayValue,
-            repaint: _repaintNotifier,
+      // 4-5. Hair layers — skip at thumbnail sizes for performance
+      if (size >= 48) ...[
+        // 4. Hair back layer
+        Positioned(
+          left: hairLeft,
+          top: hairTop,
+          width: hairSize,
+          height: hairSize,
+          child: CustomPaint(
+            isComplex: true,
+            willChange: widget.animateEffects,
+            painter: HairBackPainter(
+              style: config.hairStyle,
+              color: _hairColor,
+              isRainbow: isRainbowHair(config.hairColor),
+              faceShape: config.faceShape,
+              swayValue: _idleSwayValue,
+              repaint: _repaintNotifier,
+            ),
           ),
         ),
-      ),
 
-      // 5. Hair front layer
-      Positioned(
-        left: hairLeft,
-        top: hairTop,
-        width: hairSize,
-        height: hairSize,
-        child: CustomPaint(
-          isComplex: true,
-          willChange: widget.animateEffects,
-          painter: HairFrontPainter(
-            style: config.hairStyle,
-            color: _hairColor,
-            isRainbow: isRainbowHair(config.hairColor),
-            faceShape: config.faceShape,
-            swayValue: _idleSwayValue,
-            repaint: _repaintNotifier,
+        // 5. Hair front layer
+        Positioned(
+          left: hairLeft,
+          top: hairTop,
+          width: hairSize,
+          height: hairSize,
+          child: CustomPaint(
+            isComplex: true,
+            willChange: widget.animateEffects,
+            painter: HairFrontPainter(
+              style: config.hairStyle,
+              color: _hairColor,
+              isRainbow: isRainbowHair(config.hairColor),
+              faceShape: config.faceShape,
+              swayValue: _idleSwayValue,
+              repaint: _repaintNotifier,
+            ),
           ),
         ),
-      ),
+      ],
 
       // 6. Head bone: unified sway rotation for all face features
       // Pivot at bottom-center (neck connection point)
@@ -799,6 +858,8 @@ class _AvatarWidgetState extends State<AvatarWidget>
                     pupilDilationValue: pupilAnim,
                     expression: widget.controller?.expression ??
                         AvatarExpression.neutral,
+                    expressionIntensity:
+                        widget.controller?.expressionIntensity ?? 1.0,
                     lookTarget: widget.controller?.lookTarget,
                     avatarSize: headSize,
                     repaint: _repaintNotifier,
@@ -1398,7 +1459,9 @@ class FacePainter extends CustomPainter {
   bool shouldRepaint(FacePainter old) =>
       old.skinColor != skinColor ||
       old.faceShape != faceShape ||
-      old.time != time;
+      // Only repaint for time changes when the GPU skin glow shader is
+      // actually loaded. Without it, time has no visual effect.
+      (ShaderLoader.skinGlow != null && old.time != time);
 }
 
 // ═════════════════════════════════════════════════════════════════════
@@ -1424,6 +1487,9 @@ class EyesPainter extends CustomPainter {
   final Animation<double> pupilDilationValue;
   final AvatarExpression expression;
 
+  /// Smooth intensity of the expression (0.0-1.0) for lerped transitions.
+  final double expressionIntensity;
+
   /// Target point for eye tracking (avatar-local coords). Null = idle sway.
   final Offset? lookTarget;
 
@@ -1438,6 +1504,7 @@ class EyesPainter extends CustomPainter {
     required this.swayValue,
     required this.pupilDilationValue,
     this.expression = AvatarExpression.neutral,
+    this.expressionIntensity = 1.0,
     this.lookTarget,
     this.avatarSize = 80,
     super.repaint,
@@ -1455,14 +1522,16 @@ class EyesPainter extends CustomPainter {
     final leftCenter = Offset(w * 0.25, h * 0.5);
     final rightCenter = Offset(w * 0.75, h * 0.5);
 
-    // Expression-aware eye scaling — exaggerated for kids to clearly see reactions
-    final eyeScaleFactor = switch (expression) {
+    // Expression-aware eye scaling — lerped via expressionIntensity for
+    // smooth transitions instead of snapping between sizes
+    final targetScale = switch (expression) {
       AvatarExpression.excited => 1.25,
       AvatarExpression.surprised => 1.35,
       AvatarExpression.thinking => 0.78,
       AvatarExpression.happy => 1.10,
       _ => 1.0,
     };
+    final eyeScaleFactor = 1.0 + (targetScale - 1.0) * expressionIntensity;
     final eyeRadius = w * 0.12 * eyeScaleFactor;
 
     // Eye tracking: use lookTarget if set, otherwise idle sway

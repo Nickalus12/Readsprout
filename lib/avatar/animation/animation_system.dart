@@ -266,16 +266,49 @@ class ProceduralIdleSystem {
       dx: sin(time * 0.35) * 0.004 * e,
     );
 
+    // ── Breathing head tilt: chest rise slightly tilts head back ──
+    transforms['head'] = BoneTransform(
+      dx: headX,
+      dy: headY + breathPhase * -0.002, // head lifts with breath
+      rotation: headRot + breathPhase * -0.004, // slight head tilt from chest rise
+    );
+
+    // ── Micro-expressions: subtle eyebrow + mouth twitches for life ──
+    // Slow sine-layered eyebrow micro-movements (asymmetric for realism)
+    transforms['leftEyebrow'] = BoneTransform(
+      dy: sin(time * 0.25 + 1.2) * 0.003 * e +
+          sin(time * 0.7 + 0.4) * 0.001 * e,
+    );
+    transforms['rightEyebrow'] = BoneTransform(
+      dy: sin(time * 0.25 + 2.8) * 0.003 * e +
+          sin(time * 0.7 + 1.9) * 0.001 * e,
+    );
+
+    // Micro mouth movement — very subtle lip tension shifts
+    transforms['mouth'] = BoneTransform(
+      scaleX: 1.0 + sin(time * 0.18 + 0.5) * 0.008 * e,
+    );
+
     // ── Fidgets: at high energy, occasional small gestures ──
     if (e > 0.6 && _fidgetCooldown <= 0 && _rng.nextDouble() < 0.002 * e) {
       _fidgetCooldown = 2.0 + _rng.nextDouble() * 3.0; // 2-5s cooldown
-      // Small shoulder shrug fidget
-      transforms['leftShoulder'] = BoneTransform(
-        dy: -0.010 * e,
-      );
-      transforms['rightShoulder'] = BoneTransform(
-        dy: -0.010 * e,
-      );
+
+      // Randomly pick a fidget type for variety
+      final fidgetType = _rng.nextInt(3);
+      switch (fidgetType) {
+        case 0: // Shoulder shrug
+          transforms['leftShoulder'] = BoneTransform(dy: -0.010 * e);
+          transforms['rightShoulder'] = BoneTransform(dy: -0.010 * e);
+        case 1: // Head tilt curiosity
+          transforms['head'] = BoneTransform(
+            dx: headX,
+            dy: headY,
+            rotation: headRot + (_rng.nextBool() ? 0.04 : -0.04) * e,
+          );
+        case 2: // Quick eyebrow raise
+          transforms['leftEyebrow'] = BoneTransform(dy: -0.012 * e);
+          transforms['rightEyebrow'] = BoneTransform(dy: -0.012 * e);
+      }
     }
 
     return BonePose(transforms);
