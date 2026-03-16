@@ -484,8 +484,11 @@ class _HomeScreenState extends State<HomeScreen>
                     if (widget.settingsService?.hasContinue == true)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 12),
-                        child: GestureDetector(
-                          onTap: _onContinue,
+                        child: Semantics(
+                          label: 'Continue where you left off',
+                          button: true,
+                          child: GestureDetector(
+                            onTap: _onContinue,
                           child: Container(
                             padding: EdgeInsets.symmetric(
                                 horizontal: 20 * sf, vertical: 12 * sf),
@@ -579,6 +582,7 @@ class _HomeScreenState extends State<HomeScreen>
                               delay: 400.ms,
                               duration: 500.ms,
                             ),
+                        ),
                       ),
 
                     // ── Adventure Mode button (hero CTA) ────────────────
@@ -849,9 +853,12 @@ class _HomeScreenState extends State<HomeScreen>
           );
     }
 
-    return GestureDetector(
-      onTap: _launchReviewMode,
-      child: Container(
+    return Semantics(
+      label: 'Review $overdueCount words due',
+      button: true,
+      child: GestureDetector(
+        onTap: _launchReviewMode,
+        child: Container(
         padding: EdgeInsets.symmetric(
             horizontal: 16 * sf, vertical: 10 * sf),
         decoration: BoxDecoration(
@@ -893,6 +900,7 @@ class _HomeScreenState extends State<HomeScreen>
               ),
             ),
           ],
+        ),
         ),
       ),
     )
