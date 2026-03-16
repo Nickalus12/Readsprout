@@ -1097,10 +1097,10 @@ extension ElementBehaviors on SimulationEngine {
     }
 
     // --- Volcanic gas: surface lava emits smoke and steam ---
-    final uy = y - gravityDir;
-    if (rng.nextInt(80) == 0 && inBounds(x, uy) && grid[uy * gridW + x] == El.empty) {
+    final gasY = y - gravityDir;
+    if (rng.nextInt(80) == 0 && inBounds(x, gasY) && grid[gasY * gridW + x] == El.empty) {
       // Emit smoke (2/3) or steam (1/3)
-      final gasIdx = uy * gridW + x;
+      final gasIdx = gasY * gridW + x;
       if (rng.nextInt(3) == 0) {
         grid[gasIdx] = El.steam;
       } else {

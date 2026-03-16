@@ -362,11 +362,11 @@ class PixelRenderer {
                 }
               } else if (el == El.lava) {
                 // Check if surface lava (air above) for more dramatic particles
-                final isLavaSurface = y > 1 && grid[(y - 1) * w + x] == El.empty;
+                final isLavaSurface = y > 1 && g[(y - 1) * w + x] == El.empty;
                 if (isLavaSurface) {
                   // Surface lava: frequent bright embers and sparks
                   if (rng.nextInt(40) < 3) {
-                    final emberR = 255;
+                    const emberR = 255;
                     final emberG = 160 + rng.nextInt(95);
                     final emberB = rng.nextInt(80);
                     spawnParticle(x + rng.nextInt(3) - 1, y - 1 - rng.nextInt(2),
