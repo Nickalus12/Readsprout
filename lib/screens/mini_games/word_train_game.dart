@@ -50,6 +50,9 @@ class _TrainSim extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Notify painters that train state changed (safe to call externally).
+  void markDirty() => notifyListeners();
+
   void reset() {
     smokeParticles.clear();
     trainX = 0.95;
@@ -133,7 +136,7 @@ class _WordTrainGameState extends State<WordTrainGame>
     _trainMoveController.addListener(() {
       if (mounted) {
         _sim.trainX = _trainMoveAnim.value;
-        _sim.notifyListeners();
+        _sim.markDirty();
       }
     });
 
