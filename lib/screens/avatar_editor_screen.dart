@@ -1,8 +1,6 @@
-import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../avatar/data/avatar_options.dart';
@@ -11,6 +9,7 @@ import '../services/audio_service.dart';
 import '../services/profile_service.dart';
 import '../theme/app_theme.dart';
 import '../avatar/avatar_widget.dart';
+import '../utils/haptics.dart';
 
 /// Full-screen avatar editor designed as a fun dress-up game for ages 3-6.
 ///
@@ -82,10 +81,7 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen>
     setState(() => _config = newConfig);
     // Auto-save on every change
     widget.profileService.setAvatar(newConfig);
-    // Light haptic tap feedback on mobile
-    if (Platform.isAndroid || Platform.isIOS) {
-      HapticFeedback.selectionClick();
-    }
+    Haptics.tap();
   }
 
   void _showLockedHint(String hint) {
