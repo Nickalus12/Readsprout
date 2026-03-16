@@ -489,10 +489,19 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
     return PageRouteBuilder(
       pageBuilder: (_, __, ___) => page,
       transitionsBuilder: (_, animation, __, child) {
+        final curved = CurvedAnimation(
+          parent: animation,
+          curve: Curves.easeOutCubic,
+        );
         return FadeTransition(
-          opacity:
-              CurvedAnimation(parent: animation, curve: Curves.easeInOut),
-          child: child,
+          opacity: curved,
+          child: SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(0, 0.04),
+              end: Offset.zero,
+            ).animate(curved),
+            child: child,
+          ),
         );
       },
       transitionDuration: const Duration(milliseconds: 350),
