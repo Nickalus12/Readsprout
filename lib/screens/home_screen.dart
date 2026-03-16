@@ -802,17 +802,50 @@ class _HomeScreenState extends State<HomeScreen>
     final overdueCount = widget.reviewService!.getOverdueCount();
 
     if (overdueCount == 0) {
-      // Show "All caught up!" when nothing is due
-      return Text(
-        'All caught up! \u{1F31F}',
-        style: AppFonts.nunito(
-          fontSize: 14 * sf,
-          fontWeight: FontWeight.w600,
-          color: AppColors.starGold.withValues(alpha: 0.8),
+      // Show "All caught up!" with a cheerful visual
+      return Container(
+        padding: EdgeInsets.symmetric(horizontal: 16 * sf, vertical: 8 * sf),
+        decoration: BoxDecoration(
+          color: AppColors.success.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.success.withValues(alpha: 0.2),
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              Icons.check_circle_rounded,
+              size: 20 * sf,
+              color: AppColors.success.withValues(alpha: 0.7),
+            ),
+            SizedBox(width: 6 * sf),
+            Text(
+              'All caught up!',
+              style: AppFonts.fredoka(
+                fontSize: 15 * sf,
+                fontWeight: FontWeight.w600,
+                color: AppColors.success.withValues(alpha: 0.9),
+              ),
+            ),
+            SizedBox(width: 4 * sf),
+            Text(
+              '\u{1F31F}',
+              style: TextStyle(fontSize: 16 * sf),
+            ),
+          ],
         ),
       )
           .animate()
-          .fadeIn(delay: 600.ms, duration: 500.ms);
+          .fadeIn(delay: 600.ms, duration: 500.ms)
+          .scaleXY(
+            begin: 0.9,
+            end: 1.0,
+            delay: 600.ms,
+            duration: 400.ms,
+            curve: Curves.easeOutBack,
+          );
     }
 
     return GestureDetector(
