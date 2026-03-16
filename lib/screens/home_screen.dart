@@ -184,24 +184,28 @@ class _HomeScreenState extends State<HomeScreen>
           ),
 
           // ── Floating hearts + cloud physics layer ───────────
-          Positioned.fill(
-            child: FloatingHeartsBackground(
-              key: _heartsKey,
-              cloudZoneHeight: 0.18,
+          ExcludeSemantics(
+            child: Positioned.fill(
+              child: FloatingHeartsBackground(
+                key: _heartsKey,
+                cloudZoneHeight: 0.18,
+              ),
             ),
           ),
 
           // ── Floating stars (IgnorePointer — taps pass through) ──
-          Positioned.fill(
-            child: IgnorePointer(
-              child: RepaintBoundary(
-                child: LayoutBuilder(builder: (context, constraints) {
-                  _starSim.size = constraints.biggest;
-                  return CustomPaint(
-                    size: constraints.biggest,
-                    painter: _StarPainter(sim: _starSim),
-                  );
-                }),
+          ExcludeSemantics(
+            child: Positioned.fill(
+              child: IgnorePointer(
+                child: RepaintBoundary(
+                  child: LayoutBuilder(builder: (context, constraints) {
+                    _starSim.size = constraints.biggest;
+                    return CustomPaint(
+                      size: constraints.biggest,
+                      painter: _StarPainter(sim: _starSim),
+                    );
+                  }),
+                ),
               ),
             ),
           ),
@@ -394,23 +398,27 @@ class _HomeScreenState extends State<HomeScreen>
                     const SizedBox(height: 24),
 
                     // ── Adventure Mode button ────────────────
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        _smoothRoute(LevelSelectScreen(
-                          progressService: widget.progressService,
-                          audioService: widget.audioService,
-                          profileService: widget.profileService,
-                          statsService: widget.statsService,
-                          streakService: widget.streakService,
-                          personalityService: widget.personalityService,
-                          reviewService: widget.reviewService,
-                          adaptiveDifficultyService: widget.adaptiveDifficultyService,
-                          musicService: widget.musicService,
-                          playerName: widget.playerName,
-                          profileId: widget.profileId,
-                        )),
-                      ),
+                    Semantics(
+                      label: 'Adventure Mode',
+                      hint: 'Begin your word journey',
+                      button: true,
+                      child: GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          _smoothRoute(LevelSelectScreen(
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            profileService: widget.profileService,
+                            statsService: widget.statsService,
+                            streakService: widget.streakService,
+                            personalityService: widget.personalityService,
+                            reviewService: widget.reviewService,
+                            adaptiveDifficultyService: widget.adaptiveDifficultyService,
+                            musicService: widget.musicService,
+                            playerName: widget.playerName,
+                            profileId: widget.profileId,
+                          )),
+                        ),
                       child: Container(
                         padding: EdgeInsets.symmetric(
                             horizontal: 16 * sf, vertical: 10 * sf),
@@ -487,7 +495,7 @@ class _HomeScreenState extends State<HomeScreen>
                           ],
                         ),
                       ),
-                    )
+                    ))
                         .animate(
                           onPlay: (controller) =>
                               controller.repeat(reverse: true),
@@ -516,6 +524,7 @@ class _HomeScreenState extends State<HomeScreen>
                         if (widget.profileService != null)
                           _MenuIconButton(
                             icon: Icons.local_florist_rounded,
+                            semanticLabel: 'My Profile',
                             onTap: () => Navigator.push(
                               context,
                               _smoothRoute(ProfileScreen(
@@ -532,6 +541,7 @@ class _HomeScreenState extends State<HomeScreen>
                           const SizedBox(width: 20),
                         _MenuIconButton(
                           icon: Icons.abc_rounded,
+                          semanticLabel: 'Alphabet Practice',
                           onTap: () => Navigator.push(
                             context,
                             _smoothRoute(AlphabetScreen(
@@ -542,6 +552,7 @@ class _HomeScreenState extends State<HomeScreen>
                         const SizedBox(width: 20),
                         _MenuIconButton(
                           icon: Icons.sports_esports_rounded,
+                          semanticLabel: 'Mini Games',
                           onTap: () => Navigator.push(
                             context,
                             _smoothRoute(MiniGamesScreen(
@@ -896,10 +907,12 @@ class _TappableTagWordState extends State<_TappableTagWord>
 class _MenuIconButton extends StatefulWidget {
   final IconData icon;
   final VoidCallback onTap;
+  final String? semanticLabel;
 
   const _MenuIconButton({
     required this.icon,
     required this.onTap,
+    this.semanticLabel,
   });
 
   @override
@@ -927,38 +940,42 @@ class _MenuIconButtonState extends State<_MenuIconButton>
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: widget.onTap,
-      onTapDown: (_) => _pressController.forward(),
-      onTapUp: (_) => _pressController.reverse(),
-      onTapCancel: () => _pressController.reverse(),
-      child: AnimatedBuilder(
-        animation: _pressController,
-        builder: (context, child) {
-          final scale = 1.0 - _pressController.value * 0.08;
-          return Transform.scale(scale: scale, child: child);
-        },
-        child: Container(
-          width: 56,
-          height: 56,
-          decoration: BoxDecoration(
-            color: AppColors.surface.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(18),
-            border: Border.all(
-              color: AppColors.border.withValues(alpha: 0.45),
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.violet.withValues(alpha: 0.06),
-                blurRadius: 8,
-                spreadRadius: 1,
+    return Semantics(
+      label: widget.semanticLabel,
+      button: true,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onTapDown: (_) => _pressController.forward(),
+        onTapUp: (_) => _pressController.reverse(),
+        onTapCancel: () => _pressController.reverse(),
+        child: AnimatedBuilder(
+          animation: _pressController,
+          builder: (context, child) {
+            final scale = 1.0 - _pressController.value * 0.08;
+            return Transform.scale(scale: scale, child: child);
+          },
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.surface.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.45),
               ),
-            ],
-          ),
-          child: Icon(
-            widget.icon,
-            size: 26,
-            color: AppColors.secondaryText,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.violet.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Icon(
+              widget.icon,
+              size: 26,
+              color: AppColors.secondaryText,
+            ),
           ),
         ),
       ),
