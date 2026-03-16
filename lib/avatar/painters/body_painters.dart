@@ -514,8 +514,13 @@ class ShoulderPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     final w = size.width;
     final h = size.height;
-    final cx = w * 0.5 + sin(swayValue * pi) * w * 0.006;
-    final breathExpand = sin(breathingValue * pi) * 0.01;
+
+    // Quantize sway/breath to match TorsoPainter — prevents shimmer from
+    // sub-pixel jitter between shoulder and torso paint passes
+    final qSway = (swayValue * 20).roundToDouble() / 20;
+    final qBreath = (breathingValue * 20).roundToDouble() / 20;
+    final cx = w * 0.5 + sin(qSway * pi) * w * 0.004; // match torso 0.004
+    final breathExpand = sin(qBreath * pi) * 0.008;    // match torso 0.008
     final shoulderW = w * (0.72 + breathExpand);
     final shoulderY = h * 0.78;
 
@@ -607,8 +612,8 @@ class ShoulderPainter extends CustomPainter {
   @override
   bool shouldRepaint(ShoulderPainter old) =>
       old.shirtColor != shirtColor ||
-      (old.swayValue * 100).round() != (swayValue * 100).round() ||
-      (old.breathingValue * 100).round() != (breathingValue * 100).round() ||
+      (old.swayValue * 20).round() != (swayValue * 20).round() ||
+      (old.breathingValue * 20).round() != (breathingValue * 20).round() ||
       (old.leftShoulderDy * 100).round() != (leftShoulderDy * 100).round() ||
       (old.rightShoulderDy * 100).round() != (rightShoulderDy * 100).round();
 }
@@ -650,8 +655,12 @@ class ArmPainter extends CustomPainter {
     final highlight = _warmHighlight(skinColor);
     final shadow = _coolShadow(skinColor);
 
-    final cx = w * 0.5 + sin(swayValue * pi) * w * 0.006;
-    final shoulderW = w * 0.72;
+    // Quantize to match TorsoPainter/ShoulderPainter — prevents shimmer
+    final qSway = (swayValue * 20).roundToDouble() / 20;
+    final qBreath = (breathingValue * 20).roundToDouble() / 20;
+    final cx = w * 0.5 + sin(qSway * pi) * w * 0.004; // match torso
+    final breathExpand = sin(qBreath * pi) * 0.008;
+    final shoulderW = w * (0.72 + breathExpand);
     final shoulderY = h * 0.78;
 
     for (final side in [-1.0, 1.0]) {
@@ -889,7 +898,9 @@ class HandPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    final cx = w * 0.5 + sin(swayValue * pi) * w * 0.006;
+    // Quantize sway to match TorsoPainter
+    final qSway = (swayValue * 20).roundToDouble() / 20;
+    final cx = w * 0.5 + sin(qSway * pi) * w * 0.004;
     final shoulderW = w * 0.72;
     final handY = h * 0.78 + h * 0.22; // at bottom of arms
 
