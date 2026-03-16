@@ -347,8 +347,8 @@ class _SplashScreen extends StatelessWidget {
           ),
 
           // Floating hearts — even the splash is alive
-          const ExcludeSemantics(
-            child: Positioned.fill(
+          const Positioned.fill(
+            child: ExcludeSemantics(
               child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
             ),
           ),

@@ -69,8 +69,8 @@ class AlphabetScreen extends StatelessWidget {
           ),
 
           // Floating hearts background
-          const ExcludeSemantics(
-            child: Positioned.fill(
+          const Positioned.fill(
+            child: ExcludeSemantics(
               child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
             ),
           ),

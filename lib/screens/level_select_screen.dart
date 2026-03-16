@@ -119,8 +119,8 @@ class _LevelSelectScreenState extends State<LevelSelectScreen>
       body: Stack(
         children: [
           // Zone-themed animated background
-          ExcludeSemantics(
-            child: Positioned.fill(
+          Positioned.fill(
+            child: ExcludeSemantics(
               child: ZoneBackground(zone: _activeZoneIndex),
             ),
           ),

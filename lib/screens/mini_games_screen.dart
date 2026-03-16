@@ -102,8 +102,8 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
           ),
 
           // Floating particles
-          const ExcludeSemantics(
-            child: Positioned.fill(child: _MiniGameParticles()),
+          const Positioned.fill(
+            child: ExcludeSemantics(child: _MiniGameParticles()),
           ),
 
           // Content

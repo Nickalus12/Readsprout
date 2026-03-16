@@ -240,8 +240,8 @@ class _HomeScreenState extends State<HomeScreen>
           ),
 
           // ── Floating hearts + cloud physics layer ───────────
-          ExcludeSemantics(
-            child: Positioned.fill(
+          Positioned.fill(
+            child: ExcludeSemantics(
               child: FloatingHeartsBackground(
                 key: _heartsKey,
                 cloudZoneHeight: 0.18,
@@ -250,8 +250,8 @@ class _HomeScreenState extends State<HomeScreen>
           ),
 
           // ── Floating stars (IgnorePointer — taps pass through) ──
-          ExcludeSemantics(
-            child: Positioned.fill(
+          Positioned.fill(
+            child: ExcludeSemantics(
               child: IgnorePointer(
                 child: RepaintBoundary(
                   child: LayoutBuilder(builder: (context, constraints) {

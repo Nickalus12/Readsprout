@@ -105,8 +105,8 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
           ),
 
           // ── Floating hearts physics layer ────────────────────
-          const ExcludeSemantics(
-            child: Positioned.fill(
+          const Positioned.fill(
+            child: ExcludeSemantics(
               child: FloatingHeartsBackground(
                 cloudZoneHeight: 0.18,
               ),
