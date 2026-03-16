@@ -784,20 +784,22 @@ class _ElementLabGameState extends State<ElementLabGame>
               height: dotSz,
               child: _elementSvgNames.length > elType &&
                       _elementSvgNames[elType].isNotEmpty
-                  ? SvgPicture.asset(
-                      'assets/icons/elements/${_elementSvgNames[elType]}.svg',
-                      width: dotSz,
-                      height: dotSz,
-                      placeholderBuilder: (_) => _colorDotFallback(dotSz, color),
+                  ? Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: SvgPicture.asset(
+                        'assets/icons/elements/${_elementSvgNames[elType]}.svg',
+                        fit: BoxFit.contain,
+                        placeholderBuilder: (_) => _colorDotFallback(dotSz - 4, color),
+                      ),
                     )
                   : _colorDotFallback(dotSz, color),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               name,
               style: AppFonts.fredoka(
                 fontSize: labelSz,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
                 color: isSelected ? color : AppColors.secondaryText,
               ),
             ),
@@ -1140,6 +1142,7 @@ class _ElementLabGameState extends State<ElementLabGame>
       required Color color,
       double? size,
       double? box,
+      String? tooltip,
     }) {
       final bSz = box ?? btnBox;
       final iSz = size ?? btnIcon;
@@ -1151,6 +1154,7 @@ class _ElementLabGameState extends State<ElementLabGame>
           icon: Icon(icon, color: color),
           iconSize: iSz,
           padding: EdgeInsets.zero,
+          tooltip: tooltip,
         ),
       );
     }
@@ -1180,10 +1184,13 @@ class _ElementLabGameState extends State<ElementLabGame>
                 Haptics.tap();
                 _speakLabel(_engine.gravityDir == -1 ? 'up' : 'down');
               },
-              icon: Icons.swap_vert_rounded,
+              icon: _engine.gravityDir == -1
+                  ? Icons.arrow_upward_rounded
+                  : Icons.arrow_downward_rounded,
               color: _engine.gravityDir == -1
                   ? AppColors.starGold
                   : AppColors.secondaryText,
+              tooltip: 'Gravity ${_engine.gravityDir == -1 ? 'up' : 'down'}',
             ),
             // Wind left
             buildIconBtn(
@@ -1203,6 +1210,7 @@ class _ElementLabGameState extends State<ElementLabGame>
                   : AppColors.secondaryText.withValues(alpha: 0.4),
               size: smallBtnIcon,
               box: smallBtnBox,
+              tooltip: 'Wind left',
             ),
             // Wind indicator
             SizedBox(
@@ -1238,6 +1246,7 @@ class _ElementLabGameState extends State<ElementLabGame>
                   : AppColors.secondaryText.withValues(alpha: 0.4),
               size: smallBtnIcon,
               box: smallBtnBox,
+              tooltip: 'Wind right',
             ),
             // Shake
             buildIconBtn(
@@ -1246,6 +1255,7 @@ class _ElementLabGameState extends State<ElementLabGame>
               color: _shakeCooldown <= 0
                   ? AppColors.electricBlue
                   : AppColors.secondaryText.withValues(alpha: 0.3),
+              tooltip: 'Shake',
             ),
             SizedBox(width: compact ? 4 : 8),
             // Undo
@@ -1258,12 +1268,14 @@ class _ElementLabGameState extends State<ElementLabGame>
               color: _input.undoHistory.isNotEmpty
                   ? AppColors.electricBlue
                   : AppColors.secondaryText.withValues(alpha: 0.3),
+              tooltip: 'Undo',
             ),
             // Pause/Play
             buildIconBtn(
               onPressed: _togglePause,
               icon: _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
               color: AppColors.electricBlue,
+              tooltip: _isPaused ? 'Play' : 'Pause',
             ),
             // Clear
             buildIconBtn(
@@ -1273,6 +1285,7 @@ class _ElementLabGameState extends State<ElementLabGame>
               },
               icon: Icons.delete_outline_rounded,
               color: AppColors.error.withValues(alpha: 0.8),
+              tooltip: 'Clear all',
             ),
           ],
         ),
