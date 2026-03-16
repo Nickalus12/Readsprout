@@ -77,6 +77,14 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
   int _countdownValue = 3;
   int _nextBubbleId = 0;
 
+  // Screen shake on pop
+  double _shakeX = 0;
+  double _shakeY = 0;
+  double _shakeTimer = 0;
+
+  // Track unique animals discovered
+  final Set<String> _discoveredAnimals = {};
+
   // Wave system: introduce new animals over time
   int _waveIndex = 0;
   int _animalsInWave = 0;
@@ -187,6 +195,17 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
         r.age += dt;
       }
       _ringBursts.removeWhere((r) => r.age > 0.5);
+
+      // Update screen shake
+      if (_shakeTimer > 0) {
+        _shakeTimer -= dt;
+        final intensity = _shakeTimer * 8;
+        _shakeX = ((_rng.nextDouble() - 0.5) * 2) * intensity;
+        _shakeY = ((_rng.nextDouble() - 0.5) * 2) * intensity;
+      } else {
+        _shakeX = 0;
+        _shakeY = 0;
+      }
 
       // Update new animal banner
       if (_newAnimalBannerTimer > 0) {
@@ -327,6 +346,12 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
   void _popBubble(_Bubble bubble, Size size) {
     Haptics.correct();
 
+    // Screen shake — subtle but satisfying
+    _shakeTimer = 0.15;
+
+    // Track discovered animals
+    _discoveredAnimals.add(bubble.animal.word);
+
     // Score
     _combo++;
     _comboTimer = 1.5;
@@ -427,9 +452,11 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
             ),
           ),
 
-          // Game canvas
+          // Game canvas (with screen shake)
           if (!_gameOver)
-            LayoutBuilder(
+            Transform.translate(
+              offset: Offset(_shakeX, _shakeY),
+              child: LayoutBuilder(
               builder: (context, constraints) {
                 final size = Size(constraints.maxWidth, constraints.maxHeight);
                 return GestureDetector(
@@ -447,6 +474,7 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
                   ),
                 );
               },
+            ),
             ),
 
           // HUD — timer and score
@@ -787,7 +815,33 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
                 ),
               ),
 
-              const SizedBox(height: 32),
+              // Discovered animals row
+              if (_discoveredAnimals.isNotEmpty) ...[
+                const SizedBox(height: 16),
+                Text(
+                  'Animals Discovered: ${_discoveredAnimals.length}/${_animals.length}',
+                  style: AppFonts.fredoka(
+                    fontSize: 14,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Wrap(
+                  spacing: 4,
+                  children: _animals.map((a) {
+                    final found = _discoveredAnimals.contains(a.word);
+                    return Opacity(
+                      opacity: found ? 1.0 : 0.2,
+                      child: Text(
+                        a.emoji,
+                        style: const TextStyle(fontSize: 28),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ],
+
+              const SizedBox(height: 24),
 
               // Play again button
               GestureDetector(
@@ -864,6 +918,10 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
       _nextBubbleId = 0;
       _newAnimalBanner = '';
       _newAnimalBannerTimer = 0;
+      _shakeX = 0;
+      _shakeY = 0;
+      _shakeTimer = 0;
+      _discoveredAnimals.clear();
     });
     _ticker.reset();
     _lastTime = 0;
