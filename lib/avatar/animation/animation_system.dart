@@ -197,69 +197,84 @@ class ProceduralIdleSystem {
     final e = energyLevel;
     final transforms = <String, BoneTransform>{};
 
-    // ── Root: slow weight-shift sway ──
+    // ── Root: slow weight-shift sway — visible but gentle ──
     transforms['root'] = BoneTransform(
-      dx: sin(time * 0.4) * 0.01 * e,
-      rotation: sin(time * 0.3 + 0.7) * 0.008 * e,
+      dx: sin(time * 0.4) * 0.014 * e,
+      rotation: sin(time * 0.3 + 0.7) * 0.012 * e,
     );
 
-    // ── Spine/Chest: breathing oscillation ──
+    // ── Spine/Chest: breathing oscillation — clearly visible chest rise ──
     final breathPhase = sin(time * 1.05); // ~3s cycle
     transforms['chest'] = BoneTransform(
-      scaleY: 1.0 + breathPhase * 0.015,
-      dy: breathPhase * -0.003, // chest rises slightly on inhale
+      scaleY: 1.0 + breathPhase * 0.022,
+      dy: breathPhase * -0.005, // chest rises on inhale
     );
 
     // ── Head: layered sin waves for organic micro-movement ──
+    // Slightly larger amplitude so the character feels alive, not frozen
     final headX = (sin(time * 0.7) * 0.30 +
             sin(time * 1.3) * 0.15 +
             sin(time * 2.1) * 0.05) *
-        0.005 *
+        0.008 *
         e;
     final headY = (sin(time * 0.5 + 1.0) * 0.20 +
             sin(time * 1.1 + 0.5) * 0.10) *
-        0.003 *
+        0.005 *
         e;
-    final headRot = sin(time * 0.3) * 0.02 * e;
+    final headRot = sin(time * 0.3) * 0.025 * e;
     transforms['head'] = BoneTransform(
       dx: headX,
       dy: headY,
       rotation: headRot,
     );
 
-    // ── Shoulders: subtle asymmetric micro-shifts ──
+    // ── Shoulders: asymmetric micro-shifts ──
     transforms['leftShoulder'] = BoneTransform(
-      dy: sin(time * 0.6 + 0.3) * 0.003 * e,
+      dy: sin(time * 0.6 + 0.3) * 0.005 * e,
     );
     transforms['rightShoulder'] = BoneTransform(
-      dy: sin(time * 0.6 + 1.8) * 0.003 * e,
+      dy: sin(time * 0.6 + 1.8) * 0.005 * e,
     );
 
     // ── Arms: gentle pendulum sway at rest ──
     transforms['leftUpperArm'] = BoneTransform(
-      rotation: sin(time * 0.35 + 0.5) * 0.015 * e,
+      rotation: sin(time * 0.35 + 0.5) * 0.022 * e,
     );
     transforms['rightUpperArm'] = BoneTransform(
-      rotation: sin(time * 0.35 + 2.0) * 0.015 * e,
+      rotation: sin(time * 0.35 + 2.0) * 0.022 * e,
+    );
+
+    // ── Hands: very gentle follow-through lag from arm sway ──
+    transforms['leftHand'] = BoneTransform(
+      rotation: sin(time * 0.35 + 0.8) * 0.015 * e,
+    );
+    transforms['rightHand'] = BoneTransform(
+      rotation: sin(time * 0.35 + 2.3) * 0.015 * e,
     );
 
     // ── Eyes: micro look-around (driven by head but slightly offset) ──
     final eyeTransform = BoneTransform(
-      dx: sin(time * 0.8 + 0.2) * 0.004 * e,
-      dy: sin(time * 0.6 + 1.5) * 0.002 * e,
+      dx: sin(time * 0.8 + 0.2) * 0.005 * e,
+      dy: sin(time * 0.6 + 1.5) * 0.003 * e,
     );
     transforms['leftEye'] = eyeTransform;
     transforms['rightEye'] = eyeTransform;
 
+    // ── Hair: gentle secondary motion from head sway ──
+    transforms['hairRoot'] = BoneTransform(
+      rotation: sin(time * 0.4 + 0.5) * 0.018 * e,
+      dx: sin(time * 0.35) * 0.004 * e,
+    );
+
     // ── Fidgets: at high energy, occasional small gestures ──
-    if (e > 0.6 && _fidgetCooldown <= 0 && _rng.nextDouble() < 0.001 * e) {
+    if (e > 0.6 && _fidgetCooldown <= 0 && _rng.nextDouble() < 0.002 * e) {
       _fidgetCooldown = 2.0 + _rng.nextDouble() * 3.0; // 2-5s cooldown
       // Small shoulder shrug fidget
       transforms['leftShoulder'] = BoneTransform(
-        dy: -0.008 * e,
+        dy: -0.010 * e,
       );
       transforms['rightShoulder'] = BoneTransform(
-        dy: -0.008 * e,
+        dy: -0.010 * e,
       );
     }
 
