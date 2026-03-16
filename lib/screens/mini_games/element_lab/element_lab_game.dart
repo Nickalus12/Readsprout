@@ -1213,18 +1213,33 @@ class _ElementLabGameState extends State<ElementLabGame>
               tooltip: 'Wind left',
             ),
             // Wind indicator
-            SizedBox(
-              width: compact ? 16 : 20,
-              child: Center(
-                child: Text(
-                  _engine.windForce == 0 ? '0' : '${_engine.windForce > 0 ? "+" : ""}${_engine.windForce}',
-                  style: AppFonts.fredoka(
-                    fontSize: compact ? 9 : 10,
-                    fontWeight: FontWeight.w600,
-                    color: _engine.windForce != 0
-                        ? AppColors.electricBlue
-                        : AppColors.secondaryText.withValues(alpha: 0.5),
-                  ),
+            Tooltip(
+              message: _engine.windForce == 0
+                  ? 'No wind'
+                  : 'Wind ${_engine.windForce < 0 ? "left" : "right"} ${_engine.windForce.abs()}',
+              child: SizedBox(
+                width: compact ? 20 : 26,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.air_rounded,
+                      size: compact ? 10 : 12,
+                      color: _engine.windForce != 0
+                          ? AppColors.electricBlue
+                          : AppColors.secondaryText.withValues(alpha: 0.4),
+                    ),
+                    Text(
+                      _engine.windForce == 0 ? '0' : '${_engine.windForce > 0 ? "+" : ""}${_engine.windForce}',
+                      style: AppFonts.fredoka(
+                        fontSize: compact ? 7 : 8,
+                        fontWeight: FontWeight.w600,
+                        color: _engine.windForce != 0
+                            ? AppColors.electricBlue
+                            : AppColors.secondaryText.withValues(alpha: 0.5),
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ),
