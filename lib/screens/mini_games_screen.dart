@@ -116,200 +116,231 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
                   child: SingleChildScrollView(
                     physics: const BouncingScrollPhysics(),
                     padding: const EdgeInsets.symmetric(vertical: 8),
-                    child: Wrap(
-                      alignment: WrapAlignment.center,
-                      spacing: 16,
-                      runSpacing: 12,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
-                        _buildGameBtn(
-                          context, 'Unicorn Flight',
-                          const _UnicornIconPainter(), AppColors.magenta, 0,
-                          UnicornFlightGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            playerName: widget.playerName,
-                            profileService: widget.profileService,
-                            hintsEnabled: _hintsEnabled,
-                            difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('unicorn_flight'),
-                          ),
+                        // ── Free Games Section ──
+                        _buildSectionHeader(
+                          icon: Icons.play_circle_rounded,
+                          label: 'Free Games',
+                          gradientColors: [AppColors.electricBlue, AppColors.cyan],
                         ),
-                        _buildGameBtn(
-                          context, 'Lightning Speller',
-                          const _StormCloudPainter(), AppColors.electricBlue, 1,
-                          LightningSpellerGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            playerName: widget.playerName,
-                            profileService: widget.profileService,
-                            hintsEnabled: _hintsEnabled,
-                            difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('lightning_speller'),
-                          ),
+                        const SizedBox(height: 8),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 16,
+                          runSpacing: 12,
+                          children: [
+                            _buildGameBtn(
+                              context, 'Unicorn Flight',
+                              const _UnicornIconPainter(), AppColors.magenta, 0,
+                              UnicornFlightGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                playerName: widget.playerName,
+                                profileService: widget.profileService,
+                                hintsEnabled: _hintsEnabled,
+                                difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('unicorn_flight'),
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Lightning Speller',
+                              const _StormCloudPainter(), AppColors.electricBlue, 1,
+                              LightningSpellerGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                playerName: widget.playerName,
+                                profileService: widget.profileService,
+                                hintsEnabled: _hintsEnabled,
+                                difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('lightning_speller'),
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Word Bubbles',
+                              const _BubblesIconPainter(), AppColors.cyan, 2,
+                              WordBubblesGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                playerName: widget.playerName,
+                                profileService: widget.profileService,
+                                hintsEnabled: _hintsEnabled,
+                                difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('word_bubbles'),
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Memory Match',
+                              const _CardsIconPainter(), AppColors.violet, 3,
+                              MemoryMatchGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                playerName: widget.playerName,
+                                profileService: widget.profileService,
+                                hintsEnabled: _hintsEnabled,
+                                difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('memory_match'),
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Falling Letters',
+                              const _FallingIconPainter(), AppColors.starGold, 4,
+                              FallingLettersGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                playerName: widget.playerName,
+                                profileService: widget.profileService,
+                                hintsEnabled: _hintsEnabled,
+                                difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('falling_letters'),
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Cat Toss',
+                              const _CatIconPainter(), AppColors.magenta, 5,
+                              CatLetterTossGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                playerName: widget.playerName,
+                                profileService: widget.profileService,
+                                hintsEnabled: _hintsEnabled,
+                                difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('cat_letter_toss'),
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Letter Drop',
+                              const _DropIconPainter(), AppColors.emerald, 6,
+                              LetterDropGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                playerName: widget.playerName,
+                                profileService: widget.profileService,
+                                hintsEnabled: _hintsEnabled,
+                                difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('letter_drop'),
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Rhyme Time',
+                              const _RhymeIconPainter(), AppColors.magenta, 7,
+                              RhymeTimeGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                playerName: widget.playerName,
+                                profileService: widget.profileService,
+                                hintsEnabled: _hintsEnabled,
+                                difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('rhyme_time'),
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Star Catcher',
+                              const _StarCatcherIconPainter(), AppColors.violet, 8,
+                              StarCatcherGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                playerName: widget.playerName,
+                                profileService: widget.profileService,
+                                hintsEnabled: _hintsEnabled,
+                                difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('star_catcher'),
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Paint Splash',
+                              const _PaintSplashIconPainter(), AppColors.magenta, 9,
+                              PaintSplashGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                playerName: widget.playerName,
+                                profileService: widget.profileService,
+                                hintsEnabled: _hintsEnabled,
+                                difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('paint_splash'),
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Word Rocket',
+                              const _RocketIconPainter(), AppColors.electricBlue, 10,
+                              WordRocketGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                highScoreService: widget.highScoreService,
+                                playerName: widget.playerName,
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Word Safari',
+                              const _SafariIconPainter(), AppColors.emerald, 11,
+                              SightWordSafariGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                highScoreService: widget.highScoreService,
+                                playerName: widget.playerName,
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Word Ninja',
+                              const _NinjaIconPainter(), AppColors.magenta, 12,
+                              WordNinjaGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                highScoreService: widget.highScoreService,
+                                playerName: widget.playerName,
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Spelling Bee',
+                              const _BeeIconPainter(), AppColors.starGold, 13,
+                              SpellingBeeGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                highScoreService: widget.highScoreService,
+                                playerName: widget.playerName,
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Word Train',
+                              const _TrainIconPainter(), AppColors.electricBlue, 14,
+                              WordTrainGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                highScoreService: widget.highScoreService,
+                                playerName: widget.playerName,
+                              ),
+                            ),
+                            _buildGameBtn(
+                              context, 'Ladybug Letters',
+                              const _LadybugIconPainter(), AppColors.error, 15,
+                              LadybugGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                highScoreService: widget.highScoreService,
+                                playerName: widget.playerName,
+                              ),
+                            ),
+                          ],
                         ),
-                        _buildGameBtn(
-                          context, 'Word Bubbles',
-                          const _BubblesIconPainter(), AppColors.cyan, 2,
-                          WordBubblesGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            playerName: widget.playerName,
-                            profileService: widget.profileService,
-                            hintsEnabled: _hintsEnabled,
-                            difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('word_bubbles'),
-                          ),
+
+                        const SizedBox(height: 24),
+
+                        // ── Premium Games Section ──
+                        _buildSectionHeader(
+                          icon: Icons.star_rounded,
+                          label: 'Premium Games',
+                          gradientColors: [const Color(0xFFFFD700), const Color(0xFFFF8C42)],
+                          trailing: _buildCoinBalanceChip(),
                         ),
-                        _buildGameBtn(
-                          context, 'Memory Match',
-                          const _CardsIconPainter(), AppColors.violet, 3,
-                          MemoryMatchGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            playerName: widget.playerName,
-                            profileService: widget.profileService,
-                            hintsEnabled: _hintsEnabled,
-                            difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('memory_match'),
-                          ),
+                        const SizedBox(height: 12),
+                        Wrap(
+                          alignment: WrapAlignment.center,
+                          spacing: 20,
+                          runSpacing: 16,
+                          children: [
+                            _buildPremiumGameCard(
+                              context, 'Element Lab',
+                              const BeakerIconPainter(), AppColors.emerald, 16,
+                              kElementLabCost,
+                            ),
+                          ],
                         ),
-                        _buildGameBtn(
-                          context, 'Falling Letters',
-                          const _FallingIconPainter(), AppColors.starGold, 4,
-                          FallingLettersGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            playerName: widget.playerName,
-                            profileService: widget.profileService,
-                            hintsEnabled: _hintsEnabled,
-                            difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('falling_letters'),
-                          ),
-                        ),
-                        _buildGameBtn(
-                          context, 'Cat Toss',
-                          const _CatIconPainter(), AppColors.magenta, 5,
-                          CatLetterTossGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            playerName: widget.playerName,
-                            profileService: widget.profileService,
-                            hintsEnabled: _hintsEnabled,
-                            difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('cat_letter_toss'),
-                          ),
-                        ),
-                        _buildGameBtn(
-                          context, 'Letter Drop',
-                          const _DropIconPainter(), AppColors.emerald, 6,
-                          LetterDropGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            playerName: widget.playerName,
-                            profileService: widget.profileService,
-                            hintsEnabled: _hintsEnabled,
-                            difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('letter_drop'),
-                          ),
-                        ),
-                        _buildGameBtn(
-                          context, 'Rhyme Time',
-                          const _RhymeIconPainter(), AppColors.magenta, 7,
-                          RhymeTimeGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            playerName: widget.playerName,
-                            profileService: widget.profileService,
-                            hintsEnabled: _hintsEnabled,
-                            difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('rhyme_time'),
-                          ),
-                        ),
-                        _buildGameBtn(
-                          context, 'Star Catcher',
-                          const _StarCatcherIconPainter(), AppColors.violet, 8,
-                          StarCatcherGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            playerName: widget.playerName,
-                            profileService: widget.profileService,
-                            hintsEnabled: _hintsEnabled,
-                            difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('star_catcher'),
-                          ),
-                        ),
-                        _buildGameBtn(
-                          context, 'Paint Splash',
-                          const _PaintSplashIconPainter(), AppColors.magenta, 9,
-                          PaintSplashGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            playerName: widget.playerName,
-                            profileService: widget.profileService,
-                            hintsEnabled: _hintsEnabled,
-                            difficultyParams: widget.adaptiveDifficultyService?.getParamsForGame('paint_splash'),
-                          ),
-                        ),
-                        _buildGameBtn(
-                          context, 'Word Rocket',
-                          const _RocketIconPainter(), AppColors.electricBlue, 10,
-                          WordRocketGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            highScoreService: widget.highScoreService,
-                            playerName: widget.playerName,
-                          ),
-                        ),
-                        _buildGameBtn(
-                          context, 'Word Safari',
-                          const _SafariIconPainter(), AppColors.emerald, 11,
-                          SightWordSafariGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            highScoreService: widget.highScoreService,
-                            playerName: widget.playerName,
-                          ),
-                        ),
-                        _buildGameBtn(
-                          context, 'Word Ninja',
-                          const _NinjaIconPainter(), AppColors.magenta, 12,
-                          WordNinjaGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            highScoreService: widget.highScoreService,
-                            playerName: widget.playerName,
-                          ),
-                        ),
-                        _buildGameBtn(
-                          context, 'Spelling Bee',
-                          const _BeeIconPainter(), AppColors.starGold, 13,
-                          SpellingBeeGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            highScoreService: widget.highScoreService,
-                            playerName: widget.playerName,
-                          ),
-                        ),
-                        _buildGameBtn(
-                          context, 'Word Train',
-                          const _TrainIconPainter(), AppColors.electricBlue, 14,
-                          WordTrainGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            highScoreService: widget.highScoreService,
-                            playerName: widget.playerName,
-                          ),
-                        ),
-                        _buildGameBtn(
-                          context, 'Ladybug Letters',
-                          const _LadybugIconPainter(), AppColors.error, 15,
-                          LadybugGame(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            highScoreService: widget.highScoreService,
-                            playerName: widget.playerName,
-                          ),
-                        ),
-                        _buildCoinGameBtn(
-                          context, 'Element Lab',
-                          const BeakerIconPainter(), AppColors.emerald, 16,
-                          kElementLabCost,
-                        ),
+                        const SizedBox(height: 24),
                       ],
                     ),
                   ),
-                  ),
+                ),
               ],
             ),
           ),
@@ -368,6 +399,279 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
     );
   }
 
+  Widget _buildSectionHeader({
+    required IconData icon,
+    required String label,
+    required List<Color> gradientColors,
+    Widget? trailing,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(colors: gradientColors),
+              borderRadius: BorderRadius.circular(8),
+              boxShadow: [
+                BoxShadow(
+                  color: gradientColors.first.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Icon(icon, color: Colors.white, size: 18),
+          ),
+          const SizedBox(width: 10),
+          Text(
+            label,
+            style: AppFonts.fredoka(
+              fontSize: 18,
+              fontWeight: FontWeight.w600,
+              color: AppColors.primaryText,
+            ),
+          ),
+          if (trailing != null) ...[
+            const Spacer(),
+            trailing,
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCoinBalanceChip() {
+    final coins = widget.progressService.starCoins;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: AppColors.starGold.withValues(alpha: 0.5),
+          width: 1.5,
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.starGold.withValues(alpha: 0.15),
+            blurRadius: 6,
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.star_rounded, color: AppColors.starGold, size: 16),
+          const SizedBox(width: 4),
+          Text(
+            '$coins',
+            style: AppFonts.fredoka(
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
+              color: AppColors.starGold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// Builds a premium game card — larger than free game buttons with gold border.
+  Widget _buildPremiumGameCard(BuildContext context, String label,
+      CustomPainter painter, Color glow, int index, int cost) {
+    final balance = widget.progressService.starCoins;
+    final freePlay = widget.progressService.freePlayMode;
+    final canAfford = freePlay || balance >= cost;
+
+    return GestureDetector(
+      onTap: () async {
+        if (!canAfford) {
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            builder: (ctx) => AlertDialog(
+              backgroundColor: AppColors.surface,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+              title: Row(
+                children: [
+                  const Icon(Icons.star_rounded, color: AppColors.starGold, size: 24),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Need More Stars!',
+                    style: AppFonts.fredoka(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryText,
+                    ),
+                  ),
+                ],
+              ),
+              content: Text(
+                'This game costs $cost star coins.\n'
+                'You have $balance — earn ${cost - balance} more by completing words!',
+                style: AppFonts.fredoka(
+                  fontSize: 14,
+                  color: AppColors.secondaryText,
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(ctx).pop(),
+                  child: Text(
+                    'OK',
+                    style: AppFonts.fredoka(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.electricBlue,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+        if (!freePlay) {
+          widget.progressService.spendStarCoins(cost);
+        }
+        if (!mounted) return;
+        final game = ElementLabGame(
+          progressService: widget.progressService,
+          audioService: widget.audioService,
+          playerName: widget.playerName,
+          freePlay: freePlay,
+        );
+        await Navigator.push(context, GameAnimations.smoothRoute(game));
+        if (!mounted) return;
+        setState(() {}); // refresh coin display
+        if (widget.profileId.isNotEmpty) {
+          widget.personalityService?.onMiniGamePlayed(widget.profileId, index);
+        }
+        if (index < _gameIds.length) {
+          widget.statsService?.recordMiniGamePlayed(_gameIds[index], 0);
+        }
+      },
+      child: Container(
+        width: 140,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: canAfford
+                ? AppColors.starGold.withValues(alpha: 0.6)
+                : AppColors.secondaryText.withValues(alpha: 0.3),
+            width: 2,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: canAfford
+                  ? AppColors.starGold.withValues(alpha: 0.2)
+                  : Colors.transparent,
+              blurRadius: 12,
+              spreadRadius: 2,
+            ),
+          ],
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icon
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: RadialGradient(
+                  center: const Alignment(-0.3, -0.3),
+                  colors: [
+                    glow.withValues(alpha: 0.1),
+                    AppColors.surface,
+                  ],
+                ),
+                border: Border.all(
+                  color: glow.withValues(alpha: canAfford ? 0.5 : 0.2),
+                  width: 1.5,
+                ),
+              ),
+              child: Opacity(
+                opacity: canAfford ? 1.0 : 0.5,
+                child: CustomPaint(
+                  painter: painter,
+                  size: const Size(64, 64),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // Label
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              style: AppFonts.fredoka(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: canAfford
+                    ? AppColors.primaryText
+                    : AppColors.secondaryText,
+              ),
+            ),
+            const SizedBox(height: 6),
+            // Cost badge
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+              decoration: BoxDecoration(
+                color: canAfford
+                    ? AppColors.starGold.withValues(alpha: 0.15)
+                    : AppColors.secondaryText.withValues(alpha: 0.1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: canAfford
+                      ? AppColors.starGold.withValues(alpha: 0.4)
+                      : AppColors.secondaryText.withValues(alpha: 0.2),
+                ),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    canAfford ? Icons.star_rounded : Icons.lock_rounded,
+                    color: canAfford
+                        ? AppColors.starGold
+                        : AppColors.secondaryText,
+                    size: 14,
+                  ),
+                  const SizedBox(width: 3),
+                  Text(
+                    '$cost',
+                    style: AppFonts.fredoka(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: canAfford
+                          ? AppColors.starGold
+                          : AppColors.secondaryText,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    )
+        .animate()
+        .fadeIn(delay: (index * 80).ms, duration: 400.ms)
+        .scale(
+          begin: const Offset(0.8, 0.8),
+          curve: Curves.easeOutBack,
+          delay: (index * 80).ms,
+          duration: 500.ms,
+        );
+  }
+
   static const _gameIds = [
     'unicorn_flight', 'lightning_speller', 'word_bubbles',
     'memory_match', 'falling_letters', 'cat_letter_toss',
@@ -406,93 +710,6 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
         );
   }
 
-  /// Builds a game button that requires star coins to enter.
-  Widget _buildCoinGameBtn(BuildContext context, String label,
-      CustomPainter painter, Color glow, int index, int cost) {
-    return _GameButton(
-      label: label,
-      painter: painter,
-      glowColor: glow,
-      floatIndex: index,
-      coinCost: widget.progressService.freePlayMode ? null : cost,
-      coinBalance: widget.progressService.starCoins,
-      onTap: () async {
-        final balance = widget.progressService.starCoins;
-        if (!widget.progressService.freePlayMode && balance < cost) {
-          if (!mounted) return;
-          showDialog(
-            context: context,
-            builder: (ctx) => AlertDialog(
-              backgroundColor: AppColors.surface,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(16),
-              ),
-              title: Text(
-                'Not Enough Coins!',
-                style: AppFonts.fredoka(
-                  fontSize: 18,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.primaryText,
-                ),
-              ),
-              content: Text(
-                'You need $cost star coins to play.\n'
-                'You have $balance — earn ${cost - balance} more by completing words!',
-                style: AppFonts.fredoka(
-                  fontSize: 14,
-                  color: AppColors.secondaryText,
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(ctx).pop(),
-                  child: Text(
-                    'OK',
-                    style: AppFonts.fredoka(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                      color: AppColors.electricBlue,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-          return;
-        }
-        // Spend the coins (skip in free play mode)
-        final freePlay = widget.progressService.freePlayMode;
-        if (!freePlay) {
-          widget.progressService.spendStarCoins(cost);
-        }
-        if (!mounted) return;
-        final game = ElementLabGame(
-          progressService: widget.progressService,
-          audioService: widget.audioService,
-          playerName: widget.playerName,
-          freePlay: freePlay,
-        );
-        await Navigator.push(context, GameAnimations.smoothRoute(game));
-        if (!mounted) return;
-        setState(() {}); // refresh coin display
-        if (widget.profileId.isNotEmpty) {
-          widget.personalityService?.onMiniGamePlayed(widget.profileId, index);
-        }
-        if (index < _gameIds.length) {
-          widget.statsService?.recordMiniGamePlayed(_gameIds[index], 0);
-        }
-      },
-    )
-        .animate()
-        .fadeIn(delay: (index * 80).ms, duration: 400.ms)
-        .scale(
-          begin: const Offset(0.8, 0.8),
-          curve: Curves.easeOutBack,
-          delay: (index * 80).ms,
-          duration: 500.ms,
-        );
-  }
-
 }
 
 // ── Compact floating game button ──────────────────────────────────────────
@@ -502,8 +719,6 @@ class _GameButton extends StatefulWidget {
   final CustomPainter painter;
   final Color glowColor;
   final VoidCallback onTap;
-  final int? coinCost;
-  final int? coinBalance;
   final int floatIndex;
 
   const _GameButton({
@@ -511,8 +726,6 @@ class _GameButton extends StatefulWidget {
     required this.painter,
     required this.glowColor,
     required this.onTap,
-    this.coinCost,
-    this.coinBalance,
     this.floatIndex = 0,
   });
 
@@ -587,45 +800,6 @@ class _GameButtonState extends State<_GameButton> {
                         duration: Duration(milliseconds: 1800 + (widget.floatIndex % 3) * 200),
                         curve: Curves.easeInOut,
                       ),
-                  if (widget.coinCost != null)
-                    Positioned(
-                      top: -4,
-                      right: -4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                            horizontal: 5, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.surface,
-                          borderRadius: BorderRadius.circular(10),
-                          border: Border.all(
-                            color: AppColors.starGold.withValues(alpha: 0.6),
-                            width: 1,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: AppColors.starGold.withValues(alpha: 0.3),
-                              blurRadius: 4,
-                            ),
-                          ],
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.star_rounded,
-                                color: AppColors.starGold, size: 10),
-                            const SizedBox(width: 2),
-                            Text(
-                              '${widget.coinCost}',
-                              style: AppFonts.fredoka(
-                                fontSize: 9,
-                                fontWeight: FontWeight.w600,
-                                color: AppColors.starGold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
                 ],
               ),
               const SizedBox(height: 6),
