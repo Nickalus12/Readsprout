@@ -1241,7 +1241,11 @@ extension ElementBehaviors on SimulationEngine {
 
     if (inWater) {
       if (life[idx] % 3 == 0 && inBounds(x, uy)) {
-        final ai = uy * gridW + x;
+        // Wobble sideways while rising for realistic bubble movement
+        final wobble = rng.nextInt(3) - 1;
+        final riseX = (x + wobble).clamp(0, gridW - 1);
+
+        final ai = uy * gridW + riseX;
         if (grid[ai] == El.water) {
           grid[ai] = El.bubble;
           life[ai] = life[idx];
@@ -1251,10 +1255,27 @@ extension ElementBehaviors on SimulationEngine {
           markProcessed(idx);
           return;
         }
-        if (grid[ai] == El.empty) {
+        // Try straight up if wobble failed
+        if (wobble != 0) {
+          final straightUp = uy * gridW + x;
+          if (grid[straightUp] == El.water) {
+            grid[straightUp] = El.bubble;
+            life[straightUp] = life[idx];
+            grid[idx] = El.water;
+            life[idx] = 100;
+            markProcessed(straightUp);
+            markProcessed(idx);
+            return;
+          }
+        }
+        // Pop at surface — create water droplet splash
+        final surfaceIdx = uy * gridW + x;
+        if (inBounds(x, uy) && grid[surfaceIdx] == El.empty) {
           grid[idx] = El.empty;
           life[idx] = 0;
-          for (int i = 0; i < 2 + rng.nextInt(2); i++) {
+          // Pop splash: scatter water droplets upward
+          final droplets = 2 + rng.nextInt(3);
+          for (int i = 0; i < droplets; i++) {
             final dx = rng.nextInt(5) - 2;
             final dy = -gravityDir * (rng.nextInt(3) + 1);
             final nx = x + dx;
@@ -1265,13 +1286,17 @@ extension ElementBehaviors on SimulationEngine {
               markProcessed(ny * gridW + nx);
             }
           }
+          // Pop visual effect
+          queueReactionFlash(x, uy, 150, 210, 255, 3);
           return;
         }
       }
     } else {
-      if (life[idx] > 30) {
+      // Bubble outside water pops quickly
+      if (life[idx] > 20) {
         grid[idx] = El.empty;
         life[idx] = 0;
+        queueReactionFlash(x, y, 130, 200, 240, 2);
       }
     }
   }
