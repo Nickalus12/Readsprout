@@ -11,26 +11,27 @@ import '../../utils/haptics.dart';
 // A delightful mini game for young children (ages 3-5).
 // ---------------------------------------------------------------------------
 
-/// Animal data: emoji, word (must have audio), and a fun color.
+/// Animal data: emoji, word (must have audio), color, and silly reaction.
 class _AnimalData {
   final String emoji;
   final String word;
   final Color bubbleColor;
+  final String sillyReaction;
 
-  const _AnimalData(this.emoji, this.word, this.bubbleColor);
+  const _AnimalData(this.emoji, this.word, this.bubbleColor, this.sillyReaction);
 }
 
 const _animals = [
-  _AnimalData('🐶', 'dog', Color(0xFF64B5F6)),
-  _AnimalData('🐱', 'cat', Color(0xFFFFB74D)),
-  _AnimalData('🐸', 'frog', Color(0xFF81C784)),
-  _AnimalData('🐻', 'bear', Color(0xFFA1887F)),
-  _AnimalData('🐟', 'fish', Color(0xFF4FC3F7)),
-  _AnimalData('🐦', 'bird', Color(0xFFE57373)),
-  _AnimalData('🐷', 'pig', Color(0xFFF48FB1)),
-  _AnimalData('🐔', 'hen', Color(0xFFFFD54F)),
-  _AnimalData('🦇', 'bat', Color(0xFFB39DDB)),
-  _AnimalData('🐛', 'bug', Color(0xFFA5D6A7)),
+  _AnimalData('🐶', 'dog', Color(0xFF64B5F6), 'Woof woof!'),
+  _AnimalData('🐱', 'cat', Color(0xFFFFB74D), 'Meow!'),
+  _AnimalData('🐸', 'frog', Color(0xFF81C784), 'Ribbit!'),
+  _AnimalData('🐻', 'bear', Color(0xFFA1887F), 'Roar!'),
+  _AnimalData('🐟', 'fish', Color(0xFF4FC3F7), 'Splash!'),
+  _AnimalData('🐦', 'bird', Color(0xFFE57373), 'Tweet!'),
+  _AnimalData('🐷', 'pig', Color(0xFFF48FB1), 'Oink!'),
+  _AnimalData('🐔', 'hen', Color(0xFFFFD54F), 'Cluck!'),
+  _AnimalData('🦇', 'bat', Color(0xFFB39DDB), 'Flap flap!'),
+  _AnimalData('🐛', 'bug', Color(0xFFA5D6A7), 'Buzz!'),
 ];
 
 class BubblePopZooGame extends StatefulWidget {
@@ -56,6 +57,7 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
   final List<_PopEffect> _popEffects = [];
   final List<_FreedAnimal> _freedAnimals = [];
   final List<_BackgroundBubble> _bgBubbles = [];
+  final List<_RingBurst> _ringBursts = [];
 
   late AnimationController _ticker;
   double _lastTime = 0;
@@ -169,6 +171,12 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
 
       // Update freed animals
       _updateFreedAnimals(dt);
+
+      // Update ring bursts
+      for (final r in _ringBursts) {
+        r.age += dt;
+      }
+      _ringBursts.removeWhere((r) => r.age > 0.5);
 
       // Update background
       _updateBackgroundBubbles(dt);
@@ -343,10 +351,19 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
 
     _popEffects.add(_PopEffect(particles: particles));
 
+    // Create expanding ring burst
+    _ringBursts.add(_RingBurst(
+      x: bubble.x,
+      y: bubble.y,
+      color: bubble.animal.bubbleColor,
+      maxRadius: bubble.radius * 3,
+    ));
+
     // Create freed animal animation
     _freedAnimals.add(_FreedAnimal(
       emoji: bubble.animal.emoji,
       word: bubble.animal.word,
+      sillyReaction: bubble.animal.sillyReaction,
       x: bubble.x,
       y: bubble.y,
       spinSpeed: (_rng.nextDouble() - 0.5) * 3,
@@ -401,6 +418,7 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
                       popEffects: _popEffects,
                       freedAnimals: _freedAnimals,
                       bgBubbles: _bgBubbles,
+                      ringBursts: _ringBursts,
                       gameTime: _gameTime,
                     ),
                     size: size,
@@ -483,46 +501,69 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
 
           // Freed animal word display
           for (final animal in _freedAnimals)
-            if (animal.age < 1.2)
+            if (animal.age < 1.5)
               Positioned(
                 left: 0,
                 right: 0,
-                top: MediaQuery.of(context).size.height * animal.y - 60,
+                top: MediaQuery.of(context).size.height * animal.y - 80,
                 child: Center(
                   child: Opacity(
-                    opacity: (1.0 - animal.age / 1.2).clamp(0.0, 1.0),
+                    opacity: (1.0 - animal.age / 1.5).clamp(0.0, 1.0),
                     child: Transform.translate(
-                      offset: Offset(0, -animal.age * 40),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            animal.emoji,
-                            style: TextStyle(
-                              fontSize: 40 + (animal.age * 10),
-                            ),
-                          ),
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 12, vertical: 4,
-                            ),
-                            decoration: BoxDecoration(
-                              color: AppColors.surface.withValues(alpha: 0.9),
-                              borderRadius: BorderRadius.circular(12),
-                              border: Border.all(
-                                color: AppColors.electricBlue.withValues(alpha: 0.5),
+                      offset: Offset(
+                        sin(animal.age * 8) * 5, // wiggle side to side
+                        -animal.age * 50,
+                      ),
+                      child: Transform.rotate(
+                        angle: sin(animal.age * 6) * 0.1,
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            // Silly reaction text
+                            if (animal.age < 0.8)
+                              Text(
+                                animal.sillyReaction,
+                                style: AppFonts.fredoka(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.starGold,
+                                ),
+                              ),
+                            Text(
+                              animal.emoji,
+                              style: TextStyle(
+                                fontSize: 44 + (animal.age * 8),
                               ),
                             ),
-                            child: Text(
-                              animal.word.toUpperCase(),
-                              style: AppFonts.fredoka(
-                                fontSize: 22,
-                                fontWeight: FontWeight.bold,
-                                color: AppColors.primaryText,
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14, vertical: 5,
+                              ),
+                              decoration: BoxDecoration(
+                                color: AppColors.surface.withValues(alpha: 0.9),
+                                borderRadius: BorderRadius.circular(14),
+                                border: Border.all(
+                                  color: AppColors.electricBlue.withValues(alpha: 0.5),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: AppColors.electricBlue.withValues(alpha: 0.2),
+                                    blurRadius: 8,
+                                  ),
+                                ],
+                              ),
+                              child: Text(
+                                animal.word.toUpperCase(),
+                                style: AppFonts.fredoka(
+                                  fontSize: 24,
+                                  fontWeight: FontWeight.bold,
+                                  color: AppColors.primaryText,
+                                ),
                               ),
                             ),
-                          ),
-                        ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -730,6 +771,7 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
       _bubbles.clear();
       _popEffects.clear();
       _freedAnimals.clear();
+      _ringBursts.clear();
       _score = 0;
       _combo = 0;
       _comboTimer = 0;
@@ -804,6 +846,7 @@ class _PopParticle {
 class _FreedAnimal {
   final String emoji;
   final String word;
+  final String sillyReaction;
   double x, y;
   double age = 0;
   double rotation = 0;
@@ -813,6 +856,7 @@ class _FreedAnimal {
   _FreedAnimal({
     required this.emoji,
     required this.word,
+    required this.sillyReaction,
     required this.x,
     required this.y,
     required this.spinSpeed,
@@ -837,6 +881,20 @@ class _BackgroundBubble {
   });
 }
 
+class _RingBurst {
+  final double x, y;
+  final Color color;
+  final double maxRadius;
+  double age = 0;
+
+  _RingBurst({
+    required this.x,
+    required this.y,
+    required this.color,
+    required this.maxRadius,
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Custom painter — renders bubbles, pop effects, and background
 // ---------------------------------------------------------------------------
@@ -846,6 +904,7 @@ class _BubblePopZooPainter extends CustomPainter {
   final List<_PopEffect> popEffects;
   final List<_FreedAnimal> freedAnimals;
   final List<_BackgroundBubble> bgBubbles;
+  final List<_RingBurst> ringBursts;
   final double gameTime;
 
   _BubblePopZooPainter({
@@ -853,6 +912,7 @@ class _BubblePopZooPainter extends CustomPainter {
     required this.popEffects,
     required this.freedAnimals,
     required this.bgBubbles,
+    required this.ringBursts,
     required this.gameTime,
   });
 
@@ -860,6 +920,7 @@ class _BubblePopZooPainter extends CustomPainter {
   void paint(Canvas canvas, Size size) {
     _drawBackground(canvas, size);
     _drawBubbles(canvas, size);
+    _drawRingBursts(canvas, size);
     _drawPopEffects(canvas, size);
   }
 
@@ -971,6 +1032,32 @@ class _BubblePopZooPainter extends CustomPainter {
       wordPainter.paint(
         canvas,
         Offset(cx - wordPainter.width / 2, cy + r * 0.2),
+      );
+    }
+  }
+
+  void _drawRingBursts(Canvas canvas, Size size) {
+    for (final r in ringBursts) {
+      final progress = (r.age / 0.5).clamp(0.0, 1.0);
+      final alpha = (1.0 - progress).clamp(0.0, 1.0);
+      final radius = r.maxRadius * Curves.easeOut.transform(progress);
+      canvas.drawCircle(
+        Offset(r.x * size.width, r.y * size.height),
+        radius,
+        Paint()
+          ..color = r.color.withValues(alpha: alpha * 0.4)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3 * (1.0 - progress),
+      );
+      // Inner glow ring
+      canvas.drawCircle(
+        Offset(r.x * size.width, r.y * size.height),
+        radius * 0.7,
+        Paint()
+          ..color = Colors.white.withValues(alpha: alpha * 0.2)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 2 * (1.0 - progress)
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4),
       );
     }
   }
