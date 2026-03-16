@@ -708,14 +708,18 @@ class PixelRenderer {
 
       case El.ice:
         _inlineA = 255;
+        // Occasional bright glint on ice facets
+        final iceGlint = (frameCount + idx * 13) % 30 < 2 ? 20 : 0;
         if ((x + y) % 3 == 0) {
-          _inlineR = 230; _inlineG = 240; _inlineB = 255;
+          _inlineR = (230 + iceGlint).clamp(230, 255);
+          _inlineG = (240 + iceGlint).clamp(240, 255);
+          _inlineB = 255;
         } else {
           final facet = (x * 5 + y * 9) % 3;
           switch (facet) {
-            case 0: _inlineR = (175 + variation).clamp(155, 200); _inlineG = (225 + variation).clamp(205, 245); _inlineB = 255;
-            case 1: _inlineR = (160 + variation).clamp(140, 185); _inlineG = (210 + variation).clamp(190, 230); _inlineB = 248;
-            default: _inlineR = (185 + variation).clamp(165, 210); _inlineG = (230 + variation).clamp(210, 250); _inlineB = 255;
+            case 0: _inlineR = (175 + variation + iceGlint).clamp(155, 210); _inlineG = (225 + variation + iceGlint).clamp(205, 255); _inlineB = 255;
+            case 1: _inlineR = (160 + variation + iceGlint).clamp(140, 195); _inlineG = (210 + variation + iceGlint).clamp(190, 240); _inlineB = 248;
+            default: _inlineR = (185 + variation + iceGlint).clamp(165, 220); _inlineG = (230 + variation + iceGlint).clamp(210, 255); _inlineB = 255;
           }
         }
 
@@ -798,14 +802,17 @@ class PixelRenderer {
       case El.snow:
         _inlineA = 255;
         final isShadow = (x * 7 + y * 11) % 5 == 0;
-        final sparkle = (frameCount + idx * 5) % 15 < 2 ? 12 : 0;
+        // Multi-frequency sparkle for glittering snow
+        final snowSparkle1 = (frameCount + idx * 5) % 15 < 2 ? 12 : 0;
+        final snowSparkle2 = (frameCount * 3 + idx * 11) % 23 < 2 ? 8 : 0;
+        final snowSparkle = snowSparkle1 + snowSparkle2;
         if (isShadow) {
-          _inlineR = (220 + sparkle).clamp(215, 240);
-          _inlineG = (225 + sparkle).clamp(220, 245);
-          _inlineB = 240;
+          _inlineR = (220 + snowSparkle).clamp(215, 245);
+          _inlineG = (225 + snowSparkle).clamp(220, 250);
+          _inlineB = (240 + snowSparkle ~/ 2).clamp(238, 255);
         } else {
-          _inlineR = (240 + sparkle).clamp(235, 255);
-          _inlineG = (243 + sparkle).clamp(238, 255);
+          _inlineR = (240 + snowSparkle).clamp(235, 255);
+          _inlineG = (243 + snowSparkle).clamp(238, 255);
           _inlineB = 255;
         }
 
