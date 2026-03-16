@@ -299,6 +299,10 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
                 const SizedBox(height: 16),
                 _buildStrengthsCard(),
                 const SizedBox(height: 16),
+                _buildStruggledWordsCard(),
+                const SizedBox(height: 16),
+                _buildAccuracyTrendCard(),
+                const SizedBox(height: 16),
                 _buildMiniGameCard(),
                 const SizedBox(height: 16),
                 _buildInsightsCard(),
@@ -718,6 +722,123 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
         ],
       ),
     ).animate().fadeIn(delay: 300.ms, duration: 400.ms).slideY(begin: 0.05, end: 0, duration: 300.ms);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 4b. Most Struggled Words
+  // ─────────────────────────────────────────────────────────────────────
+
+  Widget _buildStruggledWordsCard() {
+    final hardest = widget.statsService.hardestWords.take(8).toList();
+
+    return _DashboardCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionTitle(title: 'Most Struggled Words', icon: Icons.warning_amber_rounded),
+          const SizedBox(height: 14),
+
+          if (hardest.isEmpty)
+            const _EmptyState(message: 'Play more to see which words need extra practice!')
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: hardest.map((e) {
+                final avgMistakes = e.value;
+                final wordStats = widget.statsService.stats.wordAttempts[e.key]!;
+                // Color coding: red for high mistakes, amber for moderate
+                final color = avgMistakes >= 2.0
+                    ? AppColors.error
+                    : avgMistakes >= 1.0
+                        ? AppColors.flameOrange
+                        : AppColors.starGold;
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: color.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: color.withValues(alpha: 0.3)),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        e.key,
+                        style: AppFonts.fredoka(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${avgMistakes.toStringAsFixed(1)} avg mistakes',
+                        style: AppFonts.nunito(
+                          fontSize: 10,
+                          color: color,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      Text(
+                        '${wordStats.attempts} attempt${wordStats.attempts == 1 ? '' : 's'}',
+                        style: AppFonts.nunito(
+                          fontSize: 10,
+                          color: AppColors.secondaryText,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+        ],
+      ),
+    ).animate().fadeIn(delay: 350.ms, duration: 400.ms).slideY(begin: 0.05, end: 0, duration: 300.ms);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // 4c. Accuracy Trend (Last 7 Days)
+  // ─────────────────────────────────────────────────────────────────────
+
+  Widget _buildAccuracyTrendCard() {
+    final dailyStats = widget.statsService.getDailyStats(7);
+    final hasData = dailyStats.any((e) => e.value.correctTaps + e.value.wrongTaps > 0);
+
+    return _DashboardCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionTitle(title: 'Accuracy Trend', icon: Icons.show_chart_rounded),
+          const SizedBox(height: 16),
+
+          if (!hasData)
+            const _EmptyState(message: 'Play more to see accuracy trends over time!')
+          else
+            SizedBox(
+              height: 120,
+              child: CustomPaint(
+                size: const Size(double.infinity, 120),
+                painter: _AccuracyTrendPainter(
+                  data: dailyStats,
+                ),
+              ),
+            ),
+          if (hasData) ...[
+            const SizedBox(height: 8),
+            Center(
+              child: Text(
+                'Daily accuracy (correct taps / total taps)',
+                style: AppFonts.nunito(
+                  fontSize: 12,
+                  color: AppColors.secondaryText.withValues(alpha: 0.7),
+                ),
+              ),
+            ),
+          ],
+        ],
+      ),
+    ).animate().fadeIn(delay: 370.ms, duration: 400.ms).slideY(begin: 0.05, end: 0, duration: 300.ms);
   }
 
   // ─────────────────────────────────────────────────────────────────────
@@ -1741,5 +1862,152 @@ class _BarChartPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _BarChartPainter oldDelegate) =>
+      oldDelegate.data != data;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Accuracy Trend Line Chart Painter
+// ─────────────────────────────────────────────────────────────────────────────
+
+class _AccuracyTrendPainter extends CustomPainter {
+  final List<MapEntry<String, DailySessionStats>> data;
+
+  const _AccuracyTrendPainter({required this.data});
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (data.isEmpty) return;
+
+    const topPad = 16.0;
+    const bottomPad = 24.0;
+    final chartHeight = size.height - topPad - bottomPad;
+    final stepX = size.width / (data.length - 1).clamp(1, double.infinity);
+
+    // Draw grid lines at 50% and 100%
+    final gridPaint = Paint()
+      ..color = AppColors.border.withValues(alpha: 0.2)
+      ..strokeWidth = 0.5;
+    canvas.drawLine(
+      Offset(0, topPad),
+      Offset(size.width, topPad),
+      gridPaint,
+    );
+    canvas.drawLine(
+      Offset(0, topPad + chartHeight / 2),
+      Offset(size.width, topPad + chartHeight / 2),
+      gridPaint,
+    );
+
+    // Draw 100% and 50% labels
+    for (final entry in [
+      MapEntry('100%', topPad),
+      MapEntry('50%', topPad + chartHeight / 2),
+    ]) {
+      final tp = TextPainter(
+        text: TextSpan(
+          text: entry.key,
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontSize: 9,
+            color: AppColors.secondaryText.withValues(alpha: 0.5),
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      tp.paint(canvas, Offset(0, entry.value - 12));
+    }
+
+    // Compute points
+    final points = <Offset>[];
+    final hasActivity = <bool>[];
+    for (int i = 0; i < data.length; i++) {
+      final stats = data[i].value;
+      final total = stats.correctTaps + stats.wrongTaps;
+      final active = total > 0;
+      hasActivity.add(active);
+      final accuracy = active ? stats.accuracy : 0.0;
+      final x = i * stepX;
+      final y = topPad + chartHeight * (1.0 - accuracy);
+      points.add(Offset(x, y));
+    }
+
+    // Draw line segments between active days
+    final linePaint = Paint()
+      ..color = AppColors.emerald
+      ..strokeWidth = 2.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    final dottedPaint = Paint()
+      ..color = AppColors.emerald.withValues(alpha: 0.3)
+      ..strokeWidth = 1.5
+      ..strokeCap = StrokeCap.round
+      ..style = PaintingStyle.stroke;
+
+    for (int i = 0; i < points.length - 1; i++) {
+      final bothActive = hasActivity[i] && hasActivity[i + 1];
+      canvas.drawLine(
+        points[i],
+        points[i + 1],
+        bothActive ? linePaint : dottedPaint,
+      );
+    }
+
+    // Draw dots
+    for (int i = 0; i < points.length; i++) {
+      if (hasActivity[i]) {
+        // Glow
+        canvas.drawCircle(
+          points[i],
+          6,
+          Paint()..color = AppColors.emerald.withValues(alpha: 0.2),
+        );
+        // Core dot
+        canvas.drawCircle(
+          points[i],
+          3.5,
+          Paint()..color = AppColors.emerald,
+        );
+        // Accuracy label
+        final stats = data[i].value;
+        final pct = (stats.accuracy * 100).round();
+        final tp = TextPainter(
+          text: TextSpan(
+            text: '$pct%',
+            style: const TextStyle(
+              fontFamily: 'Nunito',
+              fontSize: 9,
+              fontWeight: FontWeight.w700,
+              color: AppColors.emerald,
+            ),
+          ),
+          textDirection: TextDirection.ltr,
+        )..layout();
+        tp.paint(canvas, Offset(points[i].dx - tp.width / 2, points[i].dy - 14));
+      }
+
+      // Date label
+      final parts = data[i].key.split('-');
+      final label = '${parts[1]}/${parts[2]}';
+      final labelPainter = TextPainter(
+        text: TextSpan(
+          text: label,
+          style: TextStyle(
+            fontFamily: 'Nunito',
+            fontSize: 9,
+            color: AppColors.secondaryText.withValues(alpha: 0.6),
+          ),
+        ),
+        textDirection: TextDirection.ltr,
+      )..layout();
+      labelPainter.paint(
+        canvas,
+        Offset(points[i].dx - labelPainter.width / 2, size.height - bottomPad + 6),
+      );
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _AccuracyTrendPainter oldDelegate) =>
       oldDelegate.data != data;
 }
