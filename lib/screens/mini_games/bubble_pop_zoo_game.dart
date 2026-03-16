@@ -1021,15 +1021,18 @@ class _BubblePopZooPainter extends CustomPainter {
     for (final b in bubbles) {
       final cx = b.x * size.width;
       final cy = b.y * size.height;
-      final r = b.radius * b.scale;
+      // Pulsing size: bubbles gently breathe
+      final pulse = 1.0 + sin(gameTime * 2.5 + b.shimmerPhase) * 0.03;
+      final r = b.radius * b.scale * pulse;
 
-      // Bubble outer glow
+      // Bubble outer glow (pulses gently)
+      final glowAlpha = 0.12 + sin(gameTime * 3 + b.wobblePhase) * 0.06;
       canvas.drawCircle(
         Offset(cx, cy),
-        r + 4,
+        r + 6,
         Paint()
-          ..color = b.animal.bubbleColor.withValues(alpha: 0.15)
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 8),
+          ..color = b.animal.bubbleColor.withValues(alpha: glowAlpha.clamp(0.05, 0.25))
+          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
       );
 
       // Bubble body — translucent with gradient
@@ -1052,14 +1055,27 @@ class _BubblePopZooPainter extends CustomPainter {
           ..style = PaintingStyle.fill,
       );
 
-      // Bubble border (soap film look)
+      // Bubble border (soap film look) with rainbow shimmer
+      final borderRect = Rect.fromCircle(center: Offset(cx, cy), radius: r);
+      final rainbowShift = gameTime * 0.5 + b.shimmerPhase;
       canvas.drawCircle(
         Offset(cx, cy),
         r,
         Paint()
-          ..color = b.animal.bubbleColor.withValues(alpha: 0.4)
+          ..shader = SweepGradient(
+            center: Alignment.center,
+            startAngle: rainbowShift,
+            endAngle: rainbowShift + pi * 2,
+            colors: [
+              b.animal.bubbleColor.withValues(alpha: 0.5),
+              Colors.white.withValues(alpha: 0.3),
+              b.animal.bubbleColor.withValues(alpha: 0.2),
+              Colors.white.withValues(alpha: 0.4),
+              b.animal.bubbleColor.withValues(alpha: 0.5),
+            ],
+          ).createShader(borderRect)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.5,
+          ..strokeWidth = 2.0,
       );
 
       // Shimmer highlight — moves with time
