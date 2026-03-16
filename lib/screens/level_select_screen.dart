@@ -240,9 +240,9 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                               style: TextStyle(fontSize: 20 * sf),
                             )
                           : Icon(
-                              Icons.lock_rounded,
+                              Icons.auto_awesome_rounded,
                               color:
-                                  AppColors.secondaryText.withValues(alpha: 0.4),
+                                  AppColors.secondaryText.withValues(alpha: 0.35),
                               size: 18 * sf,
                             ),
                     ),
@@ -309,8 +309,8 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                           else
                             Text(
                               previousZoneName != null
-                                  ? 'Master all tiers in $previousZoneName to unlock'
-                                  : 'Locked',
+                                  ? 'Coming soon! Finish $previousZoneName first'
+                                  : 'Coming soon!',
                               style: AppFonts.nunito(
                                 fontSize: 12 * sf,
                                 fontWeight: FontWeight.w500,
@@ -622,8 +622,8 @@ class _LevelCardState extends State<_LevelCard> {
                     )
                   else
                     Icon(
-                      Icons.lock_rounded,
-                      color: AppColors.secondaryText.withValues(alpha: 0.4),
+                      Icons.auto_awesome_rounded,
+                      color: AppColors.secondaryText.withValues(alpha: 0.3),
                       size: 18 * sf,
                     ),
                 ],
