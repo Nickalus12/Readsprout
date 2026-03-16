@@ -40,14 +40,14 @@ extension AntColonyAI on SimulationEngine {
 
     for (int cy = 0; cy < rows; cy++) {
       final chunkRowBase = cy * cols;
-      final yStart = (cy * 16).clamp(1, h - 1);
-      final yEnd = ((cy + 1) * 16).clamp(1, h - 1);
+      final yStart = (cy * 16).clamp(1, h - 2);
+      final yEnd = ((cy + 1) * 16).clamp(1, h - 2);
 
       for (int cx = 0; cx < cols; cx++) {
         if (dc[chunkRowBase + cx] == 0) continue;
 
-        final xStart = (cx * 16).clamp(1, w - 1);
-        final xEnd = ((cx + 1) * 16).clamp(1, w - 1);
+        final xStart = (cx * 16).clamp(1, w - 2);
+        final xEnd = ((cx + 1) * 16).clamp(1, w - 2);
 
         for (int y = yStart; y < yEnd; y++) {
           final row = y * w;
@@ -237,7 +237,7 @@ extension AntColonyAI on SimulationEngine {
       }
 
       // TNT or lightning nearby but not adjacent fire — just flee
-      if (flags[idx] & _antAlarmFlag == 0) {
+      if ((flags[idx] & _antAlarmFlag) == 0) {
         _fireAlarm(x, y);
       }
     }

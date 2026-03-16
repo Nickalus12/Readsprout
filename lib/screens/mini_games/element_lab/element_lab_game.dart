@@ -296,6 +296,8 @@ class _ElementLabGameState extends State<ElementLabGame>
         final oldImage = _frameImageNotifier.value;
         _frameImageNotifier.value = newImage;
         oldImage?.dispose();
+      }).catchError((e) {
+        _imageDecodeInFlight = false;
       });
     }
   }
