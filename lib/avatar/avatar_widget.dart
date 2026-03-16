@@ -228,6 +228,23 @@ class AvatarController extends ChangeNotifier {
     notifyListeners();
   }
 
+  // ── Animation clip playback (driven by widget's mixer) ──────────────
+  String? _pendingClip;
+
+  /// The name of a clip queued for playback (consumed by widget each frame).
+  String? consumePendingClip() {
+    final clip = _pendingClip;
+    _pendingClip = null;
+    return clip;
+  }
+
+  /// Trigger an authored animation clip by name (e.g. 'wave', 'celebrate').
+  /// The AvatarWidget picks this up on the next frame and plays it via the mixer.
+  void playAnimation(String clipName) {
+    _pendingClip = clipName;
+    notifyListeners();
+  }
+
   // ── Amplitude-based lip sync binding ─────────────────────────────────
 
   ValueNotifier<double>? _boundAmplitude;
@@ -414,6 +431,15 @@ class _AvatarWidgetState extends State<AvatarWidget>
         : (now - _lastTickTime).clamp(0.001, 0.05);
     _lastTickTime = now;
     _totalTime += dt;
+
+    // 0. Check for pending animation clip from controller
+    final pendingClip = widget.controller?.consumePendingClip();
+    if (pendingClip != null) {
+      final clip = AvatarAnimations.all[pendingClip];
+      if (clip != null) {
+        _mixer.play(clip);
+      }
+    }
 
     // 1. Advance the animation mixer (procedural idle + authored clips)
     final pose = _mixer.update(dt, _totalTime);
@@ -843,12 +869,13 @@ class _AvatarWidgetState extends State<AvatarWidget>
                   ),
                 ),
 
-              // Eyes
+              // Eyes — oversized for child proportions (kids have ~40% larger
+              // eye-to-face ratio than adults, key to cute/appealing look)
               Positioned(
-                left: headSize * 0.26,
-                top: headSize * (_faceTop + _faceHeightFraction * 0.28),
+                left: headSize * 0.24,
+                top: headSize * (_faceTop + _faceHeightFraction * 0.26),
                 child: CustomPaint(
-                  size: Size(headSize * 0.48, headSize * 0.16),
+                  size: Size(headSize * 0.52, headSize * 0.18),
                   isComplex: true,
                   willChange: widget.animateEffects,
                   painter: EyesPainter(
@@ -869,13 +896,13 @@ class _AvatarWidgetState extends State<AvatarWidget>
                 ),
               ),
 
-              // Eyelashes
+              // Eyelashes — matched to enlarged eye area
               if (config.eyelashStyle > 0)
                 Positioned(
-                  left: headSize * 0.26,
-                  top: headSize * (_faceTop + _faceHeightFraction * 0.22),
+                  left: headSize * 0.24,
+                  top: headSize * (_faceTop + _faceHeightFraction * 0.20),
                   child: CustomPaint(
-                    size: Size(headSize * 0.48, headSize * 0.20),
+                    size: Size(headSize * 0.52, headSize * 0.22),
                     painter: EyelashPainter(
                       style: config.eyelashStyle,
                       eyeStyle: config.eyeStyle,
@@ -883,14 +910,14 @@ class _AvatarWidgetState extends State<AvatarWidget>
                   ),
                 ),
 
-              // Eyebrows (expression-driven offset)
+              // Eyebrows — matched to enlarged eye area
               Positioned(
-                left: headSize * 0.26,
-                top: headSize * (_faceTop + _faceHeightFraction * 0.16),
+                left: headSize * 0.24,
+                top: headSize * (_faceTop + _faceHeightFraction * 0.14),
                 child: Transform.translate(
                   offset: Offset(0, browOffset),
                   child: CustomPaint(
-                    size: Size(headSize * 0.48, headSize * 0.10),
+                    size: Size(headSize * 0.52, headSize * 0.10),
                     painter: EyebrowPainter(
                       style: config.eyebrowStyle,
                       color: _hairColor,
