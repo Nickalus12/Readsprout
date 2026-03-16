@@ -255,9 +255,8 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
         _nextRound();
       });
     } else {
-      // Wrong
+      // Wrong - gentle feedback
       Haptics.wrong();
-      widget.audioService.playError();
       _shakeController.forward(from: 0.0);
       _streak = 0;
 
@@ -282,8 +281,7 @@ class _SightWordSafariGameState extends State<SightWordSafariGame>
     _answered = true;
     _streak = 0;
 
-    widget.audioService.playError();
-
+    // Just show the correct answer on timeout - no harsh sound
     setState(() {
       for (final a in _animals) {
         if (a.word == _targetWord) a.state = _CardState.correct;

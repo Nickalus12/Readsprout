@@ -386,7 +386,7 @@ class _LadybugGameState extends State<LadybugGame>
       _sim.ladybugScale = max(_minScale, _sim.ladybugScale - _shrinkAmount);
       _sim.spotsCount = (3 + (_sim.ladybugScale - 0.6) * 5).round().clamp(3, 12);
 
-      widget.audioService.playError();
+      // Gentle feedback - no harsh error sound for young children
       Haptics.wrong();
 
       leaf.isWrong = true;

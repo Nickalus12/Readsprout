@@ -212,9 +212,8 @@ class _SpellingBeeGameState extends State<SpellingBeeGame>
         _onWordComplete();
       }
     } else {
-      // Wrong
+      // Wrong - gentle feedback only
       Haptics.wrong();
-      widget.audioService.playError();
       _shakeController.forward(from: 0.0);
       setState(() {
         _mistakes++;

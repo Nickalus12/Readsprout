@@ -252,7 +252,6 @@ class _WordRocketGameState extends State<WordRocketGame>
       }
     } else {
       Haptics.wrong();
-      widget.audioService.playError();
       _sim.turbulence = 1.0;
       _turbulenceController.forward(from: 0.0);
       setState(() {

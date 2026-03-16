@@ -280,7 +280,7 @@ class _WordTrainGameState extends State<WordTrainGame>
       }
     } else if (_dragOffset.dy < -40) {
       Haptics.wrong();
-      widget.audioService.playError();
+      // Gentle feedback - no harsh error sound for young children
       setState(() => _streak = 0);
     }
 
