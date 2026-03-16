@@ -1829,20 +1829,20 @@ class EyesPainter extends CustomPainter {
 
     canvas.restore();
 
-    // 5. Limbal ring with gradient fade
+    // 5. Limbal ring — thicker and more defined for cartoon readability
     canvas.drawCircle(
       irisCenter,
       irisR,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = irisR * 0.10
+        ..strokeWidth = irisR * 0.13
         ..shader = RadialGradient(
           colors: [
             Colors.transparent,
-            (Color.lerp(eyeColor, const Color(0xFF0A0A1A), 0.55) ?? eyeColor)
-                .withValues(alpha: 0.65),
+            (Color.lerp(saturatedEye, const Color(0xFF0A0A1A), 0.60) ?? saturatedEye)
+                .withValues(alpha: 0.72),
           ],
-          stops: const [0.85, 1.0],
+          stops: const [0.82, 1.0],
         ).createShader(Rect.fromCircle(center: irisCenter, radius: irisR)),
     );
   }
@@ -1912,7 +1912,7 @@ class EyesPainter extends CustomPainter {
     );
   }
 
-  /// Subtle lower eyelid line for depth.
+  /// Subtle lower eyelid line for depth — warm tone for child look.
   void _drawLowerEyelid(Canvas canvas, Offset center, double r) {
     canvas.drawArc(
       Rect.fromCenter(
@@ -1925,10 +1925,10 @@ class EyesPainter extends CustomPainter {
       false,
       Paint()
         ..style = PaintingStyle.stroke
-        ..strokeWidth = r * 0.04
+        ..strokeWidth = r * 0.035
         ..strokeCap = StrokeCap.round
-        ..color = (Color.lerp(skinColor, const Color(0xFF8878A0), 0.18) ?? skinColor)
-            .withValues(alpha: 0.30),
+        ..color = (Color.lerp(skinColor, const Color(0xFF9080A0), 0.15) ?? skinColor)
+            .withValues(alpha: 0.25),
     );
   }
 
