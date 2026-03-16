@@ -138,7 +138,7 @@ class LetterTile extends StatelessWidget {
   }
 
   Color get _backgroundColor {
-    if (isError) return AppColors.error.withValues(alpha: 0.12);
+    if (isError) return AppColors.error.withValues(alpha: 0.08);
     if (isRevealed) {
       final color = revealedColor ?? AppColors.success;
       return color.withValues(alpha: 0.1);

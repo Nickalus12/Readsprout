@@ -245,7 +245,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // Shake animation for wrong input
     _shakeController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 400),
+      duration: const Duration(milliseconds: 300),
     );
     _shakeAnimation = Tween<double>(begin: 0, end: 1).animate(
       CurvedAnimation(parent: _shakeController, curve: Curves.elasticIn),

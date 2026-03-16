@@ -130,9 +130,9 @@ class GameLetterTiles extends StatelessWidget {
       builder: (context, child) {
         double offsetX = 0;
         if (shaking) {
-          // Gentle wobble: 2.5 oscillations, moderate amplitude, damped
+          // Soft wobble: 2 oscillations, small amplitude, quickly damped
           final t = shakeAnimation.value;
-          offsetX = sin(t * pi * 2.5) * 8 * (1.0 - t * 0.5);
+          offsetX = sin(t * pi * 2) * 5 * (1.0 - t * 0.7);
         }
         return Transform.translate(
           offset: Offset(offsetX, 0),
