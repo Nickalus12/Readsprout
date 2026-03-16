@@ -333,8 +333,10 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen>
           ),
 
           // Hearts
-          const Positioned.fill(
-            child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
+          const ExcludeSemantics(
+            child: Positioned.fill(
+              child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
+            ),
           ),
 
           // Content
