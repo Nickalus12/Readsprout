@@ -374,7 +374,12 @@ extension ElementBehaviors on SimulationEngine {
 
   void simFire(int x, int y, int idx) {
     life[idx]++;
-    if (life[idx] > 40 + rng.nextInt(40)) {
+
+    // Check if this fire is near oil — oil fires burn longer and hotter
+    final nearOil = checkAdjacent(x, y, El.oil);
+    final burnoutLife = nearOil ? 70 + rng.nextInt(50) : 40 + rng.nextInt(40);
+
+    if (life[idx] > burnoutLife) {
       grid[idx] = El.ash;
       life[idx] = 0;
       markProcessed(idx);
@@ -421,6 +426,21 @@ extension ElementBehaviors on SimulationEngine {
           markProcessed(ni);
           // Orange ignition flash
           queueReactionFlash(nx, ny, 255, 180, 50, 3);
+          // Oil fire spreads to nearby oil within 2-cell radius
+          for (int dy2 = -2; dy2 <= 2; dy2++) {
+            for (int dx2 = -2; dx2 <= 2; dx2++) {
+              if (dx2 == 0 && dy2 == 0) continue;
+              final ox = nx + dx2;
+              final oy = ny + dy2;
+              if (!inBounds(ox, oy)) continue;
+              final oi = oy * gridW + ox;
+              if (grid[oi] == El.oil && rng.nextInt(3) == 0) {
+                grid[oi] = El.fire;
+                life[oi] = 0;
+                markProcessed(oi);
+              }
+            }
+          }
         }
         if (neighbor == El.ice) {
           grid[ni] = El.water;
