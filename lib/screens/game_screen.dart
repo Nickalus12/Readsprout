@@ -564,6 +564,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     widget.audioService.playSuccess();
     _avatarController.setExpression(AvatarExpression.excited, duration: const Duration(seconds: 2));
 
+    // Record daily streak on every word completion (not just level/tier finish)
+    widget.streakService?.recordPractice();
+
     // Bump adaptive music intensity on correct answer
     widget.musicService?.onCorrectAnswer();
 
@@ -640,9 +643,6 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       widget.audioService.playLevelCompleteEffect();
       _avatarController.setExpression(AvatarExpression.excited, duration: const Duration(seconds: 4));
       _playZoneLevelComplete();
-
-      // Record daily streak
-      widget.streakService?.recordPractice();
 
       setState(() {
         _showingCelebration = false;
