@@ -817,7 +817,26 @@ class PixelRenderer {
         final lavaFlicker = (lFlick1 < 3 ? 18 : 0) + (lFlick2 < 4 ? 12 : 0) + (lFlick3 < 8 ? 8 : 0);
         final isBrightSpot = (idx * 17 + frameCount) % 30 == 0;
         final isSuperBright = (idx * 31 + frameCount * 2) % 80 == 0;
-        if ((isBrightSpot || isSuperBright) && lavaLife < 150) {
+        // Surface crust: exposed lava that's aging develops dark crust with bright cracks
+        final isLavaSurface = y > 0 && grid[(y - 1) * w + x] != El.lava;
+        final showCrust = isLavaSurface && lavaLife > 80;
+        if (showCrust) {
+          // Dark basalt crust with glowing crack lines
+          final crustAge = ((lavaLife - 80) / 120.0).clamp(0.0, 1.0);
+          final isCrack = (x * 13 + y * 7 + idx * 3) % 7 == 0;
+          if (isCrack) {
+            // Bright molten crack showing through dark crust
+            _inlineR = 255;
+            _inlineG = (160 - crustAge * 80 + lavaFlicker ~/ 2).round().clamp(50, 200);
+            _inlineB = (40 + lavaFlicker ~/ 3).clamp(0, 80);
+          } else {
+            // Dark cooling crust
+            _inlineR = (100 - crustAge * 50 + lavaFlicker ~/ 4).round().clamp(40, 120);
+            _inlineG = (30 - crustAge * 15).round().clamp(10, 40);
+            _inlineB = (10 - crustAge * 5).round().clamp(5, 15);
+          }
+          _inlineA = 255;
+        } else if ((isBrightSpot || isSuperBright) && lavaLife < 150) {
           final spotB = isSuperBright ? 220 : 180;
           _inlineR = 255; _inlineG = 255; _inlineB = spotB; _inlineA = 255;
         } else if (lavaLife < 40) {
