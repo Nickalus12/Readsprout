@@ -55,6 +55,8 @@ class PlayerSettingsService {
   static const _setupCompleteKey = 'setup_complete';
   static const _profilesKey = 'player_profiles';
   static const _activeProfileKey = 'active_profile_id';
+  static const _lastPlayedLevelKey = 'last_played_level';
+  static const _lastPlayedTierKey = 'last_played_tier';
 
   late SharedPreferences _prefs;
 
@@ -62,6 +64,8 @@ class PlayerSettingsService {
   bool _setupComplete = false;
   List<PlayerEntry> _profiles = [];
   String? _activeProfileId;
+  int? _lastPlayedLevel;
+  int? _lastPlayedTier;
 
   /// The active player's display name.
   String get playerName => _playerName;
@@ -90,6 +94,24 @@ class PlayerSettingsService {
 
   /// Whether there are multiple profiles.
   bool get hasMultipleProfiles => _profiles.length > 1;
+
+  /// The last level the player was playing (null if never played).
+  int? get lastPlayedLevel => _lastPlayedLevel;
+
+  /// The last tier the player was playing (null if never played).
+  int? get lastPlayedTier => _lastPlayedTier;
+
+  /// Whether the player has a last-played session to continue.
+  bool get hasContinue => _lastPlayedLevel != null;
+
+  /// Record the level and tier the player is currently playing.
+  Future<void> setLastPlayed(int level, int tier) async {
+    _lastPlayedLevel = level;
+    _lastPlayedTier = tier;
+    final profileKey = _activeProfileId ?? '';
+    await _prefs.setInt('${_lastPlayedLevelKey}_$profileKey', level);
+    await _prefs.setInt('${_lastPlayedTierKey}_$profileKey', tier);
+  }
 
   Future<void> init([SharedPreferences? prefs]) async {
     _prefs = prefs ?? await SharedPreferences.getInstance();
@@ -120,6 +142,17 @@ class PlayerSettingsService {
       _activeProfileId = entry.id;
       await _saveProfiles();
     }
+
+    // Load last-played level/tier for active profile
+    _loadLastPlayed();
+  }
+
+  void _loadLastPlayed() {
+    final profileKey = _activeProfileId ?? '';
+    final level = _prefs.getInt('${_lastPlayedLevelKey}_$profileKey');
+    final tier = _prefs.getInt('${_lastPlayedTierKey}_$profileKey');
+    _lastPlayedLevel = level;
+    _lastPlayedTier = tier;
   }
 
   Future<void> _saveProfiles() async {
@@ -150,6 +183,7 @@ class PlayerSettingsService {
     if (profile != null) {
       _playerName = profile.name;
       _setupComplete = true;
+      _loadLastPlayed();
       await _prefs.setString(_nameKey, _playerName);
       await _prefs.setBool(_setupCompleteKey, true);
     }
