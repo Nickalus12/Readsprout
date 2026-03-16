@@ -173,7 +173,8 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                     Text(
                       "We'll cheer you on by name!",
                       style: AppFonts.nunito(
-                        fontSize: 16 * sf,
+                        fontSize: 17 * sf,
+                        fontWeight: FontWeight.w500,
                         color:
                             AppColors.secondaryText.withValues(alpha: 0.7),
                       ),
