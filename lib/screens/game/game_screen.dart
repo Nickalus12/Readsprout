@@ -427,20 +427,16 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     Haptics.wrong();
 
     // ── Progressive hints (all tiers) ────────────────────────────
-    // 1st wrong tap → avatar shows "thinking"
-    // 2nd wrong tap → highlight correct next letter with subtle glow
-    // 3rd wrong tap → briefly reveal the answer letter with bounce, then hide
+    // 1st wrong tap → avatar shows "thinking" + highlight correct key
+    // 2nd+ wrong tap → briefly reveal the answer letter with bounce
 
     if (_totalWrongTapsThisWord == 1) {
-      // 1st wrong: avatar thinks
-      _avatarController.setExpression(AvatarExpression.thinking, duration: const Duration(seconds: 1));
-    } else if (_totalWrongTapsThisWord == 2) {
-      // 2nd wrong: avatar still thinking + highlight correct key on keyboard
+      // 1st wrong: avatar thinks + highlight correct key on keyboard
       _avatarController.setExpression(AvatarExpression.thinking, duration: const Duration(seconds: 2));
       setState(() => _nudgeKey = expected);
       _nudgeController.forward(from: 0);
-    } else if (_totalWrongTapsThisWord >= 3) {
-      // 3rd+ wrong: briefly reveal the correct letter tile, then hide
+    } else if (_totalWrongTapsThisWord >= 2) {
+      // 2nd+ wrong: briefly reveal the correct letter tile, then hide
       _avatarController.setExpression(AvatarExpression.surprised, duration: const Duration(milliseconds: 1500));
       setState(() {
         _hintRevealing = true;
@@ -448,7 +444,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       });
       _nudgeController.forward(from: 0);
       // Auto-hide the hint after a brief moment
-      Future.delayed(const Duration(milliseconds: 1200), () {
+      Future.delayed(const Duration(milliseconds: 1500), () {
         if (mounted) {
           setState(() => _hintRevealing = false);
         }
