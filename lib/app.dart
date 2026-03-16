@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_animate/flutter_animate.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
@@ -333,16 +334,37 @@ class _SplashScreen extends StatelessWidget {
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 16),
-                const SizedBox(
-                  width: 32,
-                  height: 32,
-                  child: CircularProgressIndicator(
-                    strokeWidth: 3,
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      AppColors.electricBlue,
-                    ),
-                  ),
+                const SizedBox(height: 20),
+                // Bouncing dots loader
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: List.generate(3, (i) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 4),
+                      child: Container(
+                        width: 10,
+                        height: 10,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.electricBlue,
+                        ),
+                      )
+                          .animate(
+                            onPlay: (c) => c.repeat(reverse: true),
+                            delay: Duration(milliseconds: i * 150),
+                          )
+                          .scaleXY(
+                            begin: 0.6,
+                            end: 1.0,
+                            duration: 400.ms,
+                            curve: Curves.easeInOut,
+                          )
+                          .fadeIn(
+                            begin: 0.4,
+                            duration: 400.ms,
+                          ),
+                    );
+                  }),
                 ),
               ],
             ),
