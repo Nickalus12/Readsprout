@@ -129,6 +129,8 @@ class _HomeScreenState extends State<HomeScreen>
     if (settings == null || !settings.hasContinue) return;
     final level = settings.lastPlayedLevel!;
     final tier = settings.lastPlayedTier ?? 1;
+    // Validate level is in valid range
+    if (level < 1 || level > DolchWords.totalLevels) return;
 
     // Record this as last-played again (in case tier suggestion changed)
     settings.setLastPlayed(level, tier);
