@@ -127,11 +127,6 @@ class _LetterDropSim extends ChangeNotifier {
     required this.slots,
     required this.particles,
     required this.trails,
-    this.currentWord = '',
-    this.slotShelfY = 0,
-    this.scale = 50.0,
-    this.areaWidth = 0,
-    this.areaHeight = 0,
     this.themeColors = const [Color(0xFF00D4FF), Color(0xFF06D6A0)],
     this.hintsEnabled = true,
   });
@@ -1492,13 +1487,12 @@ class _LetterDropPainter extends CustomPainter {
         borderAlpha = 0.9;
         shadowAlpha = 0.6;
       } else {
-        const isDragging = false; // drag state not easily trackable in painter
         color = lb.isBouncing && sim.hintsEnabled
             ? AppColors.error
             : lb.isDropping
                 ? themeColors[0]
                 : themeColors[1];
-        borderWidth = isDragging ? 3 : 2;
+        borderWidth = 2;
         glowRadius = lb.isDropping ? 16 : 8;
         fillAlpha = 0.35;
         borderAlpha = 0.7;
