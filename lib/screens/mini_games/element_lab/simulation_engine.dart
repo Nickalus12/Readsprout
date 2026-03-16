@@ -83,6 +83,10 @@ class SimulationEngine {
   // -- Recent explosion locations (consumed by renderer for particles) ------
   final List<Explosion> recentExplosions = [];
 
+  // -- Reaction flash queue (consumed by renderer for micro-particles) ------
+  // Each entry: [x, y, r, g, b, count]
+  final List<Int32List> reactionFlashes = [];
+
   // -- Rainbow color cycling -------------------------------------------------
   int rainbowHue = 0;
 
@@ -164,6 +168,14 @@ class SimulationEngine {
     colonyX = -1;
     colonyY = -1;
     markAllDirty();
+  }
+
+  /// Queue a reaction flash for the renderer to spawn particles.
+  @pragma('vm:prefer-inline')
+  void queueReactionFlash(int x, int y, int r, int g, int b, int count) {
+    if (reactionFlashes.length < 20) {
+      reactionFlashes.add(Int32List.fromList([x, y, r, g, b, count]));
+    }
   }
 
   // ── Core helpers ─────────────────────────────────────────────────────────

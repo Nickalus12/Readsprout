@@ -13,6 +13,8 @@ extension ElementBehaviors on SimulationEngine {
       grid[idx] = El.glass;
       life[idx] = 0;
       markProcessed(idx);
+      // Bright flash for glass formation
+      queueReactionFlash(x, y, 200, 230, 255, 4);
       return;
     }
     if (checkAdjacent(x, y, El.water)) {
@@ -389,6 +391,8 @@ extension ElementBehaviors on SimulationEngine {
           grid[ni] = El.fire;
           life[ni] = 0;
           markProcessed(ni);
+          // Orange ignition flash
+          queueReactionFlash(nx, ny, 255, 180, 50, 3);
         }
         if (neighbor == El.ice) {
           grid[ni] = El.water;
@@ -873,6 +877,8 @@ extension ElementBehaviors on SimulationEngine {
           grid[ni] = El.steam;
           life[ni] = 0;
           markProcessed(ni);
+          // Steam burst particles for dramatic lava+water reaction
+          queueReactionFlash(x, y, 220, 220, 255, 6);
           final extraSteam = 2 + rng.nextInt(2);
           for (int s = 0; s < extraSteam; s++) {
             final sx = x + rng.nextInt(5) - 2;

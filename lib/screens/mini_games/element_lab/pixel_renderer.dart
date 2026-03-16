@@ -87,6 +87,19 @@ class PixelRenderer {
       p[4] = (p[4] * 220) ~/ 256;
     }
 
+    // Spawn reaction flash particles
+    for (final rf in engine.reactionFlashes) {
+      final rx = rf[0], ry = rf[1];
+      final rr = rf[2], rg = rf[3], rb = rf[4];
+      final count = rf[5];
+      for (int i = 0; i < count; i++) {
+        final dx = engine.rng.nextInt(5) - 2;
+        final dy = -(1 + engine.rng.nextInt(3));
+        spawnParticle(rx + dx, ry + dy, rr, rg, rb, 4 + engine.rng.nextInt(3));
+      }
+    }
+    engine.reactionFlashes.clear();
+
     // Spawn explosion micro-particles from recent explosions
     for (final exp in engine.recentExplosions) {
       final count = (exp.radius * 3).clamp(6, 30);
