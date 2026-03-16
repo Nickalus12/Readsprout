@@ -80,6 +80,10 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
   int _animalsInWave = 0;
   static const _waveSize = 8;
 
+  // New animal banner
+  String _newAnimalBanner = '';
+  double _newAnimalBannerTimer = 0;
+
   // Animals available in current wave
   List<_AnimalData> _availableAnimals = [];
 
@@ -178,6 +182,11 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
       }
       _ringBursts.removeWhere((r) => r.age > 0.5);
 
+      // Update new animal banner
+      if (_newAnimalBannerTimer > 0) {
+        _newAnimalBannerTimer -= dt;
+      }
+
       // Update background
       _updateBackgroundBubbles(dt);
     });
@@ -186,19 +195,23 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
   void _spawnBubble() {
     // Wave progression: add new animal every _waveSize pops
     if (_waveIndex < _animals.length - 2) {
-      // Check if wave is complete
       if (_animalsInWave >= _waveSize) {
         _waveIndex++;
         _animalsInWave = 0;
         if (_waveIndex + 2 <= _animals.length) {
           _availableAnimals = _animals.sublist(0, _waveIndex + 2);
+          // Show "New Animal!" banner
+          final newAnimal = _animals[_waveIndex + 1];
+          _newAnimalBanner = '${newAnimal.emoji} New: ${newAnimal.word}!';
+          _newAnimalBannerTimer = 2.0;
         }
       }
     }
 
     final animal = _availableAnimals[_rng.nextInt(_availableAnimals.length)];
-    final radius = 38.0 + _rng.nextDouble() * 16.0;
-    final speed = 0.06 + _rng.nextDouble() * 0.04;
+    // Big bubbles for small hands!
+    final radius = 44.0 + _rng.nextDouble() * 18.0;
+    final speed = 0.05 + _rng.nextDouble() * 0.035;
 
     // Find non-overlapping x position
     double x = 0.15 + _rng.nextDouble() * 0.7;
@@ -291,7 +304,8 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
       final dx = tapX - b.x;
       final dy = tapY - b.y;
       final dist = sqrt(dx * dx + dy * dy);
-      final hitRadius = (b.radius * b.scale) / min(size.width, size.height) * 1.4;
+      // Extra generous hit radius — little fingers need big targets!
+      final hitRadius = (b.radius * b.scale) / min(size.width, size.height) * 1.8;
 
       if (dist < hitRadius && dist < bestDist) {
         bestDist = dist;
@@ -490,6 +504,45 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
                       '${_combo}x COMBO!',
                       style: AppFonts.fredoka(
                         fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          // New animal banner
+          if (_newAnimalBannerTimer > 0 && !_gameOver)
+            Positioned(
+              bottom: 80,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Opacity(
+                  opacity: (_newAnimalBannerTimer / 0.5).clamp(0.0, 1.0),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          AppColors.emerald.withValues(alpha: 0.8),
+                          AppColors.cyan.withValues(alpha: 0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(20),
+                      boxShadow: [
+                        BoxShadow(
+                          color: AppColors.emerald.withValues(alpha: 0.4),
+                          blurRadius: 16,
+                        ),
+                      ],
+                    ),
+                    child: Text(
+                      _newAnimalBanner,
+                      style: AppFonts.fredoka(
+                        fontSize: 20,
                         fontWeight: FontWeight.bold,
                         color: Colors.white,
                       ),
@@ -785,6 +838,8 @@ class _BubblePopZooGameState extends State<BubblePopZooGame>
       _animalsInWave = 0;
       _availableAnimals = [_animals[0], _animals[1]];
       _nextBubbleId = 0;
+      _newAnimalBanner = '';
+      _newAnimalBannerTimer = 0;
     });
     _ticker.reset();
     _lastTime = 0;
