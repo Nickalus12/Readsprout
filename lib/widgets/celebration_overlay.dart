@@ -111,7 +111,10 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
   Widget build(BuildContext context) {
     final showStreakBadge = widget.inLevelStreak >= 3;
 
-    return Container(
+    return Semantics(
+      label: '$_praise Word: ${widget.word}',
+      liveRegion: true,
+      child: Container(
       color: const Color(0xFF0A0A1A).withValues(alpha: 0.88),
       child: Center(
         child: Column(
@@ -325,7 +328,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
           ],
         ),
       ),
-    )
+    ))
         .animate()
         .fadeIn(duration: 200.ms);
   }

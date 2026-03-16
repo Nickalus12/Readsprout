@@ -933,32 +933,36 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                   ),
 
                 // ── Standard confetti ─────────────────────
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: ConfettiWidget(
-                    confettiController: _confettiController,
-                    blastDirection: pi / 2,
-                    maxBlastForce: _isAdventurer ? 7 : 5,
-                    minBlastForce: 2,
-                    emissionFrequency: _isAdventurer ? 0.2 : 0.3,
-                    numberOfParticles: _isChampion ? 15 : (_isAdventurer ? 12 : 8),
-                    gravity: 0.3,
-                    colors: AppColors.confettiColors,
+                ExcludeSemantics(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConfettiWidget(
+                      confettiController: _confettiController,
+                      blastDirection: pi / 2,
+                      maxBlastForce: _isAdventurer ? 7 : 5,
+                      minBlastForce: 2,
+                      emissionFrequency: _isAdventurer ? 0.2 : 0.3,
+                      numberOfParticles: _isChampion ? 15 : (_isAdventurer ? 12 : 8),
+                      gravity: 0.3,
+                      colors: AppColors.confettiColors,
+                    ),
                   ),
                 ),
 
                 // ── Level complete confetti ───────────────
-                Align(
-                  alignment: Alignment.topCenter,
-                  child: ConfettiWidget(
-                    confettiController: _levelConfettiController,
-                    blastDirectionality: BlastDirectionality.explosive,
-                    maxBlastForce: _isChampion ? 20 : 15,
-                    minBlastForce: 5,
-                    emissionFrequency: _isChampion ? 0.05 : 0.1,
-                    numberOfParticles: _isChampion ? 35 : 20,
-                    gravity: 0.2,
-                    colors: AppColors.confettiColors,
+                ExcludeSemantics(
+                  child: Align(
+                    alignment: Alignment.topCenter,
+                    child: ConfettiWidget(
+                      confettiController: _levelConfettiController,
+                      blastDirectionality: BlastDirectionality.explosive,
+                      maxBlastForce: _isChampion ? 20 : 15,
+                      minBlastForce: 5,
+                      emissionFrequency: _isChampion ? 0.05 : 0.1,
+                      numberOfParticles: _isChampion ? 35 : 20,
+                      gravity: 0.2,
+                      colors: AppColors.confettiColors,
+                    ),
                   ),
                 ),
 
