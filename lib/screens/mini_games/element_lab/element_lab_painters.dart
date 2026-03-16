@@ -46,11 +46,19 @@ class GridPainter extends CustomPainter {
     canvas.drawImageRect(image!, src, dst, paint);
 
     if (lightningFlash) {
+      // Bright flash overlay for lightning strikes
       canvas.drawRect(
         dst,
         Paint()
-          ..color = const Color(0x18FFFFFF)
+          ..color = const Color(0x30FFFFCC)
           ..blendMode = BlendMode.screen,
+      );
+      // Subtle secondary bloom with blue-white tint
+      canvas.drawRect(
+        dst,
+        Paint()
+          ..color = const Color(0x10CCDDFF)
+          ..blendMode = BlendMode.plus,
       );
     }
   }

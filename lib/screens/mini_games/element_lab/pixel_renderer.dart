@@ -96,7 +96,7 @@ class PixelRenderer {
         final px = exp.x + (dist * math.cos(angle)).round();
         final py = exp.y + (dist * math.sin(angle)).round();
         // Hot debris particles: orange-white
-        final pr = 255;
+        const pr = 255;
         final pg = 150 + engine.rng.nextInt(105);
         final pb = engine.rng.nextInt(100);
         spawnParticle(px, py, pr, pg, pb, 5 + engine.rng.nextInt(6));
@@ -123,14 +123,14 @@ class PixelRenderer {
     final baseBgG = (12 - t * 6).round().clamp(0, 255);
     final baseBgB = (28 - t * 10).round().clamp(0, 255);
 
-    final glowMul = 1.0 + t * 1.5;
-    final glow1R = (14 * glowMul).round();
-    final glow1G = (5 * glowMul).round();
-    final glow2R = (7 * glowMul).round();
-    final glow2G = (2 * glowMul).round();
-    final lGlow1 = (25 * glowMul).round();
-    final lGlow2 = (14 * glowMul).round();
-    final lGlow3 = (6 * glowMul).round();
+    final glowMul = 1.0 + t * 2.0;
+    final glow1R = (18 * glowMul).round();
+    final glow1G = (7 * glowMul).round();
+    final glow2R = (10 * glowMul).round();
+    final glow2G = (3 * glowMul).round();
+    final lGlow1 = (30 * glowMul).round();
+    final lGlow2 = (18 * glowMul).round();
+    final lGlow3 = (8 * glowMul).round();
 
     // Use cached star set (Fix 3) instead of rebuilding every frame
     final starSet = t > 0.05 ? _starSet : const <int>{};
@@ -194,10 +194,11 @@ class PixelRenderer {
           }
         } else {
           final isFire = el == El.fire;
-          for (int dy = -2; dy <= 2; dy++) {
+          final glowRadius = el == El.lava ? 3 : 2;
+          for (int dy = -glowRadius; dy <= glowRadius; dy++) {
             final ny = ey + dy;
             if (ny < 0 || ny >= h) continue;
-            for (int dx = -2; dx <= 2; dx++) {
+            for (int dx = -glowRadius; dx <= glowRadius; dx++) {
               final nx = ex + dx;
               if (nx < 0 || nx >= w) continue;
               final dist = dx.abs() + dy.abs();
@@ -206,10 +207,20 @@ class PixelRenderer {
               if (g[ni] != El.empty) continue;
               if (dist <= 1) {
                 glowR8[ni] = (glowR8[ni] + glow1R).clamp(0, 255);
-                if (isFire) glowG8[ni] = (glowG8[ni] + glow1G).clamp(0, 255);
-              } else {
+                if (isFire) {
+                  glowG8[ni] = (glowG8[ni] + glow1G).clamp(0, 255);
+                } else {
+                  // Lava: warmer orange glow
+                  glowG8[ni] = (glowG8[ni] + glow1G ~/ 2).clamp(0, 255);
+                }
+              } else if (dist <= 2) {
                 glowR8[ni] = (glowR8[ni] + glow2R).clamp(0, 255);
-                if (isFire) glowG8[ni] = (glowG8[ni] + glow2G).clamp(0, 255);
+                if (isFire) {
+                  glowG8[ni] = (glowG8[ni] + glow2G).clamp(0, 255);
+                }
+              } else {
+                // Outer lava glow (radius 3 only)
+                glowR8[ni] = (glowR8[ni] + glow2R ~/ 2).clamp(0, 255);
               }
             }
           }
@@ -310,7 +321,7 @@ class PixelRenderer {
               if (el == El.fire) {
                 if (rng.nextInt(120) < 2 && y > 1) {
                   // Brighter, more varied fire sparks
-                  final sparkR = 255;
+                  const sparkR = 255;
                   final sparkG = 180 + rng.nextInt(75);
                   final sparkB = rng.nextInt(120);
                   spawnParticle(x + rng.nextInt(3) - 1, y - 1, sparkR, sparkG, sparkB, 4 + rng.nextInt(4));
