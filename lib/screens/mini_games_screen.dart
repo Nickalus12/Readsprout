@@ -30,6 +30,7 @@ import 'mini_games/element_lab/element_lab_game.dart';
 import 'mini_games/element_lab/element_lab_painters.dart';
 import 'mini_games/color_mix_lab_game.dart';
 import 'mini_games/sound_garden_game.dart';
+import 'mini_games/bubble_pop_zoo_game.dart';
 import '../services/adaptive_difficulty_service.dart';
 
 class MiniGamesScreen extends StatefulWidget {
@@ -313,6 +314,15 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
                                 playerName: widget.playerName,
                               ),
                             ),
+                            _buildGameBtn(
+                              context, 'Bubble Pop Zoo',
+                              const BubblePopZooIconPainter(), AppColors.cyan, 16,
+                              BubblePopZooGame(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                playerName: widget.playerName,
+                              ),
+                            ),
                           ],
                         ),
 
@@ -333,7 +343,7 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
                           children: [
                             _buildPremiumGameCard(
                               context, 'Element Lab',
-                              const BeakerIconPainter(), AppColors.emerald, 16,
+                              const BeakerIconPainter(), AppColors.emerald, 17,
                               kElementLabCost,
                               (freePlay) => ElementLabGame(
                                 progressService: widget.progressService,
@@ -344,7 +354,7 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
                             ),
                             _buildPremiumGameCard(
                               context, 'Color Mix Lab',
-                              const ColorMixLabIconPainter(), AppColors.magenta, 17,
+                              const ColorMixLabIconPainter(), AppColors.magenta, 18,
                               kColorMixLabCost,
                               (freePlay) => ColorMixLabGame(
                                 progressService: widget.progressService,
@@ -355,7 +365,7 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
                             ),
                             _buildPremiumGameCard(
                               context, 'Sound Garden',
-                              const SoundGardenIconPainter(), AppColors.emerald, 18,
+                              const SoundGardenIconPainter(), AppColors.emerald, 19,
                               kSoundGardenCost,
                               (freePlay) => SoundGardenGame(
                                 progressService: widget.progressService,
@@ -703,8 +713,8 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
     'memory_match', 'falling_letters', 'cat_letter_toss',
     'letter_drop', 'rhyme_time', 'star_catcher', 'paint_splash',
     'word_rocket', 'sight_word_safari', 'word_ninja',
-    'spelling_bee', 'word_train', 'ladybug_letters', 'element_lab',
-    'color_mix_lab', 'sound_garden',
+    'spelling_bee', 'word_train', 'ladybug_letters', 'bubble_pop_zoo',
+    'element_lab', 'color_mix_lab', 'sound_garden',
   ];
 
   Widget _buildGameBtn(BuildContext context, String label,
