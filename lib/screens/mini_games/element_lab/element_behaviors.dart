@@ -902,6 +902,7 @@ extension ElementBehaviors on SimulationEngine {
 
   void simLava(int x, int y, int idx) {
     life[idx]++;
+    final g = gravityDir;
 
     if (life[idx] > 200 + rng.nextInt(50)) {
       grid[idx] = El.stone;
@@ -910,6 +911,128 @@ extension ElementBehaviors on SimulationEngine {
       return;
     }
 
+    // --- Volcanic gas emission ---
+    // Lava exposed to air above emits smoke/steam upward
+    final uy = y - g;
+    if (inBounds(x, uy) && grid[uy * gridW + x] == El.empty) {
+      if (rng.nextInt(80) == 0) {
+        // Volcanic smoke plume
+        grid[uy * gridW + x] = El.smoke;
+        life[uy * gridW + x] = 0;
+        markProcessed(uy * gridW + x);
+      } else if (rng.nextInt(120) == 0) {
+        // Occasional steam vent
+        grid[uy * gridW + x] = El.steam;
+        life[uy * gridW + x] = 0;
+        markProcessed(uy * gridW + x);
+      }
+    }
+
+    // --- Eruption pressure: lava trapped under stone builds pressure ---
+    // Count stone cells directly above this lava (cap check)
+    if (rng.nextInt(60) == 0) {
+      int capDepth = 0;
+      for (int cy = y - g; inBounds(x, cy) && capDepth < 6; cy -= g) {
+        if (grid[cy * gridW + x] == El.stone) {
+          capDepth++;
+        } else {
+          break;
+        }
+      }
+      // Count lava below (magma chamber pressure)
+      int lavaBelow = 0;
+      for (int cy = y + g; inBounds(x, cy) && lavaBelow < 8; cy += g) {
+        if (grid[cy * gridW + x] == El.lava) {
+          lavaBelow++;
+        } else {
+          break;
+        }
+      }
+      // Eruption: if capped by stone and significant lava pressure, blast through
+      if (capDepth >= 2 && lavaBelow >= 3 && rng.nextInt(20) == 0) {
+        // Blast a hole in the cap — turn topmost stone to lava
+        final blastY = y - g * capDepth;
+        if (inBounds(x, blastY)) {
+          final blastIdx = blastY * gridW + x;
+          grid[blastIdx] = El.lava;
+          life[blastIdx] = 0;
+          markProcessed(blastIdx);
+          // Eruption flash
+          queueReactionFlash(x, blastY, 255, 200, 50, 8);
+        }
+        // Blast neighbors too for wider eruption
+        for (final dx in [-1, 1]) {
+          final bx = x + dx;
+          final by2 = y - g * (capDepth - 1);
+          if (inBounds(bx, by2) && grid[by2 * gridW + bx] == El.stone && rng.nextBool()) {
+            grid[by2 * gridW + bx] = El.fire;
+            life[by2 * gridW + bx] = 0;
+            markProcessed(by2 * gridW + bx);
+          }
+        }
+      }
+    }
+
+    // --- Lava spatter: surface lava ejects molten droplets upward ---
+    if (rng.nextInt(100) == 0 && inBounds(x, uy) && grid[uy * gridW + x] == El.empty) {
+      // Count lava neighbors to determine if this is a pool surface
+      int lavaNeighbors = 0;
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          if (dx == 0 && dy == 0) continue;
+          final nx = x + dx;
+          final ny = y + dy;
+          if (inBounds(nx, ny) && grid[ny * gridW + nx] == El.lava) {
+            lavaNeighbors++;
+          }
+        }
+      }
+      if (lavaNeighbors >= 3) {
+        // Spatter: eject a lava droplet upward
+        final spatterH = 2 + rng.nextInt(4);
+        final spatterDx = rng.nextInt(3) - 1;
+        for (int d = 1; d <= spatterH; d++) {
+          final sy = y - g * d;
+          final sx = x + spatterDx * (d > 2 ? 1 : 0);
+          if (inBounds(sx, sy) && grid[sy * gridW + sx] == El.empty) {
+            if (d <= 2) {
+              grid[sy * gridW + sx] = El.lava;
+              life[sy * gridW + sx] = 150; // already partially cooled
+              markProcessed(sy * gridW + sx);
+            } else {
+              grid[sy * gridW + sx] = El.fire;
+              life[sy * gridW + sx] = 0;
+              markProcessed(sy * gridW + sx);
+            }
+          } else {
+            break;
+          }
+        }
+        // Spatter particles
+        queueReactionFlash(x, uy, 255, 180, 30, 5);
+      }
+    }
+
+    // --- Heat stone: stone adjacent to lava gets heated (visual only via life) ---
+    if (frameCount % 8 == 0) {
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          if (dx == 0 && dy == 0) continue;
+          final nx = x + dx;
+          final ny = y + dy;
+          if (!inBounds(nx, ny)) continue;
+          final ni = ny * gridW + nx;
+          if (grid[ni] == El.stone) {
+            // Heat the stone — renderer will show warm glow
+            // Use velX to store heat level (0-5) since stone doesn't use velX
+            final heat = velX[ni].clamp(0, 5);
+            if (heat < 5) velX[ni] = (heat + 1);
+          }
+        }
+      }
+    }
+
+    // --- Element interactions ---
     for (int dy = -1; dy <= 1; dy++) {
       for (int dx = -1; dx <= 1; dx++) {
         if (dx == 0 && dy == 0) continue;
@@ -931,11 +1054,11 @@ extension ElementBehaviors on SimulationEngine {
           final extraSteam = 3 + rng.nextInt(3);
           for (int s = 0; s < extraSteam; s++) {
             final sx = x + rng.nextInt(7) - 3;
-            final sy = y - gravityDir * (1 + rng.nextInt(3));
-            if (inBounds(sx, sy) && grid[sy * gridW + sx] == El.empty) {
-              grid[sy * gridW + sx] = El.steam;
-              life[sy * gridW + sx] = 0;
-              markProcessed(sy * gridW + sx);
+            final sy2 = y - g * (1 + rng.nextInt(3));
+            if (inBounds(sx, sy2) && grid[sy2 * gridW + sx] == El.empty) {
+              grid[sy2 * gridW + sx] = El.steam;
+              life[sy2 * gridW + sx] = 0;
+              markProcessed(sy2 * gridW + sx);
             }
           }
           return;
@@ -1088,7 +1211,7 @@ extension ElementBehaviors on SimulationEngine {
     // Lava is very viscous — moves every 3rd frame (slower than water)
     if (frameCount % 3 != 0) return;
 
-    final by = y + gravityDir;
+    final by = y + g;
     if (inBounds(x, by) && grid[by * gridW + x] == El.empty) {
       swap(idx, by * gridW + x);
       return;
