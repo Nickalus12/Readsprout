@@ -105,9 +105,11 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
           ),
 
           // ── Floating hearts physics layer ────────────────────
-          const Positioned.fill(
-            child: FloatingHeartsBackground(
-              cloudZoneHeight: 0.18,
+          const ExcludeSemantics(
+            child: Positioned.fill(
+              child: FloatingHeartsBackground(
+                cloudZoneHeight: 0.18,
+              ),
             ),
           ),
 
@@ -173,7 +175,8 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                     Text(
                       "We'll cheer you on by name!",
                       style: AppFonts.nunito(
-                        fontSize: 16 * sf,
+                        fontSize: 17 * sf,
+                        fontWeight: FontWeight.w500,
                         color:
                             AppColors.secondaryText.withValues(alpha: 0.7),
                       ),
@@ -247,11 +250,16 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                     SizedBox(height: 24 * sf),
 
                     // Let's Go button
-                    AnimatedOpacity(
-                      opacity: _hasText ? 1.0 : 0.4,
-                      duration: const Duration(milliseconds: 200),
-                      child: GestureDetector(
-                        onTap: _hasText ? _submit : null,
+                    Semantics(
+                      label: "Let's Go",
+                      hint: 'Start playing Reading Sprout',
+                      button: true,
+                      enabled: _hasText,
+                      child: AnimatedOpacity(
+                        opacity: _hasText ? 1.0 : 0.4,
+                        duration: const Duration(milliseconds: 200),
+                        child: GestureDetector(
+                          onTap: _hasText ? _submit : null,
                         child: Container(
                           width: 200 * sf,
                           height: 56 * sf,
@@ -285,7 +293,7 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                           ),
                         ),
                       ),
-                    ).animate().fadeIn(delay: 700.ms, duration: 500.ms),
+                    )).animate().fadeIn(delay: 700.ms, duration: 500.ms),
 
                     // Back button (only when changing name, not first launch)
                     if (widget.onBack != null) ...[

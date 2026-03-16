@@ -24,23 +24,33 @@ class HighScoreDisplay extends StatelessWidget {
     if (scores.isEmpty) return const SizedBox.shrink();
 
     return Container(
-      constraints: const BoxConstraints(maxHeight: 200, maxWidth: 300),
-      padding: const EdgeInsets.all(12),
+      constraints: const BoxConstraints(maxHeight: 220, maxWidth: 320),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppColors.surface,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(
           color: isNewHighScore
               ? AppColors.starGold.withValues(alpha: 0.5)
               : AppColors.border.withValues(alpha: 0.4),
-          width: 1.5,
+          width: isNewHighScore ? 1.5 : 1,
         ),
         boxShadow: [
-          if (isNewHighScore)
+          if (isNewHighScore) ...[
             BoxShadow(
               color: AppColors.starGold.withValues(alpha: 0.15),
-              blurRadius: 12,
+              blurRadius: 16,
               spreadRadius: 2,
+            ),
+            BoxShadow(
+              color: AppColors.starGold.withValues(alpha: 0.05),
+              blurRadius: 32,
+              spreadRadius: 4,
+            ),
+          ] else
+            BoxShadow(
+              color: AppColors.violet.withValues(alpha: 0.05),
+              blurRadius: 8,
             ),
         ],
       ),
@@ -51,16 +61,22 @@ class HighScoreDisplay extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(
+              Icon(
                 Icons.emoji_events_rounded,
                 color: AppColors.starGold,
-                size: 18,
+                size: 20,
+                shadows: [
+                  Shadow(
+                    color: AppColors.starGold.withValues(alpha: 0.4),
+                    blurRadius: 6,
+                  ),
+                ],
               ),
-              const SizedBox(width: 6),
+              const SizedBox(width: 8),
               Text(
                 'High Scores',
                 style: AppFonts.fredoka(
-                  fontSize: 15,
+                  fontSize: 16,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primaryText,
                 ),
@@ -69,10 +85,15 @@ class HighScoreDisplay extends StatelessWidget {
                 const SizedBox(width: 8),
                 Container(
                   padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                   decoration: BoxDecoration(
-                    color: AppColors.starGold.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(6),
+                    gradient: LinearGradient(
+                      colors: [
+                        AppColors.starGold.withValues(alpha: 0.25),
+                        AppColors.starGold.withValues(alpha: 0.15),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
                       color: AppColors.starGold.withValues(alpha: 0.4),
                     ),
@@ -80,8 +101,8 @@ class HighScoreDisplay extends StatelessWidget {
                   child: Text(
                     'NEW BEST!',
                     style: AppFonts.fredoka(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
+                      fontSize: 11,
+                      fontWeight: FontWeight.w700,
                       color: AppColors.starGold,
                     ),
                   ),
@@ -89,12 +110,12 @@ class HighScoreDisplay extends StatelessWidget {
               ],
             ],
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 10),
           Divider(
             height: 1,
-            color: AppColors.border.withValues(alpha: 0.3),
+            color: AppColors.border.withValues(alpha: 0.25),
           ),
-          const SizedBox(height: 6),
+          const SizedBox(height: 8),
           // Score list
           Flexible(
             child: ListView.builder(
@@ -109,36 +130,46 @@ class HighScoreDisplay extends StatelessWidget {
 
                 return Container(
                   padding:
-                      const EdgeInsets.symmetric(vertical: 3, horizontal: 6),
+                      const EdgeInsets.symmetric(vertical: 5, horizontal: 8),
+                  margin: const EdgeInsets.only(bottom: 2),
                   decoration: BoxDecoration(
                     color: isCurrentScore
                         ? AppColors.starGold.withValues(alpha: 0.08)
                         : Colors.transparent,
-                    borderRadius: BorderRadius.circular(6),
+                    borderRadius: BorderRadius.circular(8),
                   ),
                   child: Row(
                     children: [
-                      // Rank
+                      // Rank with medal for top 3
                       SizedBox(
-                        width: 22,
-                        child: Text(
-                          '${index + 1}.',
-                          style: AppFonts.fredoka(
-                            fontSize: 13,
-                            fontWeight: FontWeight.w500,
-                            color: index == 0
-                                ? AppColors.starGold
-                                : AppColors.secondaryText,
-                          ),
-                        ),
+                        width: 24,
+                        child: index < 3
+                            ? Icon(
+                                Icons.star_rounded,
+                                size: 14,
+                                color: [
+                                  AppColors.starGold,
+                                  AppColors.silver,
+                                  AppColors.bronze,
+                                ][index],
+                              )
+                            : Text(
+                                '${index + 1}.',
+                                style: AppFonts.fredoka(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w500,
+                                  color: AppColors.secondaryText,
+                                ),
+                              ),
                       ),
+                      const SizedBox(width: 4),
                       // Name
                       Expanded(
                         child: Text(
                           entry.playerName,
                           overflow: TextOverflow.ellipsis,
                           style: AppFonts.nunito(
-                            fontSize: 13,
+                            fontSize: 14,
                             fontWeight: isCurrentScore
                                 ? FontWeight.w700
                                 : FontWeight.w400,
@@ -152,7 +183,7 @@ class HighScoreDisplay extends StatelessWidget {
                       Text(
                         '${entry.score}',
                         style: AppFonts.fredoka(
-                          fontSize: 14,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                           color: isCurrentScore
                               ? AppColors.starGold
@@ -164,8 +195,8 @@ class HighScoreDisplay extends StatelessWidget {
                       Text(
                         _formatDate(entry.date),
                         style: AppFonts.nunito(
-                          fontSize: 10,
-                          color: AppColors.secondaryText.withValues(alpha: 0.6),
+                          fontSize: 11,
+                          color: AppColors.secondaryText.withValues(alpha: 0.5),
                         ),
                       ),
                     ],

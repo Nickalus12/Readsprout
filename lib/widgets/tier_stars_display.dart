@@ -72,10 +72,11 @@ class TierStarsDisplay extends StatelessWidget {
     required Color color,
   }) {
     if (locked && !filled) {
+      // Show a dimmed star outline instead of a lock — inviting, not forbidding
       return Icon(
-        Icons.lock_rounded,
-        size: starSize * 0.72,
-        color: AppColors.secondaryText.withValues(alpha: 0.3),
+        Icons.star_outline_rounded,
+        size: starSize * 0.85,
+        color: AppColors.secondaryText.withValues(alpha: 0.2),
       );
     }
 

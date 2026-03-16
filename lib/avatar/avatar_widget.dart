@@ -587,11 +587,17 @@ class _AvatarWidgetState extends State<AvatarWidget>
                     painter: BodyPainter(
                       skinColor: _skinColor,
                       shirtColor: shirtColorOptions[
-                          (config.bgColor + 2).clamp(0, shirtColorOptions.length - 1)].color,
-                      collarStyle: 0,
+                          config.shirtColor.clamp(0, shirtColorOptions.length - 1)].color,
+                      collarStyle: config.shirtStyle.clamp(0, 2),
                       headTilt: swayAngle,
                       breathingValue: _breathingValue,
                       swayValue: _idleSwayValue,
+                      leftHandPose: handPoseForClip(_mixer.activeClipName).left,
+                      rightHandPose: handPoseForClip(_mixer.activeClipName).right,
+                      leftArmRotation: _skeleton.leftUpperArm.animationRotation,
+                      rightArmRotation: _skeleton.rightUpperArm.animationRotation,
+                      leftShoulderDy: _skeleton.leftShoulder.animationOffset.dy,
+                      rightShoulderDy: _skeleton.rightShoulder.animationOffset.dy,
                     ),
                   ),
                 ),
@@ -866,8 +872,70 @@ class _AvatarWidgetState extends State<AvatarWidget>
         ),
       ),
 
-      // 7. Accessories — aligned with hair size/position
+      // 7. Accessories — positioned relative to head anatomy
       if (config.accessory > 1)
+        ..._buildAccessory(config, headSize, headTop, headLeft, hairSize, hairLeft, hairTop, widgetW, widgetH),
+    ];
+  }
+
+  // ── Accessory positioning ─────────────────────────────────────────
+  // Accessories are categorized by where they attach to the avatar:
+  //  - Head-top: crowns, hats, ears, horns, headbands (sit on top of head)
+  //  - Wings: extend from shoulders (wider than head, centered on torso)
+  //  - Full-head: ninja mask, halo (overlay the head region)
+
+  // Head-top accessories (crowns, hats, ears, horns): all except wings
+  // and full-head overlays — handled as the default case below.
+
+  /// Accessories that extend from shoulders/back (wings).
+  static const _wingAccessories = {7};
+
+  /// Accessories that overlay the full head (ninja mask, halo).
+  static const _fullHeadAccessories = {14, 21};
+
+  List<Widget> _buildAccessory(
+    AvatarConfig config,
+    double headSize,
+    double headTop,
+    double headLeft,
+    double hairSize,
+    double hairLeft,
+    double hairTop,
+    double widgetW,
+    double widgetH,
+  ) {
+    final accIdx = config.accessory;
+    final painter = accessoryPainter(
+      accIdx,
+      swayValue: _idleSwayValue,
+      twinklePhase: _twinkleValue,
+    );
+    if (painter == null) return [];
+
+    if (_wingAccessories.contains(accIdx)) {
+      // Wings: wider region centered on the body, extending from shoulders
+      final wingW = widgetW * 0.95;
+      final wingH = widgetH * 0.45;
+      final wingLeft = (widgetW - wingW) / 2;
+      final wingTop = widgetH * 0.35;
+      return [
+        Positioned(
+          left: wingLeft,
+          top: wingTop,
+          width: wingW,
+          height: wingH,
+          child: CustomPaint(
+            isComplex: true,
+            willChange: widget.animateEffects,
+            painter: painter,
+          ),
+        ),
+      ];
+    }
+
+    if (_fullHeadAccessories.contains(accIdx)) {
+      // Full-head overlays: same size as hair region
+      return [
         Positioned(
           left: hairLeft,
           top: hairTop,
@@ -876,13 +944,33 @@ class _AvatarWidgetState extends State<AvatarWidget>
           child: CustomPaint(
             isComplex: true,
             willChange: widget.animateEffects,
-            painter: accessoryPainter(
-              config.accessory,
-              swayValue: _idleSwayValue,
-              twinklePhase: _twinkleValue,
-            ),
+            painter: painter,
           ),
         ),
+      ];
+    }
+
+    // Head-top accessories: compact region on top of the head
+    // Height is 45% of head, width matches head, positioned so base
+    // sits at the top of the forehead (faceTop proportion)
+    final accH = headSize * 0.45;
+    final accW = headSize * 0.80;
+    final accLeft = headLeft + (headSize - accW) / 2;
+    // Base of accessory sits at the top of the face (forehead)
+    final accTop = headTop + headSize * _faceTop - accH * 0.85;
+
+    return [
+      Positioned(
+        left: accLeft,
+        top: accTop,
+        width: accW,
+        height: accH,
+        child: CustomPaint(
+          isComplex: true,
+          willChange: widget.animateEffects,
+          painter: painter,
+        ),
+      ),
     ];
   }
 }

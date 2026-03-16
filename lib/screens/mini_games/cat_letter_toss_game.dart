@@ -1489,8 +1489,8 @@ class _BasketPainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final basketX = sim.basketX;
-    final basketWidth = _CatLetterTossSim.basketWidth;
-    final basketHeight = _CatLetterTossSim.basketHeight;
+    const basketWidth = _CatLetterTossSim.basketWidth;
+    const basketHeight = _CatLetterTossSim.basketHeight;
     final cx = basketX * size.width;
     final top = size.height - basketHeight - 40;
 
@@ -1511,7 +1511,7 @@ class _BasketPainter extends CustomPainter {
 
     // Basket body
     final basketPath = Path();
-    final halfW = basketWidth / 2;
+    const halfW = basketWidth / 2;
     // Trapezoid shape: wider at top, narrower at bottom
     basketPath.moveTo(cx - halfW, top);
     basketPath.lineTo(cx + halfW, top);

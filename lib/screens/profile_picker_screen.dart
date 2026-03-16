@@ -333,8 +333,10 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen>
           ),
 
           // Hearts
-          const Positioned.fill(
-            child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
+          const ExcludeSemantics(
+            child: Positioned.fill(
+              child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
+            ),
           ),
 
           // Content
@@ -981,21 +983,21 @@ class _ProfileCardState extends State<_ProfileCard>
 
                   // Settings gear icon
                   Positioned(
-                    top: 8 * sf,
-                    right: 8 * sf,
+                    top: 6 * sf,
+                    right: 6 * sf,
                     child: GestureDetector(
                       onTap: widget.onLongPress,
                       child: Container(
-                        width: 26 * sf,
-                        height: 26 * sf,
+                        width: 30 * sf,
+                        height: 30 * sf,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: AppColors.surface.withValues(alpha: 0.6),
+                          color: AppColors.surface.withValues(alpha: 0.5),
                         ),
                         child: Icon(
                           Icons.settings_rounded,
-                          size: 14 * sf,
-                          color: AppColors.secondaryText.withValues(alpha: 0.6),
+                          size: 15 * sf,
+                          color: AppColors.secondaryText.withValues(alpha: 0.5),
                         ),
                       ),
                     ),

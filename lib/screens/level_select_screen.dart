@@ -92,8 +92,10 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
       body: Stack(
         children: [
           // Zone-themed animated background
-          Positioned.fill(
-            child: ZoneBackground(zone: _activeZoneIndex),
+          ExcludeSemantics(
+            child: Positioned.fill(
+              child: ZoneBackground(zone: _activeZoneIndex),
+            ),
           ),
 
           // Content
@@ -105,12 +107,19 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                   padding: EdgeInsets.fromLTRB(8 * sf, 8 * sf, 16 * sf, 0),
                   child: Row(
                     children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: Icon(
-                          Icons.arrow_back_rounded,
-                          color: AppColors.primaryText,
-                          size: 24 * sf,
+                      Semantics(
+                        label: 'Go back',
+                        hint: 'Return to home screen',
+                        button: true,
+                        child: IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          iconSize: 28 * sf,
+                          padding: EdgeInsets.all(8 * sf),
+                          icon: Icon(
+                            Icons.arrow_back_rounded,
+                            color: AppColors.primaryText,
+                            size: 28 * sf,
+                          ),
                         ),
                       ),
                       SizedBox(width: 4 * sf),
@@ -246,9 +255,9 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                               style: TextStyle(fontSize: 20 * sf),
                             )
                           : Icon(
-                              Icons.lock_rounded,
+                              Icons.auto_awesome_rounded,
                               color:
-                                  AppColors.secondaryText.withValues(alpha: 0.4),
+                                  AppColors.secondaryText.withValues(alpha: 0.35),
                               size: 18 * sf,
                             ),
                     ),
@@ -315,8 +324,8 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
                           else
                             Text(
                               previousZoneName != null
-                                  ? 'Master all tiers in $previousZoneName to unlock'
-                                  : 'Locked',
+                                  ? 'Coming soon! Finish $previousZoneName first'
+                                  : 'Coming soon!',
                               style: AppFonts.nunito(
                                 fontSize: 12 * sf,
                                 fontWeight: FontWeight.w500,
@@ -679,8 +688,8 @@ class _LevelCardState extends State<_LevelCard> {
                     )
                   else
                     Icon(
-                      Icons.lock_rounded,
-                      color: AppColors.secondaryText.withValues(alpha: 0.4),
+                      Icons.auto_awesome_rounded,
+                      color: AppColors.secondaryText.withValues(alpha: 0.3),
                       size: 18 * sf,
                     ),
                 ],

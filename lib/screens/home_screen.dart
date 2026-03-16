@@ -25,6 +25,8 @@ import 'mini_games_screen.dart';
 import 'parent_dashboard_screen.dart';
 import 'profile_screen.dart';
 import '../services/adaptive_difficulty_service.dart';
+import '../services/first_time_hints_service.dart';
+import '../widgets/pulsing_hint.dart';
 
 class HomeScreen extends StatefulWidget {
   final ProfileService? profileService;
@@ -38,6 +40,7 @@ class HomeScreen extends StatefulWidget {
   final AdaptiveDifficultyService? adaptiveDifficultyService;
   final AdaptiveMusicService? musicService;
   final PlayerSettingsService? settingsService;
+  final FirstTimeHintsService? hintsService;
   final String playerName;
   final String profileId;
   final VoidCallback? onChangeName;
@@ -56,6 +59,7 @@ class HomeScreen extends StatefulWidget {
     this.adaptiveDifficultyService,
     this.musicService,
     this.settingsService,
+    this.hintsService,
     this.playerName = '',
     this.profileId = '',
     this.onChangeName,
@@ -69,6 +73,7 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen>
     with TickerProviderStateMixin {
   bool _hasPlayedWelcome = false;
+  bool _showAdventureHint = false;
   late AnimationController _logoController;
   late Ticker _starTicker;
   late _StarSim _starSim;
@@ -88,6 +93,11 @@ class _HomeScreenState extends State<HomeScreen>
     _avatarController.bindAmplitude(widget.audioService.mouthAmplitude);
     // Check streak status on app open
     widget.streakService.checkStreak();
+    // Check if we should show first-time adventure hint
+    if (widget.hintsService != null &&
+        !widget.hintsService!.hasBeenSeen(FirstTimeHintsService.adventureMode)) {
+      _showAdventureHint = true;
+    }
     // Play welcome phrase on first load
     if (widget.playerName.isNotEmpty && !_hasPlayedWelcome) {
       _hasPlayedWelcome = true;
@@ -557,28 +567,39 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
 
                     // ── Adventure Mode button ────────────────
-                    Semantics(
-                      label: 'Adventure Mode',
-                      hint: 'Begin your word journey',
-                      button: true,
-                      child: GestureDetector(
-                        onTap: () => Navigator.push(
-                          context,
-                          _smoothRoute(LevelSelectScreen(
-                            progressService: widget.progressService,
-                            audioService: widget.audioService,
-                            profileService: widget.profileService,
-                            statsService: widget.statsService,
-                            streakService: widget.streakService,
-                            personalityService: widget.personalityService,
-                            reviewService: widget.reviewService,
-                            adaptiveDifficultyService: widget.adaptiveDifficultyService,
-                            musicService: widget.musicService,
-                            settingsService: widget.settingsService,
-                            playerName: widget.playerName,
-                            profileId: widget.profileId,
-                          )),
-                        ),
+                    PulsingHint(
+                      active: _showAdventureHint,
+                      showHand: _showAdventureHint,
+                      glowColor: AppColors.emerald,
+                      child: Semantics(
+                        label: 'Adventure Mode',
+                        hint: 'Begin your word journey',
+                        button: true,
+                        child: GestureDetector(
+                          onTap: () {
+                            if (_showAdventureHint) {
+                              widget.hintsService?.markSeen(
+                                  FirstTimeHintsService.adventureMode);
+                              setState(() => _showAdventureHint = false);
+                            }
+                            Navigator.push(
+                              context,
+                              _smoothRoute(LevelSelectScreen(
+                                progressService: widget.progressService,
+                                audioService: widget.audioService,
+                                profileService: widget.profileService,
+                                statsService: widget.statsService,
+                                streakService: widget.streakService,
+                                personalityService: widget.personalityService,
+                                reviewService: widget.reviewService,
+                                adaptiveDifficultyService: widget.adaptiveDifficultyService,
+                                musicService: widget.musicService,
+                                settingsService: widget.settingsService,
+                                playerName: widget.playerName,
+                                profileId: widget.profileId,
+                              )),
+                            );
+                          },
                       child: Container(
                         padding: EdgeInsets.symmetric(
                             horizontal: 16 * sf, vertical: 10 * sf),
@@ -657,7 +678,7 @@ class _HomeScreenState extends State<HomeScreen>
                           ],
                         ),
                       ),
-                    ))
+                    )))
                         .animate(
                           onPlay: (controller) =>
                               controller.repeat(reverse: true),

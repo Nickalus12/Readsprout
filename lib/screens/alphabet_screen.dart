@@ -69,8 +69,10 @@ class AlphabetScreen extends StatelessWidget {
           ),
 
           // Floating hearts background
-          const Positioned.fill(
-            child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
+          const ExcludeSemantics(
+            child: Positioned.fill(
+              child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
+            ),
           ),
 
           // Foreground content
@@ -82,12 +84,17 @@ class AlphabetScreen extends StatelessWidget {
                   padding: EdgeInsets.fromLTRB(8 * sf, 8 * sf, 16 * sf, 0),
                   child: Row(
                     children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: Icon(
-                          Icons.arrow_back_rounded,
-                          color: AppColors.primaryText,
-                          size: 28 * sf,
+                      Semantics(
+                        label: 'Go back',
+                        hint: 'Return to home screen',
+                        button: true,
+                        child: IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: Icon(
+                            Icons.arrow_back_rounded,
+                            color: AppColors.primaryText,
+                            size: 28 * sf,
+                          ),
                         ),
                       ),
                       SizedBox(width: 4 * sf),
@@ -251,8 +258,8 @@ class _LetterCardState extends State<_LetterCard>
                     Text(
                       widget.letter,
                       style: AppFonts.fredoka(
-                        fontSize: 34 * sf,
-                        fontWeight: FontWeight.w600,
+                        fontSize: 36 * sf,
+                        fontWeight: FontWeight.w700,
                         color: glow > 0.01
                             ? Color.lerp(Colors.white, AppColors.electricBlue, glow * 0.4)
                             : Colors.white,
@@ -268,14 +275,20 @@ class _LetterCardState extends State<_LetterCard>
                                   blurRadius: 32 * glow * sf,
                                 ),
                               ]
-                            : null,
+                            : [
+                                Shadow(
+                                  color: Colors.black.withValues(alpha: 0.3),
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 1),
+                                ),
+                              ],
                       ),
                     ),
                     // Lowercase letter
                     Text(
                       widget.letter.toLowerCase(),
                       style: AppFonts.fredoka(
-                        fontSize: 22 * sf,
+                        fontSize: 24 * sf,
                         fontWeight: FontWeight.w400,
                         color: glow > 0.01
                             ? Color.lerp(

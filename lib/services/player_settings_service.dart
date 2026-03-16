@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/name_validator.dart';
 
 /// A single player profile entry.
 class PlayerEntry {
@@ -168,7 +169,7 @@ class PlayerSettingsService {
     final id = 'profile_${DateTime.now().millisecondsSinceEpoch}';
     final entry = PlayerEntry(
       id: id,
-      name: name.trim(),
+      name: NameValidator.formatName(name),
       colorIndex: _profiles.length % PlayerEntry.profileColors.length,
     );
     _profiles.add(entry);
@@ -194,15 +195,16 @@ class PlayerSettingsService {
   Future<void> renameProfile(String profileId, String newName) async {
     final idx = _profiles.indexWhere((p) => p.id == profileId);
     if (idx < 0) return;
+    final formatted = NameValidator.formatName(newName);
     final old = _profiles[idx];
     _profiles[idx] = PlayerEntry(
       id: old.id,
-      name: newName.trim(),
+      name: formatted,
       colorIndex: old.colorIndex,
       createdAt: old.createdAt,
     );
     if (_activeProfileId == profileId) {
-      _playerName = newName.trim();
+      _playerName = formatted;
       await _prefs.setString(_nameKey, _playerName);
     }
     await _saveProfiles();
@@ -237,7 +239,7 @@ class PlayerSettingsService {
   /// Save the player's name and mark setup as complete.
   /// Legacy — creates a profile if none exist.
   Future<void> setPlayerName(String name) async {
-    _playerName = name.trim();
+    _playerName = NameValidator.formatName(name);
     _setupComplete = true;
     await _prefs.setString(_nameKey, _playerName);
     await _prefs.setBool(_setupCompleteKey, true);

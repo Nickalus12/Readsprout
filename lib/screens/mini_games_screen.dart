@@ -102,7 +102,9 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
           ),
 
           // Floating particles
-          const Positioned.fill(child: _MiniGameParticles()),
+          const ExcludeSemantics(
+            child: Positioned.fill(child: _MiniGameParticles()),
+          ),
 
           // Content
           SafeArea(
@@ -320,11 +322,16 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back_rounded),
-            color: AppColors.primaryText,
-            iconSize: 28,
+          Semantics(
+            label: 'Go back',
+            hint: 'Return to home screen',
+            button: true,
+            child: IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.arrow_back_rounded),
+              color: AppColors.primaryText,
+              iconSize: 28,
+            ),
           ),
           Expanded(
             child: GestureDetector(
@@ -549,11 +556,17 @@ class _GameButtonState extends State<_GameButton> {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 68,
-                    height: 68,
+                    width: 72,
+                    height: 72,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.surface,
+                      gradient: RadialGradient(
+                        center: const Alignment(-0.3, -0.3),
+                        colors: [
+                          widget.glowColor.withValues(alpha: 0.08),
+                          AppColors.surface,
+                        ],
+                      ),
                       border: Border.all(
                         color: widget.glowColor.withValues(alpha: _hovering ? 0.8 : 0.4),
                         width: 2,
@@ -569,7 +582,7 @@ class _GameButtonState extends State<_GameButton> {
                     ),
                     child: CustomPaint(
                       painter: widget.painter,
-                      size: const Size(68, 68),
+                      size: const Size(72, 72),
                     ),
                   ),
                   if (widget.coinCost != null)
@@ -618,7 +631,7 @@ class _GameButtonState extends State<_GameButton> {
               Text(
                 widget.label,
                 style: AppFonts.fredoka(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primaryText.withValues(alpha: 0.9),
                 ),

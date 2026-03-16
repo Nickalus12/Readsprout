@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/name_setup_screen.dart';
+import 'screens/onboarding_tutorial_screen.dart';
 import 'screens/profile_picker_screen.dart';
 import 'services/progress_service.dart';
 import 'services/audio_service.dart';
@@ -16,6 +17,7 @@ import 'services/adaptive_music_service.dart';
 import 'services/avatar_personality_service.dart';
 import 'services/stats_service.dart';
 import 'services/adaptive_difficulty_service.dart';
+import 'services/first_time_hints_service.dart';
 import 'avatar/shader_loader.dart';
 import 'widgets/floating_hearts_bg.dart';
 
@@ -41,7 +43,12 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
   late final AvatarPersonalityService _personalityService;
   late final AdaptiveDifficultyService _adaptiveDifficultyService;
   late final AdaptiveMusicService _adaptiveMusicService;
+  late final FirstTimeHintsService _hintsService;
+  late SharedPreferences _prefs;
   bool _initialized = false;
+  bool _showOnboarding = false;
+
+  static const _hasSeenTutorialKey = 'has_seen_onboarding_tutorial';
 
   @override
   void initState() {
@@ -78,9 +85,11 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
     _personalityService = AvatarPersonalityService();
     _adaptiveDifficultyService = AdaptiveDifficultyService();
     _adaptiveMusicService = AdaptiveMusicService();
+    _hintsService = FirstTimeHintsService();
 
     // Get SharedPreferences once, share across all services
     final prefs = await SharedPreferences.getInstance();
+    _prefs = prefs;
 
     // Initialize all services in parallel for faster startup
     final initSw = Stopwatch()..start();
@@ -124,6 +133,9 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
       ShaderLoader.init().catchError((e) {
         debugPrint('ShaderLoader init failed: $e');
       }),
+      _hintsService.init(prefs).catchError((e) {
+        debugPrint('FirstTimeHintsService init failed: $e');
+      }),
     ]);
     debugPrint('All services initialized in ${initSw.elapsedMilliseconds}ms');
 
@@ -152,9 +164,18 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
 
   void _onNameSubmitted(String name) async {
     await _settingsService.setPlayerName(name);
-    setState(() {});
+    // Show onboarding tutorial if this is the user's first time
+    final hasSeenTutorial = _prefs.getBool(_hasSeenTutorialKey) ?? false;
+    setState(() {
+      _showOnboarding = !hasSeenTutorial;
+    });
     // Generate personalized phrases in background (if Deepgram is configured)
     _generatePhrasesInBackground(name);
+  }
+
+  void _onOnboardingComplete() async {
+    await _prefs.setBool(_hasSeenTutorialKey, true);
+    setState(() => _showOnboarding = false);
   }
 
   void _onChangeName() {
@@ -264,6 +285,14 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
       );
     }
 
+    // Show onboarding tutorial after first name setup
+    if (_showOnboarding) {
+      return OnboardingTutorialScreen(
+        onComplete: _onOnboardingComplete,
+        audioService: _audioService,
+      );
+    }
+
     // Profiles exist but none is active → profile picker
     if (_settingsService.activeProfileId == null) {
       return ProfilePickerScreen(
@@ -288,6 +317,7 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
       adaptiveDifficultyService: _adaptiveDifficultyService,
       musicService: _adaptiveMusicService,
       settingsService: _settingsService,
+      hintsService: _hintsService,
       playerName: _settingsService.playerName,
       profileId: _settingsService.activeProfileId ?? '',
       onChangeName: _onChangeName,
@@ -316,8 +346,10 @@ class _SplashScreen extends StatelessWidget {
           ),
 
           // Floating hearts — even the splash is alive
-          const Positioned.fill(
-            child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
+          const ExcludeSemantics(
+            child: Positioned.fill(
+              child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
+            ),
           ),
 
           // Loading indicator with logo

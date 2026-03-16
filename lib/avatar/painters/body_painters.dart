@@ -226,8 +226,11 @@ class TorsoPainter extends CustomPainter {
     final w = size.width;
     final h = size.height;
 
-    final cx = w * 0.5 + sin(swayValue * pi) * w * 0.006;
-    final breathExpand = sin(breathingValue * pi) * 0.012;
+    // Quantize sway/breath to reduce sub-pixel jitter that causes shimmer
+    final qSway = (swayValue * 20).roundToDouble() / 20;
+    final qBreath = (breathingValue * 20).roundToDouble() / 20;
+    final cx = w * 0.5 + sin(qSway * pi) * w * 0.004;
+    final breathExpand = sin(qBreath * pi) * 0.008;
     final shoulderW = w * (0.72 + breathExpand);
     final waistW = w * (0.55 + breathExpand * 0.5);
     final shoulderY = h * 0.78;
@@ -285,8 +288,12 @@ class TorsoPainter extends CustomPainter {
     );
     torsoPath.close();
 
+    // Use stable bounds for the gradient to prevent shimmer from
+    // sub-pixel shader coordinate changes each frame
+    final stableShoulderW = w * 0.73; // slightly wider than max to avoid clipping
     final torsoRect = Rect.fromLTRB(
-      cx - shoulderW / 2, shoulderY, cx + shoulderW / 2, torsoBottom,
+      w * 0.5 - stableShoulderW / 2, shoulderY,
+      w * 0.5 + stableShoulderW / 2, torsoBottom,
     );
 
     // ── 3D fabric gradient (left-to-right) ──
@@ -472,8 +479,8 @@ class TorsoPainter extends CustomPainter {
   bool shouldRepaint(TorsoPainter old) =>
       old.shirtColor != shirtColor ||
       old.collarStyle != collarStyle ||
-      (old.breathingValue * 100).round() != (breathingValue * 100).round() ||
-      (old.swayValue * 100).round() != (swayValue * 100).round();
+      (old.breathingValue * 20).round() != (breathingValue * 20).round() ||
+      (old.swayValue * 20).round() != (swayValue * 20).round();
 }
 
 // ═══════════════════════════════════════════════════════════════════════
@@ -521,9 +528,9 @@ class ShoulderPainter extends CustomPainter {
       // Align with torso shoulder dome (0.48 * shoulderW from center)
       final sCx = cx + side * shoulderW * 0.48;
       final sCy = shoulderY + dy * h;
-      // Wider, flatter cap for child-like roundness
-      final capW = w * 0.16;
-      final capH = h * 0.055;
+      // Wider, flatter cap for child-like roundness (matches wider arms)
+      final capW = w * 0.18;
+      final capH = h * 0.060;
 
       // Cap top sits slightly above shoulderY for overlap with torso dome
       final capTop = sCy - capH * 0.15;
@@ -659,9 +666,9 @@ class ArmPainter extends CustomPainter {
       Color highlight, Color shadow, double boneRotation) {
     // Align arm center with shoulder cap center (0.48)
     final armCx = cx + side * shoulderW * 0.48;
-    // Child proportions: chubbier upper arm, softer taper
-    final shoulderArmW = w * 0.085;
-    final wristArmW = w * 0.052;
+    // Chubby child proportions: wider, rounder arm tubes
+    final shoulderArmW = w * 0.095;
+    final wristArmW = w * 0.065;
 
     // Arm top blends with shoulder cap bottom (shoulderY + h*0.035)
     final upperArmTop = shoulderY + h * 0.033;
@@ -680,25 +687,25 @@ class ArmPainter extends CustomPainter {
     final elbowY = shoulderY + h * 0.125;
     final forearmBottom = shoulderY + h * 0.225;
 
-    // ── Upper arm (soft bezier contours for child character) ──
+    // ── Upper arm — soft rounded tube for cartoon child look ──
     final upperPath = Path();
-    // Outer contour: gentle bicep bulge
-    upperPath.moveTo(armCx - shoulderArmW * 0.5, upperArmTop);
+    // Outer contour: gentle outward curve (no angular bicep)
+    upperPath.moveTo(armCx - shoulderArmW * 0.48, upperArmTop);
     upperPath.cubicTo(
-      armCx - shoulderArmW * 0.6, upperArmTop + (elbowY - upperArmTop) * 0.3,
-      armCx - shoulderArmW * 0.55, elbowY - (elbowY - upperArmTop) * 0.15,
-      armCx - shoulderArmW * 0.46, elbowY,
+      armCx - shoulderArmW * 0.55, upperArmTop + (elbowY - upperArmTop) * 0.25,
+      armCx - shoulderArmW * 0.52, elbowY - (elbowY - upperArmTop) * 0.2,
+      armCx - shoulderArmW * 0.44, elbowY,
     );
-    // Elbow bottom: soft curve instead of hard line
+    // Elbow: smooth rounded curve (no crease)
     upperPath.quadraticBezierTo(
-      armCx, elbowY + 1.5,
-      armCx + shoulderArmW * 0.46, elbowY,
+      armCx, elbowY + 2.5,
+      armCx + shoulderArmW * 0.44, elbowY,
     );
-    // Inner contour: mirror with gentle bulge
+    // Inner contour: gentle mirror curve
     upperPath.cubicTo(
-      armCx + shoulderArmW * 0.55, elbowY - (elbowY - upperArmTop) * 0.15,
-      armCx + shoulderArmW * 0.6, upperArmTop + (elbowY - upperArmTop) * 0.3,
-      armCx + shoulderArmW * 0.5, upperArmTop,
+      armCx + shoulderArmW * 0.52, elbowY - (elbowY - upperArmTop) * 0.2,
+      armCx + shoulderArmW * 0.55, upperArmTop + (elbowY - upperArmTop) * 0.25,
+      armCx + shoulderArmW * 0.48, upperArmTop,
     );
     upperPath.close();
 
@@ -782,27 +789,27 @@ class ArmPainter extends CustomPainter {
       );
     canvas.drawPath(cuffHLPath, cuffHLPaint);
 
-    // ── Forearm (tapers from elbow to wrist, child proportions) ──
-    final elbowHalfW = shoulderArmW * 0.46;
-    final wristHalfW = wristArmW * 0.46;
+    // ── Forearm — chubby rounded tube tapering gently to wrist ──
+    final elbowHalfW = shoulderArmW * 0.44;
+    final wristHalfW = wristArmW * 0.50;
 
     final forearmPath = Path();
     forearmPath.moveTo(armCx - elbowHalfW, elbowY);
-    // Outer contour — smooth organic taper with slight forearm swell
+    // Outer contour — gentle taper with slight swell (baby fat)
     forearmPath.cubicTo(
-      armCx - elbowHalfW * 1.08, elbowY + (forearmBottom - elbowY) * 0.35,
-      armCx - wristHalfW * 1.15, forearmBottom - (forearmBottom - elbowY) * 0.2,
+      armCx - elbowHalfW * 1.05, elbowY + (forearmBottom - elbowY) * 0.30,
+      armCx - wristHalfW * 1.10, forearmBottom - (forearmBottom - elbowY) * 0.25,
       armCx - wristHalfW, forearmBottom,
     );
-    // Wrist curve — rounded end
+    // Wrist curve — rounded end (wider for cartoon look)
     forearmPath.quadraticBezierTo(
-      armCx, forearmBottom + wristArmW * 0.22,
+      armCx, forearmBottom + wristArmW * 0.30,
       armCx + wristHalfW, forearmBottom,
     );
-    // Inner contour — mirror taper
+    // Inner contour
     forearmPath.cubicTo(
-      armCx + wristHalfW * 1.15, forearmBottom - (forearmBottom - elbowY) * 0.2,
-      armCx + elbowHalfW * 1.08, elbowY + (forearmBottom - elbowY) * 0.35,
+      armCx + wristHalfW * 1.10, forearmBottom - (forearmBottom - elbowY) * 0.25,
+      armCx + elbowHalfW * 1.05, elbowY + (forearmBottom - elbowY) * 0.30,
       armCx + elbowHalfW, elbowY,
     );
     forearmPath.close();
@@ -816,32 +823,21 @@ class ArmPainter extends CustomPainter {
         begin: side < 0 ? Alignment.centerLeft : Alignment.centerRight,
         end: side < 0 ? Alignment.centerRight : Alignment.centerLeft,
         colors: [shadow, highlight, skinColor, highlight, shadow],
-        stops: const [0.0, 0.12, 0.5, 0.88, 1.0],
+        stops: const [0.0, 0.15, 0.5, 0.85, 1.0],
       ).createShader(forearmRect);
     canvas.drawPath(forearmPath, forearmPaint);
 
-    // ── Elbow crease — subtle shadow with inner fold line ──
+    // ── Elbow hint — very subtle shadow, no hard crease for cartoon style ──
     final elbowCreasePaint = Paint()
-      ..color = shadow.withValues(alpha: 0.15)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 2.5);
+      ..color = shadow.withValues(alpha: 0.08)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3.5);
     canvas.drawOval(
       Rect.fromCenter(
-        center: Offset(armCx, elbowY + 0.5),
-        width: elbowHalfW * 1.6,
-        height: 3.5,
+        center: Offset(armCx, elbowY + 1),
+        width: elbowHalfW * 1.4,
+        height: 4,
       ),
       elbowCreasePaint,
-    );
-    // Inner fold line for depth
-    final foldPaint = Paint()
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 0.5
-      ..color = shadow.withValues(alpha: 0.12)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1);
-    canvas.drawLine(
-      Offset(armCx - elbowHalfW * 0.6, elbowY + 1),
-      Offset(armCx + elbowHalfW * 0.6, elbowY + 1),
-      foldPaint,
     );
 
     if (totalRotation.abs() > 0.001) {
@@ -861,21 +857,14 @@ class ArmPainter extends CustomPainter {
 
 // ═══════════════════════════════════════════════════════════════════════
 //  HAND PAINTER
-//  5-fingered hand rendering with bezier segments per finger.
-//  Supports rest/open/point/thumbsUp/wave poses.
+//  Cartoon mitt-style hands (Animal Crossing / Mii inspired).
+//  Rounded, friendly shapes — no individual fingers.
+//  Supports rest/open/point/thumbsUp/wave poses via shape variations.
 // ═══════════════════════════════════════════════════════════════════════
 
-/// Finger definition: base angle, length multiplier, width multiplier.
-class _FingerDef {
-  final double angleDeg;
-  final double lengthMul;
-  final double widthMul;
-  const _FingerDef(this.angleDeg, this.lengthMul, this.widthMul);
-}
-
-/// Renders realistic 5-fingered hands at the ends of the arms.
-/// Each finger is built from bezier segments with knuckle bumps,
-/// tapered width, and fingernail crescents.
+/// Renders cartoon mitt-style hands at the ends of the arms.
+/// Each hand is a rounded oval with a small thumb nub, styled for
+/// a children's app with warm, friendly proportions.
 class HandPainter extends CustomPainter {
   final Color skinColor;
   final HandPose leftPose;
@@ -883,15 +872,8 @@ class HandPainter extends CustomPainter {
   final double swayValue;
   final double wavePhase; // 0.0-1.0 oscillation for wave animation
 
-  // Cached paints (created once, not per-frame allocation in loops)
   late final Color _highlight = _warmHighlight(skinColor);
   late final Color _shadow = _coolShadow(skinColor);
-  late final Paint _skinPaint = Paint()..color = skinColor;
-  late final Paint _nailPaint = Paint()
-    ..color = _highlight.withValues(alpha: 0.55);
-  late final Paint _knucklePaint = Paint()
-    ..color = _shadow.withValues(alpha: 0.12)
-    ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.0);
 
   HandPainter({
     required this.skinColor,
@@ -911,442 +893,185 @@ class HandPainter extends CustomPainter {
     final shoulderW = w * 0.72;
     final handY = h * 0.78 + h * 0.22; // at bottom of arms
 
-    // Hand scale relative to widget — works at all sizes
-    final handSize = w * 0.13;
+    // Mitt scale relative to widget
+    final mittSize = w * 0.11;
 
-    // Left hand — aligned with arm center (0.48)
-    _drawHand(canvas, cx - shoulderW * 0.48, handY, handSize, -1.0, leftPose,
-        false);
+    // Left hand
+    _drawMitt(canvas, cx - shoulderW * 0.48, handY, mittSize, -1.0, leftPose);
 
-    // Right hand — aligned with arm center (0.48)
-    _drawHand(canvas, cx + shoulderW * 0.48, handY, handSize, 1.0, rightPose,
-        true);
+    // Right hand
+    _drawMitt(canvas, cx + shoulderW * 0.48, handY, mittSize, 1.0, rightPose);
   }
 
-  void _drawHand(Canvas canvas, double cx, double cy, double hs,
-      double side, HandPose pose, bool isRight) {
+  void _drawMitt(Canvas canvas, double cx, double cy, double ms,
+      double side, HandPose pose) {
     // Wave rotation
     final waveAngle =
         (pose == HandPose.wave) ? sin(wavePhase * pi * 2) * 0.35 : 0.0;
 
     canvas.save();
+    canvas.translate(cx, cy);
     if (waveAngle != 0.0) {
-      canvas.translate(cx, cy);
       canvas.rotate(waveAngle);
-      canvas.translate(-cx, -cy);
     }
 
-    switch (pose) {
-      case HandPose.rest:
-        _drawRestHand(canvas, cx, cy, hs, side);
-      case HandPose.open:
-      case HandPose.wave:
-        _drawOpenHand(canvas, cx, cy, hs, side);
-      case HandPose.point:
-        _drawPointHand(canvas, cx, cy, hs, side);
-      case HandPose.thumbsUp:
-        _drawThumbsUp(canvas, cx, cy, hs, side);
-    }
+    // Mitt dimensions — rounded oval with slight taper at wrist
+    final mittW = ms * 0.92;
+    final mittH = ms * 0.72;
+    final mittCy = -mittH * 0.3; // center offset upward from wrist
 
-    canvas.restore();
-  }
+    // ── Wrist connection (tapered cylinder) ──
+    final wristW = mittW * 0.55;
+    final wristPath = Path()
+      ..moveTo(-wristW / 2, 0)
+      ..cubicTo(
+        -wristW * 0.6, -mittH * 0.15,
+        -mittW * 0.42, mittCy + mittH * 0.35,
+        -mittW * 0.42, mittCy + mittH * 0.15,
+      )
+      ..lineTo(mittW * 0.42, mittCy + mittH * 0.15)
+      ..cubicTo(
+        mittW * 0.42, mittCy + mittH * 0.35,
+        wristW * 0.6, -mittH * 0.15,
+        wristW / 2, 0,
+      )
+      ..close();
 
-  // ── FINGER DRAWING ENGINE ──
-
-  /// Draws a single finger using 2-3 bezier segments with tapered width,
-  /// knuckle bumps, and fingernail crescent.
-  void _drawFinger(
-    Canvas canvas, {
-    required double baseX,
-    required double baseY,
-    required double length,
-    required double baseWidth,
-    required double tipWidth,
-    required double angle, // radians from vertical (0 = straight up)
-    required double curl, // 0.0 = straight, 1.0 = fully curled
-  }) {
-    canvas.save();
-    canvas.translate(baseX, baseY);
-    canvas.rotate(angle);
-
-    // Scale dimensions
-    final bw = baseWidth;
-    final tw = tipWidth;
-    final len = length * (1.0 - curl * 0.55); // curl shortens visible finger
-
-    // Curl bends the finger inward
-    final curlOffsetX = curl * bw * 0.8;
-    final curlOffsetY = curl * len * 0.3;
-
-    // Finger path: base → middle (knuckle bump) → tip
-    final fingerPath = Path();
-
-    // Left contour
-    fingerPath.moveTo(-bw / 2, 0);
-    // First knuckle bump (subtle outward curve)
-    fingerPath.cubicTo(
-      -bw / 2 - bw * 0.08, -len * 0.25,
-      -bw * 0.42 + curlOffsetX * 0.3, -len * 0.45 + curlOffsetY * 0.3,
-      -tw * 0.45 + curlOffsetX * 0.6, -len * 0.55 + curlOffsetY * 0.5,
+    final wristRect = Rect.fromCenter(
+      center: Offset(0, -mittH * 0.1),
+      width: mittW,
+      height: mittH * 0.5,
     );
-    // Second segment to tip
-    fingerPath.cubicTo(
-      -tw * 0.48 + curlOffsetX * 0.8, -len * 0.72 + curlOffsetY * 0.7,
-      -tw * 0.40 + curlOffsetX, -len * 0.92 + curlOffsetY,
-      curlOffsetX, -len + curlOffsetY,
-    );
-    // Tip (rounded)
-    fingerPath.quadraticBezierTo(
-      tw * 0.40 + curlOffsetX, -len * 0.92 + curlOffsetY,
-      tw * 0.48 + curlOffsetX * 0.8, -len * 0.72 + curlOffsetY * 0.7,
-    );
-    // Right contour back down
-    fingerPath.cubicTo(
-      tw * 0.45 + curlOffsetX * 0.6, -len * 0.55 + curlOffsetY * 0.5,
-      bw * 0.42 + curlOffsetX * 0.3, -len * 0.45 + curlOffsetY * 0.3,
-      bw / 2 + bw * 0.08, -len * 0.25,
-    );
-    // Back to base with knuckle bump
-    fingerPath.cubicTo(
-      bw / 2, -len * 0.12,
-      bw / 2, 0,
-      bw / 2, 0,
-    );
-    fingerPath.close();
+    canvas.drawPath(wristPath, Paint()
+      ..shader = LinearGradient(
+        begin: Alignment.centerLeft,
+        end: Alignment.centerRight,
+        colors: [_shadow, _highlight, skinColor, _highlight, _shadow],
+        stops: const [0.0, 0.15, 0.5, 0.85, 1.0],
+      ).createShader(wristRect));
 
-    canvas.drawPath(fingerPath, _skinPaint);
-
-    // ── Knuckle bump shadow (at ~35% up the finger) ──
-    if (curl < 0.6) {
-      final knuckleY = -len * 0.30 + curlOffsetY * 0.25;
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(curlOffsetX * 0.2, knuckleY),
-          width: bw * 0.85,
-          height: bw * 0.25,
-        ),
-        _knucklePaint,
-      );
-    }
-
-    // ── Fingernail crescent at tip ──
-    if (curl < 0.4) {
-      final nailCx = curlOffsetX * 0.9;
-      final nailCy = -len * 0.90 + curlOffsetY * 0.85;
-      final nailW = tw * 0.75;
-      final nailH = tw * 0.50;
-      canvas.drawRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(
-            center: Offset(nailCx, nailCy),
-            width: nailW,
-            height: nailH,
-          ),
-          Radius.circular(nailW * 0.5),
-        ),
-        _nailPaint,
-      );
-    }
-
-    canvas.restore();
-  }
-
-  /// Draws the palm as a rounded trapezoid connecting wrist to finger bases.
-  void _drawPalm(Canvas canvas, double cx, double cy, double palmW,
-      double palmH, double side) {
-    final palmRect = Rect.fromCenter(
-      center: Offset(cx, cy),
-      width: palmW,
-      height: palmH,
+    // ── Main mitt body ──
+    final mittRect = Rect.fromCenter(
+      center: Offset(0, mittCy),
+      width: mittW,
+      height: mittH,
     );
-    final palmPaint = Paint()
+
+    // Mitt body shape — soft rounded rectangle via RRect
+    final mittRR = RRect.fromRectAndCorners(
+      mittRect,
+      topLeft: Radius.circular(mittW * 0.45),
+      topRight: Radius.circular(mittW * 0.45),
+      bottomLeft: Radius.circular(mittW * 0.35),
+      bottomRight: Radius.circular(mittW * 0.35),
+    );
+
+    // 3D radial gradient
+    final mittPaint = Paint()
       ..shader = RadialGradient(
         center: Alignment(side * -0.2, -0.3),
-        radius: 1.2,
+        radius: 1.1,
         colors: [_highlight, skinColor, _shadow],
         stops: const [0.0, 0.5, 1.0],
-      ).createShader(palmRect);
+      ).createShader(mittRect);
 
-    // Rounded trapezoid: wider at top (finger bases), narrower at wrist
-    const wristNarrow = 0.85; // wrist is 85% of palm width
-    final path = Path();
-    // Top-left (finger base side)
-    path.moveTo(cx - palmW * 0.48, cy - palmH * 0.45);
-    // Top curve
-    path.quadraticBezierTo(
-      cx, cy - palmH * 0.52,
-      cx + palmW * 0.48, cy - palmH * 0.45,
+    canvas.drawRRect(mittRR, mittPaint);
+
+    // ── Thumb nub ──
+    final thumbAngle = switch (pose) {
+      HandPose.thumbsUp => side * -0.8,     // thumb points up
+      HandPose.point    => side * -0.4,      // thumb slightly up
+      HandPose.open     => side * -0.55,     // thumb spread out
+      HandPose.wave     => side * -0.55,
+      HandPose.rest     => side * -0.2,      // thumb at rest alongside
+    };
+    final thumbLen = ms * 0.30;
+    final thumbW = ms * 0.20;
+
+    // Thumb base position: outer side of mitt
+    final thumbBaseX = side * mittW * 0.38;
+    final thumbBaseY = mittCy + mittH * 0.05;
+
+    canvas.save();
+    canvas.translate(thumbBaseX, thumbBaseY);
+    canvas.rotate(thumbAngle);
+
+    // Thumb shape — rounded capsule
+    final thumbPath = Path()
+      ..moveTo(-thumbW / 2, 0)
+      ..cubicTo(
+        -thumbW * 0.55, -thumbLen * 0.3,
+        -thumbW * 0.45, -thumbLen * 0.8,
+        0, -thumbLen,
+      )
+      ..cubicTo(
+        thumbW * 0.45, -thumbLen * 0.8,
+        thumbW * 0.55, -thumbLen * 0.3,
+        thumbW / 2, 0,
+      )
+      ..close();
+
+    final thumbRect = Rect.fromCenter(
+      center: Offset(0, -thumbLen * 0.5),
+      width: thumbW,
+      height: thumbLen,
     );
-    // Right side taper
-    path.cubicTo(
-      cx + palmW * 0.50, cy - palmH * 0.15,
-      cx + palmW * wristNarrow * 0.50, cy + palmH * 0.25,
-      cx + palmW * wristNarrow * 0.48, cy + palmH * 0.48,
+    canvas.drawPath(thumbPath, Paint()
+      ..shader = RadialGradient(
+        center: const Alignment(-0.2, -0.3),
+        radius: 1.1,
+        colors: [_highlight, skinColor, _shadow],
+        stops: const [0.0, 0.5, 1.0],
+      ).createShader(thumbRect));
+
+    canvas.restore(); // thumb transform
+
+    // ── Pose-specific details ──
+    if (pose == HandPose.point) {
+      // Point: small nub extending upward from top of mitt (index finger hint)
+      final pointLen = ms * 0.22;
+      final pointW = ms * 0.12;
+      final pointPath = Path()
+        ..moveTo(-pointW / 2, mittCy - mittH * 0.42)
+        ..cubicTo(
+          -pointW * 0.4, mittCy - mittH * 0.42 - pointLen * 0.5,
+          -pointW * 0.3, mittCy - mittH * 0.42 - pointLen * 0.9,
+          0, mittCy - mittH * 0.42 - pointLen,
+        )
+        ..cubicTo(
+          pointW * 0.3, mittCy - mittH * 0.42 - pointLen * 0.9,
+          pointW * 0.4, mittCy - mittH * 0.42 - pointLen * 0.5,
+          pointW / 2, mittCy - mittH * 0.42,
+        )
+        ..close();
+      canvas.drawPath(pointPath, Paint()..color = skinColor);
+    }
+
+    // ── Soft highlight on top of mitt for 3D roundness ──
+    canvas.drawOval(
+      Rect.fromCenter(
+        center: Offset(-mittW * 0.08, mittCy - mittH * 0.12),
+        width: mittW * 0.35,
+        height: mittH * 0.25,
+      ),
+      Paint()
+        ..color = _highlight.withValues(alpha: 0.25)
+        ..maskFilter = MaskFilter.blur(BlurStyle.normal, ms * 0.06),
     );
-    // Bottom (wrist)
-    path.quadraticBezierTo(
-      cx, cy + palmH * 0.52,
-      cx - palmW * wristNarrow * 0.48, cy + palmH * 0.48,
+
+    // ── Knuckle line (subtle crease across mitt) ──
+    final knucklePaint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = ms * 0.012
+      ..color = _shadow.withValues(alpha: 0.15)
+      ..maskFilter = MaskFilter.blur(BlurStyle.normal, ms * 0.02);
+    canvas.drawLine(
+      Offset(-mittW * 0.28, mittCy - mittH * 0.08),
+      Offset(mittW * 0.28, mittCy - mittH * 0.08),
+      knucklePaint,
     );
-    // Left side taper
-    path.cubicTo(
-      cx - palmW * wristNarrow * 0.50, cy + palmH * 0.25,
-      cx - palmW * 0.50, cy - palmH * 0.15,
-      cx - palmW * 0.48, cy - palmH * 0.45,
-    );
-    path.close();
 
-    canvas.drawPath(path, palmPaint);
-  }
-
-  // ── REST POSE: slight inward curl, fingers relaxed together ──
-
-  /// Finger definitions for rest pose: angle, length multiplier, width multiplier
-  static const _restFingers = [
-    _FingerDef(-20, 0.70, 1.10), // thumb (angled outward, shorter, wider)
-    _FingerDef(-4, 0.90, 0.90),  // index
-    _FingerDef(0, 1.00, 0.95),   // middle (longest)
-    _FingerDef(4, 0.88, 0.88),   // ring
-    _FingerDef(9, 0.72, 0.78),   // pinky (shortest, narrowest)
-  ];
-
-  void _drawRestHand(Canvas canvas, double cx, double cy, double hs,
-      double side) {
-    final palmW = hs * 0.78;
-    final palmH = hs * 0.58;
-    final palmCy = cy + palmH * 0.15;
-
-    _drawPalm(canvas, cx, palmCy, palmW, palmH, side);
-
-    // Base finger dimensions
-    final baseFingerLen = hs * 0.38;
-    final baseFingerW = hs * 0.10;
-
-    // Draw 5 fingers with slight curl
-    for (int i = 0; i < 5; i++) {
-      final def = _restFingers[i];
-      final isThumb = i == 0;
-
-      // Position fingers along top of palm
-      final double fx;
-      final double fy;
-      final double angle;
-
-      if (isThumb) {
-        // Thumb: positioned on the side of the palm, angled outward
-        fx = cx + side * palmW * 0.42;
-        fy = palmCy - palmH * 0.05;
-        angle = side * def.angleDeg * pi / 180;
-      } else {
-        // Fingers: spread across top of palm
-        final t = (i - 1) / 3.0; // 0.0 to 1.0 for index through pinky
-        fx = cx + (t - 0.5) * palmW * 0.72;
-        fy = palmCy - palmH * 0.42;
-        angle = side * def.angleDeg * pi / 180;
-      }
-
-      final fingerLen = baseFingerLen * def.lengthMul;
-      final fingerW = baseFingerW * def.widthMul;
-      final tipW = fingerW * 0.55; // tapers to ~55% at tip
-
-      _drawFinger(
-        canvas,
-        baseX: fx,
-        baseY: fy,
-        length: fingerLen,
-        baseWidth: fingerW,
-        tipWidth: tipW,
-        angle: angle,
-        curl: isThumb ? 0.15 : 0.35, // slight curl for rest
-      );
-    }
-  }
-
-  // ── OPEN POSE: fingers spread apart with visible gaps ──
-
-  static const _openFingers = [
-    _FingerDef(-35, 0.70, 1.10), // thumb (more spread)
-    _FingerDef(-10, 0.92, 0.90), // index
-    _FingerDef(-2, 1.00, 0.95),  // middle
-    _FingerDef(8, 0.88, 0.88),   // ring
-    _FingerDef(18, 0.72, 0.78),  // pinky
-  ];
-
-  void _drawOpenHand(Canvas canvas, double cx, double cy, double hs,
-      double side) {
-    final palmW = hs * 0.78;
-    final palmH = hs * 0.58;
-    final palmCy = cy + palmH * 0.15;
-
-    _drawPalm(canvas, cx, palmCy, palmW, palmH, side);
-
-    final baseFingerLen = hs * 0.42;
-    final baseFingerW = hs * 0.09;
-
-    for (int i = 0; i < 5; i++) {
-      final def = _openFingers[i];
-      final isThumb = i == 0;
-
-      final double fx;
-      final double fy;
-      final double angle;
-
-      if (isThumb) {
-        fx = cx + side * palmW * 0.45;
-        fy = palmCy - palmH * 0.02;
-        angle = side * def.angleDeg * pi / 180;
-      } else {
-        final t = (i - 1) / 3.0;
-        fx = cx + (t - 0.5) * palmW * 0.78; // wider spread
-        fy = palmCy - palmH * 0.42;
-        angle = side * def.angleDeg * pi / 180;
-      }
-
-      final fingerLen = baseFingerLen * def.lengthMul;
-      final fingerW = baseFingerW * def.widthMul;
-      final tipW = fingerW * 0.50;
-
-      _drawFinger(
-        canvas,
-        baseX: fx,
-        baseY: fy,
-        length: fingerLen,
-        baseWidth: fingerW,
-        tipWidth: tipW,
-        angle: angle,
-        curl: isThumb ? 0.05 : 0.08, // nearly straight
-      );
-    }
-  }
-
-  // ── POINT POSE: index extended, others curled ──
-
-  void _drawPointHand(Canvas canvas, double cx, double cy, double hs,
-      double side) {
-    final palmW = hs * 0.72;
-    final palmH = hs * 0.55;
-    final palmCy = cy + palmH * 0.15;
-
-    _drawPalm(canvas, cx, palmCy, palmW, palmH, side);
-
-    final baseFingerLen = hs * 0.42;
-    final baseFingerW = hs * 0.09;
-
-    // Finger defs for point: thumb curled against palm, index extended, rest curled
-    final pointFingers = [
-      (def: const _FingerDef(-20, 0.65, 1.10), curl: 0.55), // thumb curled
-      (def: const _FingerDef(-2, 1.00, 0.92), curl: 0.05),  // index extended
-      (def: const _FingerDef(2, 0.95, 0.95), curl: 0.75),   // middle curled
-      (def: const _FingerDef(5, 0.85, 0.88), curl: 0.80),   // ring curled
-      (def: const _FingerDef(9, 0.70, 0.78), curl: 0.85),   // pinky curled
-    ];
-
-    for (int i = 0; i < 5; i++) {
-      final finger = pointFingers[i];
-      final isThumb = i == 0;
-
-      final double fx;
-      final double fy;
-      final double angle;
-
-      if (isThumb) {
-        fx = cx + side * palmW * 0.40;
-        fy = palmCy + palmH * 0.05;
-        angle = side * finger.def.angleDeg * pi / 180;
-      } else {
-        final t = (i - 1) / 3.0;
-        fx = cx + (t - 0.5) * palmW * 0.70;
-        fy = palmCy - palmH * 0.42;
-        angle = side * finger.def.angleDeg * pi / 180;
-      }
-
-      final fingerLen = baseFingerLen * finger.def.lengthMul;
-      final fingerW = baseFingerW * finger.def.widthMul;
-      final tipW = fingerW * 0.55;
-
-      _drawFinger(
-        canvas,
-        baseX: fx,
-        baseY: fy,
-        length: fingerLen,
-        baseWidth: fingerW,
-        tipWidth: tipW,
-        angle: angle,
-        curl: finger.curl,
-      );
-    }
-  }
-
-  // ── THUMBS UP POSE: fist with thumb extended upward ──
-
-  void _drawThumbsUp(Canvas canvas, double cx, double cy, double hs,
-      double side) {
-    final palmW = hs * 0.70;
-    final palmH = hs * 0.52;
-    final palmCy = cy + palmH * 0.10;
-
-    _drawPalm(canvas, cx, palmCy, palmW, palmH, side);
-
-    final baseFingerLen = hs * 0.40;
-    final baseFingerW = hs * 0.09;
-
-    // All fingers curled into fist, thumb extended upward
-    final thumbsUpFingers = [
-      (def: const _FingerDef(-5, 0.80, 1.15), curl: 0.02),  // thumb UP
-      (def: const _FingerDef(-3, 0.85, 0.90), curl: 0.85),  // index curled
-      (def: const _FingerDef(0, 0.90, 0.92), curl: 0.88),   // middle curled
-      (def: const _FingerDef(3, 0.82, 0.88), curl: 0.88),   // ring curled
-      (def: const _FingerDef(7, 0.68, 0.78), curl: 0.90),   // pinky curled
-    ];
-
-    for (int i = 0; i < 5; i++) {
-      final finger = thumbsUpFingers[i];
-      final isThumb = i == 0;
-
-      final double fx;
-      final double fy;
-      final double angle;
-
-      if (isThumb) {
-        // Thumb: side of palm, pointing up with slight outward lean
-        fx = cx + side * palmW * 0.38;
-        fy = palmCy - palmH * 0.25;
-        angle = side * finger.def.angleDeg * pi / 180;
-      } else {
-        final t = (i - 1) / 3.0;
-        fx = cx + (t - 0.5) * palmW * 0.65;
-        fy = palmCy - palmH * 0.38;
-        angle = side * finger.def.angleDeg * pi / 180;
-      }
-
-      final fingerLen = baseFingerLen * finger.def.lengthMul;
-      final fingerW = baseFingerW * finger.def.widthMul;
-      final tipW = fingerW * 0.55;
-
-      _drawFinger(
-        canvas,
-        baseX: fx,
-        baseY: fy,
-        length: fingerLen,
-        baseWidth: fingerW,
-        tipWidth: tipW,
-        angle: angle,
-        curl: finger.curl,
-      );
-    }
-
-    // Extra: draw curled finger bumps visible on fist front
-    for (int i = 0; i < 3; i++) {
-      final bx = cx - palmW * 0.15 + i * palmW * 0.18;
-      canvas.drawOval(
-        Rect.fromCenter(
-          center: Offset(bx, palmCy + palmH * 0.35),
-          width: palmW * 0.14,
-          height: palmW * 0.10,
-        ),
-        _knucklePaint,
-      );
-    }
+    canvas.restore(); // main transform
   }
 
   @override
