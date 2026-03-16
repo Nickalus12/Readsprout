@@ -121,6 +121,24 @@ class ReviewService {
     return sorted;
   }
 
+  /// Returns all overdue words as Word objects, sorted by priority (most urgent first).
+  List<String> getOverdueWords() {
+    final due = _reviews.entries
+        .where((e) => e.value.isDue)
+        .toList()
+      ..sort((a, b) {
+        final aPriority = getWordPriority(a.key);
+        final bPriority = getWordPriority(b.key);
+        return bPriority.compareTo(aPriority);
+      });
+    return due.map((e) => e.key).toList();
+  }
+
+  /// Returns the count of overdue words for badge display.
+  int getOverdueCount() {
+    return _reviews.values.where((r) => r.isDue).length;
+  }
+
   /// Returns a summary of the review state.
   ReviewSummary getReviewSummary() {
     int dueCount = 0;
