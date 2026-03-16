@@ -770,6 +770,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     widget.musicService?.stopMusic();
     _sessionTimer.stop();
     widget.statsService?.recordPlayTime(_sessionTimer.elapsed.inSeconds);
+    // Record daily session for activity chart
+    widget.statsService?.recordDailySession(
+      _todayKey,
+      _currentWordIndex, // words completed this session
+      (_sessionTimer.elapsed.inSeconds / 60).ceil(),
+    );
     // Notify personality service of session end
     if (widget.profileId.isNotEmpty) {
       widget.personalityService?.onSessionEnd(
