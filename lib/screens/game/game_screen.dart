@@ -30,6 +30,7 @@ import 'game_hud.dart';
 import 'game_board.dart';
 import 'game_keyboard.dart';
 import 'game_completion.dart';
+import 'champion_retry_overlay.dart';
 
 class GameScreen extends StatefulWidget {
   final int level;

@@ -15,7 +15,7 @@ const _hardWords = <String>{
   'keep', 'kind', 'laugh', 'light', 'live', 'long', 'made', 'many',
   'much', 'must', 'never', 'once', 'only', 'open', 'own', 'pick',
   'please', 'pull', 'read', 'right', 'said', 'shall', 'show', 'small',
-  'some', 'start', 'take', 'tell', 'thank', 'their', 'these', 'thing',
+  'some', 'start', 'take', 'tell', 'thank', 'these', 'thing',
   'think', 'those', 'thought', 'today', 'together', 'under', 'upon',
   'very', 'walk', 'want', 'warm', 'wash', 'were', 'while', 'wish',
   'work', 'world', 'write', 'your',
@@ -362,7 +362,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                       ),
                     ),
                     child: Text(
-                      _hardWordMessage!,
+                      _hardWordMessage,
                       style: AppFonts.fredoka(
                         fontSize: 15,
                         fontWeight: FontWeight.w600,
