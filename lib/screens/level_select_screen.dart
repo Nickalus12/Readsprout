@@ -392,38 +392,41 @@ class _LevelSelectScreenState extends State<LevelSelectScreen>
                             ),
                             SizedBox(height: 4 * sf),
                             if (zoneUnlocked)
-                              Row(
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  Icon(Icons.star_rounded,
-                                      size: 13 * sf,
-                                      color: AppColors.starGold),
-                                  SizedBox(width: 3 * sf),
-                                  Text(
-                                    '$zoneStars / $zonePossibleStars',
-                                    style: AppFonts.nunito(
-                                      fontSize: 12 * sf,
-                                      fontWeight: FontWeight.w600,
-                                      color: AppColors.secondaryText,
-                                    ),
+                                  Row(
+                                    children: [
+                                      Icon(Icons.star_rounded,
+                                          size: 14 * sf,
+                                          color: AppColors.starGold),
+                                      SizedBox(width: 3 * sf),
+                                      Text(
+                                        '$zoneStars / $zonePossibleStars',
+                                        style: AppFonts.nunito(
+                                          fontSize: 12 * sf,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppColors.secondaryText,
+                                        ),
+                                      ),
+                                    ],
                                   ),
-                                  SizedBox(width: 8 * sf),
-                                  // Progress bar
-                                  Expanded(
-                                    child: ClipRRect(
-                                      borderRadius:
-                                          BorderRadius.circular(2 * sf),
-                                      child: SizedBox(
-                                        height: 4 * sf,
-                                        child: LinearProgressIndicator(
-                                          value: zoneProgress,
-                                          backgroundColor:
-                                              AppColors.background,
-                                          valueColor:
-                                              AlwaysStoppedAnimation<Color>(
-                                            zoneComplete
-                                                ? AppColors.starGold
-                                                : AppColors.electricBlue,
-                                          ),
+                                  SizedBox(height: 4 * sf),
+                                  // Prominent progress bar
+                                  ClipRRect(
+                                    borderRadius:
+                                        BorderRadius.circular(4 * sf),
+                                    child: SizedBox(
+                                      height: 8 * sf,
+                                      child: LinearProgressIndicator(
+                                        value: zoneProgress,
+                                        backgroundColor:
+                                            AppColors.background,
+                                        valueColor:
+                                            AlwaysStoppedAnimation<Color>(
+                                          zoneComplete
+                                              ? AppColors.starGold
+                                              : AppColors.electricBlue,
                                         ),
                                       ),
                                     ),
@@ -711,8 +714,9 @@ class _LevelCardState extends State<_LevelCard> {
     final starsEarned = widget.levelProgress.starsEarned;
     final hasAnyStars = starsEarned > 0;
     final isNextToPlay = widget.unlocked && !hasAnyStars && !isComplete;
+    final isFullyMastered = starsEarned >= 3;
 
-    return Padding(
+    Widget card = Padding(
       padding: EdgeInsets.only(bottom: 8 * sf),
       child: AnimatedBuilder(
         animation: widget.shakeController,
@@ -745,25 +749,36 @@ class _LevelCardState extends State<_LevelCard> {
               child: Container(
                 padding: EdgeInsets.all(14 * sf),
                 decoration: BoxDecoration(
-                  color: hasAnyStars
-                      ? widget.accentColor.withValues(alpha: 0.06)
-                      : isNextToPlay
-                          ? widget.accentColor.withValues(alpha: 0.04)
-                          : AppColors.surface.withValues(alpha: 0.75),
+                  color: isFullyMastered
+                      ? AppColors.starGold.withValues(alpha: 0.06)
+                      : hasAnyStars
+                          ? widget.accentColor.withValues(alpha: 0.06)
+                          : isNextToPlay
+                              ? widget.accentColor.withValues(alpha: 0.04)
+                              : AppColors.surface.withValues(alpha: 0.75),
                   borderRadius: BorderRadius.circular(16 * sf),
                   border: Border.all(
-                    color: hasAnyStars
-                        ? widget.accentColor.withValues(alpha: 0.25)
-                        : isNextToPlay
-                            ? widget.accentColor.withValues(alpha: 0.3)
-                            : widget.unlocked
-                                ? widget.accentColor
-                                    .withValues(alpha: 0.15)
-                                : AppColors.border.withValues(alpha: 0.5),
-                    width: isNextToPlay ? 1.8 : 1.5,
+                    color: isFullyMastered
+                        ? AppColors.starGold.withValues(alpha: 0.5)
+                        : hasAnyStars
+                            ? widget.accentColor.withValues(alpha: 0.25)
+                            : isNextToPlay
+                                ? widget.accentColor.withValues(alpha: 0.35)
+                                : widget.unlocked
+                                    ? widget.accentColor
+                                        .withValues(alpha: 0.15)
+                                    : AppColors.border.withValues(alpha: 0.5),
+                    width: isFullyMastered ? 2.0 : isNextToPlay ? 2.0 : 1.5,
                   ),
                   boxShadow: [
-                    if (isComplete)
+                    if (isFullyMastered)
+                      BoxShadow(
+                        color:
+                            AppColors.starGold.withValues(alpha: 0.12),
+                        blurRadius: 16,
+                        spreadRadius: 2,
+                      ),
+                    if (isComplete && !isFullyMastered)
                       BoxShadow(
                         color:
                             widget.accentColor.withValues(alpha: 0.08),
@@ -773,8 +788,9 @@ class _LevelCardState extends State<_LevelCard> {
                     if (isNextToPlay)
                       BoxShadow(
                         color:
-                            widget.accentColor.withValues(alpha: 0.1),
-                        blurRadius: 12,
+                            widget.accentColor.withValues(alpha: 0.15),
+                        blurRadius: 16,
+                        spreadRadius: 2,
                       ),
                   ],
                 ),
@@ -847,6 +863,22 @@ class _LevelCardState extends State<_LevelCard> {
         ),
       ),
     );
+
+    // Next-to-play card gets a gentle breathing pulse to guide the child
+    if (isNextToPlay) {
+      card = card
+          .animate(
+            onPlay: (c) => c.repeat(reverse: true),
+          )
+          .scaleXY(
+            begin: 1.0,
+            end: 1.015,
+            duration: 1600.ms,
+            curve: Curves.easeInOut,
+          );
+    }
+
+    return card;
   }
 }
 
