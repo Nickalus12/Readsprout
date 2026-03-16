@@ -116,7 +116,7 @@ class GameHeader extends StatelessWidget {
             child: Text(
               '${currentWordIndex + 1}/$totalWords',
               style: AppFonts.fredoka(
-                fontSize: 15,
+                fontSize: 17,
                 fontWeight: FontWeight.w600,
                 color: AppColors.primaryText,
               ),
@@ -160,10 +160,10 @@ class GameProgressDots extends StatelessWidget {
           Widget dot = AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             margin: const EdgeInsets.symmetric(horizontal: 3),
-            width: isCurrent ? 20 : 8,
-            height: 8,
+            width: isCurrent ? 24 : isDone ? 12 : 10,
+            height: isDone ? 12 : 10,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(4),
+              borderRadius: BorderRadius.circular(6),
               color: isDone
                   ? AppColors.success
                   : isCurrent

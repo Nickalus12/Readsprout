@@ -417,28 +417,28 @@ class _RoundButtonState extends State<RoundButton> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 68,
-              height: 68,
+              width: 80,
+              height: 80,
               decoration: BoxDecoration(
                 color: widget.color.withValues(alpha: _pressed ? 0.2 : 0.12),
                 shape: BoxShape.circle,
                 border: Border.all(
-                    color: widget.color.withValues(alpha: 0.4), width: 2),
+                    color: widget.color.withValues(alpha: 0.4), width: 2.5),
                 boxShadow: [
                   BoxShadow(
-                    color: widget.color.withValues(alpha: 0.15),
-                    blurRadius: 16,
-                    spreadRadius: 2,
+                    color: widget.color.withValues(alpha: 0.2),
+                    blurRadius: 20,
+                    spreadRadius: 3,
                   ),
                 ],
               ),
-              child: Icon(widget.icon, color: widget.color, size: 30),
+              child: Icon(widget.icon, color: widget.color, size: 36),
             ),
             const SizedBox(height: 8),
             Text(
               widget.label,
               style: AppFonts.fredoka(
-                fontSize: 14,
+                fontSize: 16,
                 fontWeight: FontWeight.w500,
                 color: widget.color,
               ),
