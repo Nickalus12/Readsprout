@@ -89,15 +89,27 @@ class GameHeader extends StatelessWidget {
               .animate()
               .fadeIn(duration: 400.ms)
               .slideX(begin: -0.1, end: 0, duration: 400.ms, curve: Curves.easeOutCubic),
-          // Small avatar with reactions
+          // Avatar with reactions - sized for visibility
           if (profileService != null)
             Padding(
-              padding: const EdgeInsets.only(right: 8),
-              child: AvatarWidget(
-                config: profileService!.avatar,
-                size: 36,
-                showBackground: false,
-                controller: avatarController,
+              padding: const EdgeInsets.only(right: 6),
+              child: Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.electricBlue.withValues(alpha: 0.1),
+                      blurRadius: 8,
+                      spreadRadius: 1,
+                    ),
+                  ],
+                ),
+                child: AvatarWidget(
+                  config: profileService!.avatar,
+                  size: 42,
+                  showBackground: false,
+                  controller: avatarController,
+                ),
               ),
             )
                 .animate()
