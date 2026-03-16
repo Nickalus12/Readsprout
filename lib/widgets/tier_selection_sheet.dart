@@ -216,12 +216,12 @@ class _TierSelectionSheetState extends State<TierSelectionSheet> {
 
             SizedBox(height: 16 * sf),
 
-            // Big PLAY button
+            // Big PLAY button - hero CTA
             Padding(
-              padding: EdgeInsets.symmetric(horizontal: 24 * sf),
+              padding: EdgeInsets.symmetric(horizontal: 20 * sf),
               child: SizedBox(
                 width: double.infinity,
-                height: 56 * sf,
+                height: 62 * sf,
                 child: _PlayButton(
                   tier: WordTier.fromValue(_selectedTierValue)!,
                   sf: sf,
@@ -509,6 +509,14 @@ class _PlayButtonState extends State<_PlayButton> {
     )
         .animate()
         .fadeIn(duration: 300.ms)
-        .scaleXY(begin: 0.9, end: 1.0, duration: 300.ms, curve: Curves.easeOutCubic);
+        .scaleXY(begin: 0.9, end: 1.0, duration: 300.ms, curve: Curves.easeOutCubic)
+        .then(delay: 500.ms)
+        .animate(onPlay: (c) => c.repeat(reverse: true))
+        .scaleXY(
+          begin: 1.0,
+          end: 1.03,
+          duration: 1400.ms,
+          curve: Curves.easeInOut,
+        );
   }
 }
