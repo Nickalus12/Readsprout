@@ -120,18 +120,32 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen>
         child: Column(
           children: [
             // ── Header (close + randomize) ──
-            _buildHeader(),
+            _buildHeader()
+                .animate()
+                .fadeIn(duration: 300.ms)
+                .slideY(begin: -0.3, end: 0, duration: 300.ms, curve: Curves.easeOut),
             // ── Avatar Preview (top ~38%) ──
             SizedBox(
               height: previewHeight.clamp(180.0, 320.0),
               child: _buildPreview(),
-            ),
+            )
+                .animate()
+                .fadeIn(delay: 100.ms, duration: 400.ms)
+                .scale(begin: const Offset(0.9, 0.9), end: const Offset(1.0, 1.0),
+                    delay: 100.ms, duration: 400.ms, curve: Curves.easeOut),
             const SizedBox(height: 8),
             // ── Tab Bar ──
-            _buildTabBar(),
+            _buildTabBar()
+                .animate()
+                .fadeIn(delay: 250.ms, duration: 300.ms)
+                .slideY(begin: 0.2, end: 0, delay: 250.ms, duration: 300.ms, curve: Curves.easeOut),
             const SizedBox(height: 4),
             // ── Options Area (rest of screen) ──
-            Expanded(child: _buildTabContent()),
+            Expanded(
+              child: _buildTabContent()
+                  .animate()
+                  .fadeIn(delay: 350.ms, duration: 300.ms),
+            ),
             // ── Done Button ──
             _buildDoneButton(),
             const SizedBox(height: 8),
@@ -512,12 +526,12 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen>
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // Skin tone slider
-          _SectionHeader(label: 'Skin Tone'),
+          const _SectionHeader(label: 'Skin Tone'),
           const SizedBox(height: 8),
           _buildSkinToneSlider(),
           const SizedBox(height: 16),
           // Face shape
-          _SectionHeader(label: 'Face Shape'),
+          const _SectionHeader(label: 'Face Shape'),
           const SizedBox(height: 8),
           SizedBox(
             height: 80,
