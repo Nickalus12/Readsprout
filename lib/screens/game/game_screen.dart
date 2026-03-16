@@ -700,8 +700,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
     setState(() => _showingCelebration = true);
 
-    // Celebrate — give the child time to enjoy it
-    await Future.delayed(const Duration(milliseconds: 2500));
+    // Celebrate — give the child plenty of time to enjoy it
+    await Future.delayed(const Duration(milliseconds: 3200));
     if (!mounted) return;
 
     if (_isLastWord || wasTierComplete) {

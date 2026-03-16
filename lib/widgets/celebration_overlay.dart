@@ -314,10 +314,10 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                         return Text(
                           widget.word.toUpperCase(),
                           style: AppFonts.fredoka(
-                            fontSize: 56,
+                            fontSize: 68,
                             fontWeight: FontWeight.w700,
                             color: Colors.white,
-                            letterSpacing: 8,
+                            letterSpacing: 10,
                             shadows: [
                               Shadow(color: glowColor, blurRadius: 28),
                               Shadow(
@@ -389,7 +389,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                   const SizedBox(height: 12),
                   Text(
                     getWordEmoji(widget.word),
-                    style: const TextStyle(fontSize: 36),
+                    style: const TextStyle(fontSize: 48),
                   )
                       .animate()
                       .scaleXY(
@@ -407,7 +407,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                       getWordSentence(widget.word),
                       textAlign: TextAlign.center,
                       style: AppFonts.nunito(
-                        fontSize: 16,
+                        fontSize: 19,
                         fontWeight: FontWeight.w600,
                         color: Colors.white.withValues(alpha: 0.85),
                         fontStyle: FontStyle.italic,
@@ -452,7 +452,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                       _praise,
                       textAlign: TextAlign.center,
                       style: AppFonts.fredoka(
-                        fontSize: 22,
+                        fontSize: 26,
                         fontWeight: FontWeight.w500,
                         color: _zoneAccent,
                         shadows: [
@@ -509,8 +509,8 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
           isHero = false; // 2 stars: equal size
         }
 
-        final size = isHero ? 32.0 : (count == 2 ? 26.0 : 22.0);
-        final iconSize = isHero ? 20.0 : (count == 2 ? 17.0 : 14.0);
+        final size = isHero ? 44.0 : (count == 2 ? 36.0 : 30.0);
+        final iconSize = isHero ? 28.0 : (count == 2 ? 22.0 : 18.0);
 
         return Padding(
           padding: const EdgeInsets.symmetric(horizontal: 8),
