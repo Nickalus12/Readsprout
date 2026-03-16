@@ -598,41 +598,62 @@ class AvatarAnimations {
     },
   );
 
-  // ── Celebrate: arms up, slight bounce ─────────────────────────────
+  // ── Celebrate: big arms up, bouncy — kids love exaggerated joy ────
   static const celebrate = AnimationClip(
     name: 'celebrate',
-    duration: 1.5,
+    duration: 1.8,
     tracks: {
       'leftUpperArm': [
         BoneKeyframe(time: 0.0, rotation: 0.0),
-        BoneKeyframe(time: 0.3, rotation: 1.4, curve: Curves.easeOut),
-        BoneKeyframe(time: 0.5, rotation: 1.2, curve: Curves.easeInOut),
-        BoneKeyframe(time: 0.7, rotation: 1.5, curve: Curves.easeInOut),
-        BoneKeyframe(time: 0.9, rotation: 1.2, curve: Curves.easeInOut),
-        BoneKeyframe(time: 1.1, rotation: 1.4, curve: Curves.easeInOut),
-        BoneKeyframe(time: 1.5, rotation: 0.0, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.25, rotation: 1.6, curve: Curves.easeOut),
+        BoneKeyframe(time: 0.45, rotation: 1.3, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.65, rotation: 1.7, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.85, rotation: 1.3, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.05, rotation: 1.6, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.25, rotation: 1.3, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.8, rotation: 0.0, curve: Curves.easeInOut),
       ],
       'rightUpperArm': [
         BoneKeyframe(time: 0.0, rotation: 0.0),
-        BoneKeyframe(time: 0.3, rotation: -1.4, curve: Curves.easeOut),
-        BoneKeyframe(time: 0.5, rotation: -1.2, curve: Curves.easeInOut),
-        BoneKeyframe(time: 0.7, rotation: -1.5, curve: Curves.easeInOut),
-        BoneKeyframe(time: 0.9, rotation: -1.2, curve: Curves.easeInOut),
-        BoneKeyframe(time: 1.1, rotation: -1.4, curve: Curves.easeInOut),
-        BoneKeyframe(time: 1.5, rotation: 0.0, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.25, rotation: -1.6, curve: Curves.easeOut),
+        BoneKeyframe(time: 0.45, rotation: -1.3, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.65, rotation: -1.7, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.85, rotation: -1.3, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.05, rotation: -1.6, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.25, rotation: -1.3, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.8, rotation: 0.0, curve: Curves.easeInOut),
+      ],
+      'leftHand': [
+        BoneKeyframe(time: 0.25, rotation: 0.0),
+        BoneKeyframe(time: 0.45, rotation: 0.3, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.65, rotation: -0.3, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.85, rotation: 0.25, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.05, rotation: -0.25, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.8, rotation: 0.0, curve: Curves.easeIn),
+      ],
+      'rightHand': [
+        BoneKeyframe(time: 0.25, rotation: 0.0),
+        BoneKeyframe(time: 0.45, rotation: -0.3, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.65, rotation: 0.3, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.85, rotation: -0.25, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.05, rotation: 0.25, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.8, rotation: 0.0, curve: Curves.easeIn),
       ],
       'root': [
         BoneKeyframe(time: 0.0, dy: 0.0),
-        BoneKeyframe(time: 0.3, dy: -0.015, curve: Curves.easeOut),
-        BoneKeyframe(time: 0.5, dy: 0.005, curve: Curves.bounceOut),
-        BoneKeyframe(time: 0.7, dy: -0.01, curve: Curves.easeOut),
-        BoneKeyframe(time: 0.9, dy: 0.003, curve: Curves.bounceOut),
-        BoneKeyframe(time: 1.5, dy: 0.0, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.25, dy: -0.025, curve: Curves.easeOut),
+        BoneKeyframe(time: 0.45, dy: 0.005, curve: Curves.bounceOut),
+        BoneKeyframe(time: 0.65, dy: -0.018, curve: Curves.easeOut),
+        BoneKeyframe(time: 0.85, dy: 0.003, curve: Curves.bounceOut),
+        BoneKeyframe(time: 1.05, dy: -0.012, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.8, dy: 0.0, curve: Curves.easeInOut),
       ],
       'head': [
-        BoneKeyframe(time: 0.0, dy: 0.0),
-        BoneKeyframe(time: 0.3, dy: -0.01, curve: Curves.easeOut),
-        BoneKeyframe(time: 1.5, dy: 0.0, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.0, dy: 0.0, rotation: 0.0),
+        BoneKeyframe(time: 0.25, dy: -0.015, rotation: -0.04, curve: Curves.easeOut),
+        BoneKeyframe(time: 0.65, dy: -0.01, rotation: 0.04, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.05, dy: -0.008, rotation: -0.03, curve: Curves.easeInOut),
+        BoneKeyframe(time: 1.8, dy: 0.0, rotation: 0.0, curve: Curves.easeInOut),
       ],
     },
   );
@@ -668,54 +689,78 @@ class AvatarAnimations {
     },
   );
 
-  // ── Think: hand on chin, head tilt ───────────────────────────────
+  // ── Think: visible head tilt, hand on chin, furrowed brow feel ───
   static const think = AnimationClip(
     name: 'think',
-    duration: 1.0,
+    duration: 1.5,
     tracks: {
       'head': [
-        BoneKeyframe(time: 0.0, rotation: 0.0),
-        BoneKeyframe(time: 0.3, rotation: 0.08, dx: 0.005, curve: Curves.easeOut),
-        BoneKeyframe(time: 0.7, rotation: 0.08, dx: 0.005),
-        BoneKeyframe(time: 1.0, rotation: 0.0, dx: 0.0, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.0, rotation: 0.0, dx: 0.0),
+        BoneKeyframe(time: 0.35, rotation: 0.14, dx: 0.008, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.0, rotation: 0.14, dx: 0.008),
+        BoneKeyframe(time: 1.5, rotation: 0.0, dx: 0.0, curve: Curves.easeInOut),
+      ],
+      'leftBrow': [
+        BoneKeyframe(time: 0.0, dy: 0.0),
+        BoneKeyframe(time: 0.35, dy: 0.006, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.0, dy: 0.006),
+        BoneKeyframe(time: 1.5, dy: 0.0, curve: Curves.easeInOut),
+      ],
+      'rightBrow': [
+        BoneKeyframe(time: 0.0, dy: 0.0, rotation: 0.0),
+        BoneKeyframe(time: 0.35, dy: -0.004, rotation: -0.06, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.0, dy: -0.004, rotation: -0.06),
+        BoneKeyframe(time: 1.5, dy: 0.0, rotation: 0.0, curve: Curves.easeInOut),
       ],
       'rightUpperArm': [
         BoneKeyframe(time: 0.0, rotation: 0.0),
-        BoneKeyframe(time: 0.3, rotation: -0.8, curve: Curves.easeOut),
-        BoneKeyframe(time: 0.7, rotation: -0.8),
-        BoneKeyframe(time: 1.0, rotation: 0.0, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.35, rotation: -0.9, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.0, rotation: -0.9),
+        BoneKeyframe(time: 1.5, rotation: 0.0, curve: Curves.easeInOut),
       ],
       'rightForearm': [
         BoneKeyframe(time: 0.0, rotation: 0.0),
-        BoneKeyframe(time: 0.3, rotation: -1.0, curve: Curves.easeOut),
-        BoneKeyframe(time: 0.7, rotation: -1.0),
-        BoneKeyframe(time: 1.0, rotation: 0.0, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.35, rotation: -1.1, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.0, rotation: -1.1),
+        BoneKeyframe(time: 1.5, rotation: 0.0, curve: Curves.easeInOut),
       ],
       'rightHand': [
         BoneKeyframe(time: 0.0, rotation: 0.0),
-        BoneKeyframe(time: 0.3, rotation: 0.1, curve: Curves.easeOut),
-        BoneKeyframe(time: 0.7, rotation: 0.1),
-        BoneKeyframe(time: 1.0, rotation: 0.0, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.35, rotation: 0.15, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.0, rotation: 0.15),
+        BoneKeyframe(time: 1.5, rotation: 0.0, curve: Curves.easeInOut),
+      ],
+      'leftEye': [
+        BoneKeyframe(time: 0.0, scaleY: 1.0),
+        BoneKeyframe(time: 0.35, scaleY: 0.85, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.0, scaleY: 0.85),
+        BoneKeyframe(time: 1.5, scaleY: 1.0, curve: Curves.easeInOut),
+      ],
+      'rightEye': [
+        BoneKeyframe(time: 0.0, scaleY: 1.0),
+        BoneKeyframe(time: 0.35, scaleY: 0.85, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.0, scaleY: 0.85),
+        BoneKeyframe(time: 1.5, scaleY: 1.0, curve: Curves.easeInOut),
       ],
     },
   );
 
-  // ── Surprise: head back, arms out, eyes wide ─────────────────────
+  // ── Surprise: big jump back, arms wide, eyes pop ─────────────────
   static const surprise = AnimationClip(
     name: 'surprise',
-    duration: 0.8,
+    duration: 1.0,
     tracks: {
       'head': [
         BoneKeyframe(time: 0.0, dy: 0.0, scaleX: 1.0, scaleY: 1.0),
         BoneKeyframe(
-            time: 0.15,
-            dy: -0.012,
-            scaleX: 1.04,
-            scaleY: 1.04,
+            time: 0.12,
+            dy: -0.022,
+            scaleX: 1.06,
+            scaleY: 1.06,
             curve: Curves.easeOut),
-        BoneKeyframe(time: 0.5, dy: -0.008, scaleX: 1.02, scaleY: 1.02),
+        BoneKeyframe(time: 0.5, dy: -0.012, scaleX: 1.03, scaleY: 1.03),
         BoneKeyframe(
-            time: 0.8,
+            time: 1.0,
             dy: 0.0,
             scaleX: 1.0,
             scaleY: 1.0,
@@ -723,20 +768,36 @@ class AvatarAnimations {
       ],
       'leftUpperArm': [
         BoneKeyframe(time: 0.0, rotation: 0.0),
-        BoneKeyframe(time: 0.15, rotation: 0.6, curve: Curves.easeOut),
-        BoneKeyframe(time: 0.5, rotation: 0.5),
-        BoneKeyframe(time: 0.8, rotation: 0.0, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.12, rotation: 0.8, curve: Curves.easeOut),
+        BoneKeyframe(time: 0.5, rotation: 0.65),
+        BoneKeyframe(time: 1.0, rotation: 0.0, curve: Curves.easeInOut),
       ],
       'rightUpperArm': [
         BoneKeyframe(time: 0.0, rotation: 0.0),
-        BoneKeyframe(time: 0.15, rotation: -0.6, curve: Curves.easeOut),
-        BoneKeyframe(time: 0.5, rotation: -0.5),
-        BoneKeyframe(time: 0.8, rotation: 0.0, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.12, rotation: -0.8, curve: Curves.easeOut),
+        BoneKeyframe(time: 0.5, rotation: -0.65),
+        BoneKeyframe(time: 1.0, rotation: 0.0, curve: Curves.easeInOut),
+      ],
+      'leftHand': [
+        BoneKeyframe(time: 0.0, scaleX: 1.0, scaleY: 1.0),
+        BoneKeyframe(time: 0.12, scaleX: 1.2, scaleY: 1.2, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.0, scaleX: 1.0, scaleY: 1.0, curve: Curves.easeInOut),
+      ],
+      'rightHand': [
+        BoneKeyframe(time: 0.0, scaleX: 1.0, scaleY: 1.0),
+        BoneKeyframe(time: 0.12, scaleX: 1.2, scaleY: 1.2, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.0, scaleX: 1.0, scaleY: 1.0, curve: Curves.easeInOut),
+      ],
+      'root': [
+        BoneKeyframe(time: 0.0, dy: 0.0),
+        BoneKeyframe(time: 0.12, dy: -0.015, curve: Curves.easeOut),
+        BoneKeyframe(time: 0.35, dy: 0.003, curve: Curves.bounceOut),
+        BoneKeyframe(time: 1.0, dy: 0.0, curve: Curves.easeInOut),
       ],
       'chest': [
         BoneKeyframe(time: 0.0, scaleY: 1.0),
-        BoneKeyframe(time: 0.15, scaleY: 1.03, curve: Curves.easeOut),
-        BoneKeyframe(time: 0.8, scaleY: 1.0, curve: Curves.easeInOut),
+        BoneKeyframe(time: 0.12, scaleY: 1.05, curve: Curves.easeOut),
+        BoneKeyframe(time: 1.0, scaleY: 1.0, curve: Curves.easeInOut),
       ],
     },
   );
