@@ -2,6 +2,7 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_animate/flutter_animate.dart';
+import '../data/dolch_words.dart';
 import '../theme/app_theme.dart';
 import '../services/profile_service.dart';
 import '../services/progress_service.dart';
@@ -358,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen>
                               icon: Icons.star_rounded,
                               iconColor: AppColors.starGold,
                               value: '$totalStars',
-                              label: 'Stars',
+                              label: '/ ${DolchWords.totalLevels * 3} Stars',
                               audioService: widget.audioService,
                               audioWord: 'stars',
                             ),
@@ -369,6 +370,14 @@ class _HomeScreenState extends State<HomeScreen>
                               label: 'Words',
                               audioService: widget.audioService,
                               audioWord: 'words',
+                            ),
+                            _StatBadge(
+                              icon: Icons.monetization_on_rounded,
+                              iconColor: AppColors.starGold,
+                              value: '${widget.progressService.starCoins}',
+                              label: 'Coins',
+                              audioService: widget.audioService,
+                              audioWord: 'coins',
                             ),
                           ],
                           if (widget.streakService.hasStreak)
