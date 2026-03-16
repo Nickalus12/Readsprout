@@ -8,8 +8,8 @@ import '../services/audio_service.dart';
 import '../services/profile_service.dart';
 import '../theme/app_theme.dart';
 
-/// A kid-friendly sticker book with categorized sections, large tappable
-/// sticker tiles, audio playback, and hint icons for unearned stickers.
+/// A kid-friendly sticker book with collapsible categorized sections,
+/// large tappable sticker tiles, audio playback, and progress hints.
 class StickerBook extends StatefulWidget {
   final ProfileService profileService;
   final AudioService? audioService;
@@ -25,6 +25,9 @@ class StickerBook extends StatefulWidget {
 }
 
 class _StickerBookState extends State<StickerBook> {
+  /// Track which categories are expanded. All collapsed by default.
+  final Set<int> _expandedCategories = {};
+
   @override
   Widget build(BuildContext context) {
     final earnedStickers = widget.profileService.allStickers;
@@ -90,6 +93,15 @@ class _StickerBookState extends State<StickerBook> {
       ),
     ];
 
+    // Auto-expand categories that have new stickers
+    if (mostRecent != null) {
+      for (int i = 0; i < sections.length; i++) {
+        if (sections[i].stickers.any((s) => s.id == mostRecent!.stickerId)) {
+          _expandedCategories.add(i);
+        }
+      }
+    }
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -101,7 +113,7 @@ class _StickerBookState extends State<StickerBook> {
               GestureDetector(
                 onTap: () => widget.audioService?.playWord('stickers'),
                 child: Text(
-                  'Stickers',
+                  'Sticker Book',
                   style: AppFonts.fredoka(
                     fontSize: 18,
                     fontWeight: FontWeight.w600,
@@ -130,10 +142,9 @@ class _StickerBookState extends State<StickerBook> {
         ),
         const SizedBox(height: 4),
 
-        // Category sections
+        // Category sections (collapsible)
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 16),
-          padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: AppColors.surface,
             borderRadius: BorderRadius.circular(20),
@@ -141,89 +152,229 @@ class _StickerBookState extends State<StickerBook> {
               color: AppColors.border.withValues(alpha: 0.3),
             ),
           ),
-          child: Column(
-            children: [
-              for (int si = 0; si < sections.length; si++) ...[
-                if (si > 0) ...[
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 6),
-                    child: Divider(
-                      color: AppColors.border.withValues(alpha: 0.2),
-                      height: 1,
-                    ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Column(
+              children: [
+                for (int si = 0; si < sections.length; si++)
+                  _CollapsibleCategory(
+                    section: sections[si],
+                    index: si,
+                    isExpanded: _expandedCategories.contains(si),
+                    earnedIds: earnedIds,
+                    earnedStickers: earnedStickers,
+                    mostRecent: mostRecent,
+                    profileService: widget.profileService,
+                    audioService: widget.audioService,
+                    isLast: si == sections.length - 1,
+                    onToggle: () {
+                      setState(() {
+                        if (_expandedCategories.contains(si)) {
+                          _expandedCategories.remove(si);
+                        } else {
+                          _expandedCategories.add(si);
+                        }
+                      });
+                    },
                   ),
-                ],
-                _buildCategorySection(
-                  sections[si],
-                  earnedIds,
-                  earnedStickers,
-                  mostRecent,
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ],
     );
   }
+}
 
-  Widget _buildCategorySection(
-    _CategorySection section,
-    Set<String> earnedIds,
-    List<StickerRecord> earnedStickers,
-    StickerRecord? mostRecent,
-  ) {
+// ── Collapsible category ───────────────────────────────────────────────
+
+class _CollapsibleCategory extends StatelessWidget {
+  final _CategorySection section;
+  final int index;
+  final bool isExpanded;
+  final Set<String> earnedIds;
+  final List<StickerRecord> earnedStickers;
+  final StickerRecord? mostRecent;
+  final ProfileService profileService;
+  final AudioService? audioService;
+  final bool isLast;
+  final VoidCallback onToggle;
+
+  const _CollapsibleCategory({
+    required this.section,
+    required this.index,
+    required this.isExpanded,
+    required this.earnedIds,
+    required this.earnedStickers,
+    this.mostRecent,
+    required this.profileService,
+    this.audioService,
+    required this.isLast,
+    required this.onToggle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     final earnedInCategory =
         section.stickers.where((s) => earnedIds.contains(s.id)).length;
+    final total = section.stickers.length;
+    final allEarned = earnedInCategory == total;
+    final hasNew = mostRecent != null &&
+        section.stickers.any((s) => s.id == mostRecent!.stickerId);
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Category header
-        Padding(
-          padding: const EdgeInsets.only(bottom: 8, top: 4),
-          child: Row(
-            children: [
-              Icon(section.icon, size: 18, color: section.color),
-              const SizedBox(width: 6),
-              Text(
-                section.title,
-                style: AppFonts.fredoka(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w500,
-                  color: section.color,
+        // Tappable header
+        GestureDetector(
+          onTap: onToggle,
+          behavior: HitTestBehavior.opaque,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+            child: Row(
+              children: [
+                // Category icon
+                Container(
+                  width: 32,
+                  height: 32,
+                  decoration: BoxDecoration(
+                    color: section.color.withValues(alpha: 0.15),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    section.icon,
+                    size: 18,
+                    color: section.color,
+                  ),
                 ),
-              ),
-              const SizedBox(width: 6),
-              Text(
-                '$earnedInCategory/${section.stickers.length}',
-                style: AppFonts.nunito(
-                  fontSize: 11,
-                  color: AppColors.secondaryText.withValues(alpha: 0.5),
+                const SizedBox(width: 10),
+
+                // Title
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            section.title,
+                            style: AppFonts.fredoka(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w600,
+                              color: section.color,
+                            ),
+                          ),
+                          if (hasNew) ...[
+                            const SizedBox(width: 6),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: AppColors.error.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(6),
+                              ),
+                              child: Text(
+                                'NEW',
+                                style: AppFonts.fredoka(
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                  color: AppColors.error,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 2),
+                      // Progress bar + count
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(3),
+                              child: LinearProgressIndicator(
+                                value: total > 0 ? earnedInCategory / total : 0,
+                                backgroundColor:
+                                    AppColors.border.withValues(alpha: 0.15),
+                                valueColor: AlwaysStoppedAnimation(
+                                  allEarned
+                                      ? section.color
+                                      : section.color.withValues(alpha: 0.6),
+                                ),
+                                minHeight: 4,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Text(
+                            '$earnedInCategory/$total',
+                            style: AppFonts.nunito(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.secondaryText.withValues(alpha: 0.6),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-            ],
+
+                const SizedBox(width: 4),
+
+                // Expand/collapse arrow
+                AnimatedRotation(
+                  turns: isExpanded ? 0.5 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    size: 22,
+                    color: AppColors.secondaryText.withValues(alpha: 0.5),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
 
-        // Sticker grid
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            for (final def in section.stickers)
-              _StickerTile(
-                definition: def,
-                isEarned: earnedIds.contains(def.id),
-                isNew: mostRecent?.stickerId == def.id,
-                record: earnedIds.contains(def.id)
-                    ? earnedStickers.firstWhere((s) => s.stickerId == def.id)
-                    : null,
-                profileService: widget.profileService,
-                audioService: widget.audioService,
-              ),
-          ],
+        // Expanded sticker grid
+        AnimatedCrossFade(
+          firstChild: const SizedBox(width: double.infinity, height: 0),
+          secondChild: Padding(
+            padding: const EdgeInsets.only(left: 14, right: 14, bottom: 12),
+            child: Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                for (final def in section.stickers)
+                  _StickerTile(
+                    definition: def,
+                    isEarned: earnedIds.contains(def.id),
+                    isNew: mostRecent?.stickerId == def.id,
+                    record: earnedIds.contains(def.id)
+                        ? earnedStickers
+                            .firstWhere((s) => s.stickerId == def.id)
+                        : null,
+                    profileService: profileService,
+                    audioService: audioService,
+                  ),
+              ],
+            ),
+          ),
+          crossFadeState: isExpanded
+              ? CrossFadeState.showSecond
+              : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 250),
+          sizeCurve: Curves.easeInOut,
         ),
+
+        // Divider between categories
+        if (!isLast)
+          Divider(
+            color: AppColors.border.withValues(alpha: 0.15),
+            height: 1,
+            indent: 14,
+            endIndent: 14,
+          ),
       ],
     );
   }
@@ -286,29 +437,38 @@ class _StickerTileState extends State<_StickerTile>
   }
 
   void _onTap() {
-    if (!widget.isEarned) return;
+    if (widget.isEarned) {
+      // Play audio
+      widget.audioService?.playWord(widget.definition.audioKey);
 
-    // Play audio
-    widget.audioService?.playWord(widget.definition.audioKey);
+      // Bounce animation
+      _bounceController.forward(from: 0);
 
-    // Bounce animation
-    _bounceController.forward(from: 0);
+      // Mark as seen
+      if (widget.record != null && widget.record!.isNew) {
+        widget.profileService.markStickerSeen(widget.definition.id);
+      }
 
-    // Mark as seen
-    if (widget.record != null && widget.record!.isNew) {
-      widget.profileService.markStickerSeen(widget.definition.id);
+      // Show details dialog
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.6),
+        builder: (dialogContext) => _StickerDetailsDialog(
+          definition: widget.definition,
+          record: widget.record!,
+          audioService: widget.audioService,
+        ),
+      );
+    } else {
+      // Show hint for locked stickers
+      showDialog(
+        context: context,
+        barrierColor: Colors.black.withValues(alpha: 0.5),
+        builder: (dialogContext) => _StickerHintDialog(
+          definition: widget.definition,
+        ),
+      );
     }
-
-    // Show details dialog
-    showDialog(
-      context: context,
-      barrierColor: Colors.black.withValues(alpha: 0.6),
-      builder: (dialogContext) => _StickerDetailsDialog(
-        definition: widget.definition,
-        record: widget.record!,
-        audioService: widget.audioService,
-      ),
-    );
   }
 
   @override
@@ -358,11 +518,11 @@ class _StickerTileState extends State<_StickerTile>
                         : null,
                   ),
                   child: Icon(
-                    widget.definition.icon,
-                    size: isEarned ? 26 : 20,
+                    isEarned ? widget.definition.icon : Icons.lock_rounded,
+                    size: isEarned ? 26 : 18,
                     color: isEarned
                         ? color
-                        : AppColors.secondaryText.withValues(alpha: 0.12),
+                        : AppColors.secondaryText.withValues(alpha: 0.15),
                   ),
                 ),
               ),
@@ -388,19 +548,22 @@ class _StickerTileState extends State<_StickerTile>
                       .scaleXY(begin: 0.8, end: 1.2, duration: 800.ms),
                 ),
 
-              // Hint question mark for unearned
-              if (!isEarned)
+              // Name label for earned stickers
+              if (isEarned)
                 Positioned(
                   bottom: 0,
                   left: 0,
                   right: 0,
                   child: Center(
                     child: Text(
-                      '?',
-                      style: AppFonts.fredoka(
-                        fontSize: 12,
+                      widget.definition.name,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: AppFonts.nunito(
+                        fontSize: 8,
                         fontWeight: FontWeight.w600,
-                        color: AppColors.secondaryText.withValues(alpha: 0.25),
+                        color: AppColors.secondaryText.withValues(alpha: 0.6),
                       ),
                     ),
                   ),
@@ -408,6 +571,104 @@ class _StickerTileState extends State<_StickerTile>
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Hint dialog for locked stickers ─────────────────────────────────────
+
+class _StickerHintDialog extends StatelessWidget {
+  final StickerDefinition definition;
+
+  const _StickerHintDialog({required this.definition});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          width: 220,
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            color: AppColors.surfaceVariant,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(
+              color: AppColors.border.withValues(alpha: 0.4),
+              width: 2,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.5),
+                blurRadius: 16,
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Locked icon
+              Container(
+                width: 64,
+                height: 64,
+                decoration: BoxDecoration(
+                  color: AppColors.border.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: AppColors.border.withValues(alpha: 0.25),
+                    width: 2,
+                  ),
+                ),
+                child: Icon(
+                  Icons.lock_rounded,
+                  size: 28,
+                  color: AppColors.secondaryText.withValues(alpha: 0.3),
+                ),
+              ),
+              const SizedBox(height: 14),
+
+              Text(
+                '???',
+                style: AppFonts.fredoka(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.secondaryText.withValues(alpha: 0.5),
+                ),
+              ),
+              const SizedBox(height: 8),
+
+              // Hint: show what they need to do
+              Text(
+                definition.description,
+                textAlign: TextAlign.center,
+                style: AppFonts.nunito(
+                  fontSize: 13,
+                  color: AppColors.secondaryText.withValues(alpha: 0.7),
+                  height: 1.3,
+                ),
+              ),
+              const SizedBox(height: 12),
+
+              Text(
+                'Keep playing to unlock!',
+                style: AppFonts.nunito(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: definition.color.withValues(alpha: 0.6),
+                ),
+              ),
+            ],
+          ),
+        )
+            .animate()
+            .fadeIn(duration: 200.ms)
+            .scaleXY(
+              begin: 0.8,
+              end: 1.0,
+              duration: 250.ms,
+              curve: Curves.easeOutBack,
+            ),
       ),
     );
   }

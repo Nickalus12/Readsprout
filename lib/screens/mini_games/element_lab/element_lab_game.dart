@@ -153,8 +153,17 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   Future<void> _toggleMute() async {
+    // Speak feedback BEFORE actually muting so the child hears it
+    if (!_isMuted) {
+      // About to mute — say "off" while still unmuted
+      await widget.audioService.playWord('off');
+    }
     setState(() => _isMuted = !_isMuted);
     Haptics.tap();
+    if (!_isMuted) {
+      // Just unmuted — say "on"
+      _speakLabel('on');
+    }
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_muteKey, _isMuted);
   }
@@ -164,17 +173,31 @@ class _ElementLabGameState extends State<ElementLabGame>
     _engine.isNight = _isNight;
     _engine.markAllDirty();
     Haptics.tap();
+    _speakLabel(_isNight ? 'night' : 'day');
   }
 
-  Future<void> _speakElementName(int elType) async {
-    if (_isMuted || elType == El.empty || elType == El.eraser) return;
-    final name = elementNames[elType.clamp(0, elementNames.length - 1)].toLowerCase();
-    if (name.isEmpty) return;
+  /// Map display names to audio file names when they differ.
+  static const Map<String, String> _displayToAudioName = {
+    'zap': 'lightning',    // display "Zap" but audio is "lightning"
+    'shroom': 'mushroom',  // seed sub-type display name
+  };
 
-    if (speakableWords.contains(name)) {
-      await widget.audioService.playWord(name);
+  Future<void> _speakElementName(int elType) async {
+    if (_isMuted || elType == El.empty) return;
+    final displayName = elType == El.eraser
+        ? 'eraser'
+        : elementNames[elType.clamp(0, elementNames.length - 1)].toLowerCase();
+    if (displayName.isEmpty) return;
+
+    // Resolve audio name: use mapping if exists, else display name
+    final audioName = _displayToAudioName[displayName] ?? displayName;
+
+    if (speakableWords.contains(audioName)) {
+      await widget.audioService.playWord(audioName);
+    } else if (speakableWords.contains(displayName)) {
+      await widget.audioService.playWord(displayName);
     } else {
-      for (final letter in name.split('')) {
+      for (final letter in displayName.split('')) {
         if (!mounted || _isMuted) break;
         await widget.audioService.playLetter(letter);
         await Future.delayed(const Duration(milliseconds: 250));
@@ -185,6 +208,22 @@ class _ElementLabGameState extends State<ElementLabGame>
   Future<void> _speakWord(String word) async {
     if (_isMuted) return;
     await widget.audioService.playWord(word);
+  }
+
+  /// Speak a UI label — tries the word audio file first, falls back to
+  /// spelling it letter-by-letter so every button gives audible feedback.
+  Future<void> _speakLabel(String text) async {
+    if (_isMuted) return;
+    final lower = text.toLowerCase();
+    // Try full word audio first
+    final ok = await widget.audioService.playWord(lower);
+    if (ok) return;
+    // Fallback: spell it out letter by letter
+    for (final letter in lower.split('')) {
+      if (!mounted || _isMuted) break;
+      await widget.audioService.playLetter(letter);
+      await Future.delayed(const Duration(milliseconds: 200));
+    }
   }
 
   void _initGrid(double canvasW, double canvasH) {
@@ -305,19 +344,47 @@ class _ElementLabGameState extends State<ElementLabGame>
   void _doShake() {
     if (_shakeCooldown > 0) return;
     _shakeCooldown = 60;
-    Haptics.tap();
+    _speakLabel('shake');
     _engine.doShake();
 
-    // Brief screen shake animation
+    // Powerful multi-frame screen shake with escalating haptics
+    Haptics.tap();
     final rng = _engine.rng;
-    _shakeOffset = Offset(
-      (rng.nextDouble() - 0.5) * 6,
-      (rng.nextDouble() - 0.5) * 6,
-    );
-    Future.delayed(const Duration(milliseconds: 100), () {
-      if (mounted) setState(() => _shakeOffset = Offset(-_shakeOffset.dx, -_shakeOffset.dy));
+    // Frame 1: big jolt
+    setState(() {
+      _shakeOffset = Offset(
+        (rng.nextDouble() - 0.5) * 12,
+        (rng.nextDouble() - 0.5) * 12,
+      );
     });
-    Future.delayed(const Duration(milliseconds: 200), () {
+    // Frame 2: reverse jolt
+    Future.delayed(const Duration(milliseconds: 60), () {
+      if (!mounted) return;
+      Haptics.tap();
+      setState(() => _shakeOffset = Offset(
+        -_shakeOffset.dx * 0.8 + (rng.nextDouble() - 0.5) * 4,
+        -_shakeOffset.dy * 0.8 + (rng.nextDouble() - 0.5) * 4,
+      ));
+    });
+    // Frame 3: smaller wobble
+    Future.delayed(const Duration(milliseconds: 120), () {
+      if (!mounted) return;
+      setState(() => _shakeOffset = Offset(
+        (rng.nextDouble() - 0.5) * 6,
+        (rng.nextDouble() - 0.5) * 6,
+      ));
+    });
+    // Frame 4: tiny settle
+    Future.delayed(const Duration(milliseconds: 180), () {
+      if (!mounted) return;
+      Haptics.tap();
+      setState(() => _shakeOffset = Offset(
+        (rng.nextDouble() - 0.5) * 2,
+        (rng.nextDouble() - 0.5) * 2,
+      ));
+    });
+    // Frame 5: done
+    Future.delayed(const Duration(milliseconds: 240), () {
       if (mounted) setState(() => _shakeOffset = Offset.zero);
     });
   }
@@ -325,6 +392,7 @@ class _ElementLabGameState extends State<ElementLabGame>
   void _togglePause() {
     setState(() => _isPaused = !_isPaused);
     Haptics.tap();
+    _speakLabel(_isPaused ? 'pause' : 'play');
   }
 
   void _addMoreTime() {
@@ -743,20 +811,22 @@ class _ElementLabGameState extends State<ElementLabGame>
               height: dotSz,
               child: _elementSvgNames.length > elType &&
                       _elementSvgNames[elType].isNotEmpty
-                  ? SvgPicture.asset(
-                      'assets/icons/elements/${_elementSvgNames[elType]}.svg',
-                      width: dotSz,
-                      height: dotSz,
-                      placeholderBuilder: (_) => _colorDotFallback(dotSz, color),
+                  ? Padding(
+                      padding: const EdgeInsets.all(2),
+                      child: SvgPicture.asset(
+                        'assets/icons/elements/${_elementSvgNames[elType]}.svg',
+                        fit: BoxFit.contain,
+                        placeholderBuilder: (_) => _colorDotFallback(dotSz - 4, color),
+                      ),
                     )
                   : _colorDotFallback(dotSz, color),
             ),
-            const SizedBox(height: 2),
+            const SizedBox(height: 1),
             Text(
               name,
               style: AppFonts.fredoka(
                 fontSize: labelSz,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w600,
                 color: isSelected ? color : AppColors.secondaryText,
               ),
             ),
@@ -796,6 +866,7 @@ class _ElementLabGameState extends State<ElementLabGame>
       onTap: () {
         setState(() => _input.selectedElement = El.eraser);
         Haptics.tap();
+        _speakElementName(El.eraser);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
@@ -909,11 +980,15 @@ class _ElementLabGameState extends State<ElementLabGame>
                     placeholderBuilder: (_) => Icon(Icons.eco_rounded, size: iconSz, color: Colors.white),
                   ),
                 ),
-                const SizedBox(height: 2),
+                const SizedBox(height: 1),
                 Text(
-                  'Seed',
-                  style: AppFonts.fredoka(fontSize: labelSz, fontWeight: FontWeight.w500,
-                    color: isSelected ? color : AppColors.secondaryText),
+                  isSelected && _input.selectedSeedType > 0
+                      ? seedNames[_input.selectedSeedType]
+                      : 'Seed',
+                  style: AppFonts.fredoka(fontSize: labelSz, fontWeight: FontWeight.w600,
+                    color: isSelected
+                        ? seedColors[_input.selectedSeedType.clamp(0, 5)]
+                        : AppColors.secondaryText),
                 ),
               ],
             ),
@@ -939,6 +1014,23 @@ class _ElementLabGameState extends State<ElementLabGame>
                         onTap: () {
                           setState(() { _input.selectedSeedType = st; _showSeedPopup = false; });
                           Haptics.tap();
+                          // Speak the seed type name (spell it out)
+                          final seedWord = seedNames[st].toLowerCase();
+                          final audioName = _displayToAudioName[seedWord] ?? seedWord;
+                          if (speakableWords.contains(audioName)) {
+                            _speakWord(audioName);
+                          } else if (speakableWords.contains(seedWord)) {
+                            _speakWord(seedWord);
+                          } else {
+                            // Spell it out letter by letter
+                            () async {
+                              for (final letter in seedWord.split('')) {
+                                if (!mounted || _isMuted) break;
+                                await widget.audioService.playLetter(letter);
+                                await Future.delayed(const Duration(milliseconds: 250));
+                              }
+                            }();
+                          }
                         },
                         child: Container(
                           width: popupItemW, height: popupItemH,
@@ -981,213 +1073,328 @@ class _ElementLabGameState extends State<ElementLabGame>
   Widget _buildBottomBar() {
     final screenW = MediaQuery.of(context).size.width;
     final compact = screenW < 400;
-    final btnBox = compact ? 26.0 : 32.0;
-    final btnIcon = compact ? 15.0 : 18.0;
-    final smallBtnBox = compact ? 22.0 : 28.0;
-    final smallBtnIcon = compact ? 13.0 : 16.0;
-    final chipSz = compact ? 22.0 : 26.0;
-    final brushChipIcon = compact ? 12.0 : 14.0;
-    final barH = compact ? 36.0 : 44.0;
-    final hPad = compact ? 6.0 : 12.0;
+    final barH = compact ? 42.0 : 50.0;
+    final hPad = compact ? 4.0 : 8.0;
+    final chipSz = compact ? 28.0 : 34.0;
+    final iconSz = compact ? 14.0 : 17.0;
+    final labelSz = compact ? 6.5 : 8.0;
 
-    Widget buildBrushSizeBtn(int size) {
-      return Padding(
-        padding: EdgeInsets.symmetric(horizontal: compact ? 2 : 3),
-        child: GestureDetector(
-          onTap: () {
-            setState(() => _input.brushSize = size);
-            Haptics.tap();
-          },
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            width: chipSz,
-            height: chipSz,
-            decoration: BoxDecoration(
-              color: _input.brushSize == size
-                  ? AppColors.electricBlue.withValues(alpha: 0.2)
-                  : AppColors.surfaceVariant,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: _input.brushSize == size
-                    ? AppColors.electricBlue
-                    : AppColors.border,
-                width: _input.brushSize == size ? 2 : 1,
-              ),
-            ),
-            child: Center(
-              child: Container(
-                width: size.toDouble() * 2 + 2,
-                height: size.toDouble() * 2 + 2,
-                decoration: BoxDecoration(
-                  color: _input.brushSize == size
-                      ? AppColors.electricBlue
-                      : AppColors.secondaryText,
-                  shape: BoxShape.circle,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    Widget buildBrushModeBtn(int mode, IconData icon) {
-      return Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 1),
-        child: GestureDetector(
-          onTap: () {
-            setState(() => _input.brushMode = mode);
-            Haptics.tap();
-          },
-          child: Container(
-            width: chipSz,
-            height: chipSz,
-            decoration: BoxDecoration(
-              color: _input.brushMode == mode
-                  ? AppColors.electricBlue.withValues(alpha: 0.2)
-                  : Colors.transparent,
-              borderRadius: BorderRadius.circular(6),
-              border: Border.all(
-                color: _input.brushMode == mode
-                    ? AppColors.electricBlue
-                    : AppColors.border.withValues(alpha: 0.3),
-                width: _input.brushMode == mode ? 2 : 1,
-              ),
-            ),
-            child: Icon(
-              icon,
-              size: brushChipIcon,
-              color: _input.brushMode == mode
-                  ? AppColors.electricBlue
-                  : AppColors.secondaryText,
-            ),
-          ),
-        ),
-      );
-    }
-
-    Widget buildIconBtn({
-      required VoidCallback? onPressed,
-      required IconData icon,
-      required Color color,
-      double? size,
-      double? box,
+    // ── Tap-animated button wrapper ──────────────────────────────────────
+    Widget tapBtn({
+      required Widget child,
+      required VoidCallback? onTap,
+      String? tooltip,
     }) {
-      final bSz = box ?? btnBox;
-      final iSz = size ?? btnIcon;
-      return SizedBox(
-        width: bSz,
-        height: bSz,
-        child: IconButton(
-          onPressed: onPressed,
-          icon: Icon(icon, color: color),
-          iconSize: iSz,
-          padding: EdgeInsets.zero,
+      return Tooltip(
+        message: tooltip ?? '',
+        waitDuration: const Duration(milliseconds: 400),
+        child: _TapScaleButton(
+          onTap: onTap,
+          child: child,
         ),
       );
     }
+
+    // ── Chip button (brush size / brush mode / labeled icon) ─────────────
+    Widget chipBtn({
+      required bool isSelected,
+      required Widget child,
+      required VoidCallback onTap,
+      required String tooltip,
+      Color activeColor = AppColors.electricBlue,
+    }) {
+      return tapBtn(
+        tooltip: tooltip,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: chipSz,
+          height: chipSz,
+          decoration: BoxDecoration(
+            color: isSelected
+                ? activeColor.withValues(alpha: 0.2)
+                : AppColors.surfaceVariant.withValues(alpha: 0.5),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected
+                  ? activeColor
+                  : AppColors.border.withValues(alpha: 0.3),
+              width: isSelected ? 2 : 1,
+            ),
+            boxShadow: isSelected
+                ? [BoxShadow(color: activeColor.withValues(alpha: 0.25), blurRadius: 6)]
+                : null,
+          ),
+          child: child,
+        ),
+      );
+    }
+
+    // ── Brush size ───────────────────────────────────────────────────────
+    Widget buildBrushSizeBtn(int size) {
+      final label = size == 1 ? 'S' : size == 3 ? 'M' : 'L';
+      final spoken = size == 1 ? 'small' : size == 3 ? 'medium' : 'big';
+      final isSelected = _input.brushSize == size;
+      return chipBtn(
+        isSelected: isSelected,
+        tooltip: '${spoken[0].toUpperCase()}${spoken.substring(1)} brush',
+        onTap: () {
+          setState(() => _input.brushSize = size);
+          Haptics.tap();
+          _speakLabel(spoken);
+        },
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: size.toDouble() * 2 + 2,
+              height: size.toDouble() * 2 + 2,
+              decoration: BoxDecoration(
+                color: isSelected ? AppColors.electricBlue : AppColors.secondaryText,
+                shape: BoxShape.circle,
+              ),
+            ),
+            const SizedBox(height: 1),
+            Text(label, style: AppFonts.fredoka(
+              fontSize: labelSz,
+              fontWeight: FontWeight.w700,
+              color: isSelected ? AppColors.electricBlue : AppColors.secondaryText,
+            )),
+          ],
+        ),
+      );
+    }
+
+    // ── Brush mode ───────────────────────────────────────────────────────
+    Widget buildBrushModeBtn(int mode, IconData icon, String label) {
+      final isSelected = _input.brushMode == mode;
+      return chipBtn(
+        isSelected: isSelected,
+        tooltip: '${label[0].toUpperCase()}${label.substring(1)} brush',
+        onTap: () {
+          setState(() => _input.brushMode = mode);
+          Haptics.tap();
+          _speakLabel(label);
+        },
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(icon, size: iconSz, color: isSelected ? AppColors.electricBlue : AppColors.secondaryText),
+            const SizedBox(height: 1),
+            Text(label, style: AppFonts.fredoka(
+              fontSize: labelSz,
+              fontWeight: FontWeight.w600,
+              color: isSelected ? AppColors.electricBlue : AppColors.secondaryText,
+            )),
+          ],
+        ),
+      );
+    }
+
+    // ── Icon action button (gravity, wind, shake, undo, etc.) ────────────
+    Widget actionBtn({
+      required VoidCallback? onTap,
+      required IconData icon,
+      required String label,
+      required Color activeColor,
+      bool isActive = true,
+      String? tooltip,
+    }) {
+      final color = onTap == null
+          ? AppColors.secondaryText.withValues(alpha: 0.3)
+          : isActive ? activeColor : AppColors.secondaryText;
+      return tapBtn(
+        tooltip: tooltip ?? label,
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          width: chipSz,
+          height: chipSz,
+          decoration: BoxDecoration(
+            color: isActive && onTap != null
+                ? activeColor.withValues(alpha: 0.1)
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(icon, size: iconSz, color: color),
+              const SizedBox(height: 1),
+              Text(label, style: AppFonts.fredoka(
+                fontSize: labelSz,
+                fontWeight: FontWeight.w600,
+                color: color,
+              )),
+            ],
+          ),
+        ),
+      );
+    }
+
+    // ── Group divider ────────────────────────────────────────────────────
+    Widget divider() {
+      return Padding(
+        padding: EdgeInsets.symmetric(horizontal: compact ? 3 : 5),
+        child: Container(
+          width: 1,
+          height: barH * 0.5,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                AppColors.border.withValues(alpha: 0.0),
+                AppColors.border.withValues(alpha: 0.5),
+                AppColors.border.withValues(alpha: 0.0),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    final gravUp = _engine.gravityDir == -1;
+    final windVal = _engine.windForce;
 
     return Container(
       height: barH,
-      color: AppColors.surface,
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        border: Border(
+          top: BorderSide(color: AppColors.border.withValues(alpha: 0.3)),
+        ),
+      ),
       padding: EdgeInsets.symmetric(horizontal: hPad),
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            // Brush sizes
+            // ── BRUSH GROUP ──────────────────────────────────────────
             for (final size in const [1, 3, 5])
-              buildBrushSizeBtn(size),
-            SizedBox(width: compact ? 4 : 6),
-            // Brush modes
-            buildBrushModeBtn(0, Icons.circle),
-            buildBrushModeBtn(1, Icons.horizontal_rule_rounded),
-            buildBrushModeBtn(2, Icons.grain_rounded),
-            SizedBox(width: compact ? 3 : 4),
-            // Gravity flip
-            buildIconBtn(
-              onPressed: () {
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 1),
+                child: buildBrushSizeBtn(size),
+              ),
+            divider(),
+            buildBrushModeBtn(0, Icons.circle, 'dot'),
+            const SizedBox(width: 2),
+            buildBrushModeBtn(1, Icons.horizontal_rule_rounded, 'line'),
+            const SizedBox(width: 2),
+            buildBrushModeBtn(2, Icons.grain_rounded, 'spray'),
+            divider(),
+            // ── PHYSICS GROUP ────────────────────────────────────────
+            actionBtn(
+              onTap: () {
                 setState(() => _engine.gravityDir = -_engine.gravityDir);
                 _engine.markAllDirty();
                 Haptics.tap();
+                _speakLabel(_engine.gravityDir == -1 ? 'up' : 'down');
               },
-              icon: Icons.swap_vert_rounded,
-              color: _engine.gravityDir == -1
-                  ? AppColors.starGold
-                  : AppColors.secondaryText,
+              icon: gravUp ? Icons.arrow_upward_rounded : Icons.arrow_downward_rounded,
+              label: gravUp ? 'up' : 'down',
+              activeColor: AppColors.starGold,
+              isActive: gravUp,
+              tooltip: 'Gravity ${gravUp ? "up" : "down"}',
             ),
-            // Wind left
-            buildIconBtn(
-              onPressed: () {
-                setState(() => _engine.windForce = (_engine.windForce - 1).clamp(-3, 3));
+            // Wind controls
+            actionBtn(
+              onTap: () {
+                setState(() => _engine.windForce = (windVal - 1).clamp(-3, 3));
                 _engine.markAllDirty();
                 Haptics.tap();
+                _speakLabel(_engine.windForce == 0 ? 'no' : 'left');
               },
-              icon: Icons.arrow_back_rounded,
-              color: _engine.windForce < 0
-                  ? AppColors.electricBlue
-                  : AppColors.secondaryText.withValues(alpha: 0.4),
-              size: smallBtnIcon,
-              box: smallBtnBox,
+              icon: Icons.chevron_left_rounded,
+              label: 'wind',
+              activeColor: AppColors.electricBlue,
+              isActive: windVal < 0,
+              tooltip: 'Wind left',
             ),
-            // Wind indicator
+            // Wind value badge
             SizedBox(
-              width: compact ? 16 : 20,
+              width: compact ? 18 : 22,
               child: Center(
-                child: Text(
-                  _engine.windForce == 0 ? '0' : '${_engine.windForce > 0 ? "+" : ""}${_engine.windForce}',
-                  style: AppFonts.fredoka(
-                    fontSize: compact ? 9 : 10,
-                    fontWeight: FontWeight.w600,
-                    color: _engine.windForce != 0
-                        ? AppColors.electricBlue
-                        : AppColors.secondaryText.withValues(alpha: 0.5),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  padding: EdgeInsets.symmetric(horizontal: compact ? 3 : 4, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: windVal != 0
+                        ? AppColors.electricBlue.withValues(alpha: 0.15)
+                        : Colors.transparent,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: windVal != 0
+                          ? AppColors.electricBlue.withValues(alpha: 0.4)
+                          : AppColors.border.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Text(
+                    '$windVal',
+                    style: AppFonts.fredoka(
+                      fontSize: compact ? 8 : 10,
+                      fontWeight: FontWeight.w700,
+                      color: windVal != 0
+                          ? AppColors.electricBlue
+                          : AppColors.secondaryText.withValues(alpha: 0.5),
+                    ),
                   ),
                 ),
               ),
             ),
-            // Wind right
-            buildIconBtn(
-              onPressed: () {
-                setState(() => _engine.windForce = (_engine.windForce + 1).clamp(-3, 3));
+            actionBtn(
+              onTap: () {
+                setState(() => _engine.windForce = (windVal + 1).clamp(-3, 3));
                 _engine.markAllDirty();
                 Haptics.tap();
+                _speakLabel(_engine.windForce == 0 ? 'no' : 'right');
               },
-              icon: Icons.arrow_forward_rounded,
-              color: _engine.windForce > 0
-                  ? AppColors.electricBlue
-                  : AppColors.secondaryText.withValues(alpha: 0.4),
-              size: smallBtnIcon,
-              box: smallBtnBox,
+              icon: Icons.chevron_right_rounded,
+              label: 'wind',
+              activeColor: AppColors.electricBlue,
+              isActive: windVal > 0,
+              tooltip: 'Wind right',
             ),
-            // Shake
-            buildIconBtn(
-              onPressed: _shakeCooldown <= 0 ? _doShake : null,
+            // Shake — prominent with special styling
+            actionBtn(
+              onTap: _shakeCooldown <= 0 ? _doShake : null,
               icon: Icons.vibration_rounded,
-              color: _shakeCooldown <= 0
-                  ? AppColors.electricBlue
-                  : AppColors.secondaryText.withValues(alpha: 0.3),
+              label: 'shake',
+              activeColor: const Color(0xFFFF8C00), // orange for emphasis
+              isActive: _shakeCooldown <= 0,
+              tooltip: 'Shake everything!',
             ),
-            SizedBox(width: compact ? 4 : 8),
-            // Undo
-            buildIconBtn(
-              onPressed: _input.undoHistory.isNotEmpty ? _input.undo : null,
+            divider(),
+            // ── ACTION GROUP ─────────────────────────────────────────
+            actionBtn(
+              onTap: _input.undoHistory.isNotEmpty ? () {
+                _input.undo();
+                Haptics.tap();
+                _speakLabel('undo');
+              } : null,
               icon: Icons.undo_rounded,
-              color: _input.undoHistory.isNotEmpty
-                  ? AppColors.electricBlue
-                  : AppColors.secondaryText.withValues(alpha: 0.3),
+              label: 'undo',
+              activeColor: AppColors.electricBlue,
             ),
-            // Pause/Play
-            buildIconBtn(
-              onPressed: _togglePause,
+            actionBtn(
+              onTap: _togglePause,
               icon: _isPaused ? Icons.play_arrow_rounded : Icons.pause_rounded,
-              color: AppColors.electricBlue,
+              label: _isPaused ? 'play' : 'stop',
+              activeColor: _isPaused ? AppColors.emerald : AppColors.electricBlue,
+              isActive: true,
+              tooltip: _isPaused ? 'Play' : 'Pause',
             ),
-            // Clear
-            buildIconBtn(
-              onPressed: _input.clearGrid,
+            actionBtn(
+              onTap: () {
+                _speakLabel('clear');
+                _input.clearGrid();
+                Haptics.tap();
+              },
               icon: Icons.delete_outline_rounded,
-              color: AppColors.error.withValues(alpha: 0.8),
+              label: 'clear',
+              activeColor: AppColors.error,
+              isActive: true,
+              tooltip: 'Clear everything',
             ),
           ],
         ),
@@ -1520,6 +1727,62 @@ class _ElementLabGameState extends State<ElementLabGame>
             ],
           ),
         ),
+      ),
+    );
+  }
+}
+
+// ── Tap-scale animated button ─────────────────────────────────────────────
+/// A button that briefly scales down on press for satisfying tactile feedback.
+class _TapScaleButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback? onTap;
+
+  const _TapScaleButton({required this.child, this.onTap});
+
+  @override
+  State<_TapScaleButton> createState() => _TapScaleButtonState();
+}
+
+class _TapScaleButtonState extends State<_TapScaleButton>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+  late final Animation<double> _scale;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 80),
+      reverseDuration: const Duration(milliseconds: 120),
+    );
+    _scale = Tween(begin: 1.0, end: 0.88).animate(
+      CurvedAnimation(parent: _ctrl, curve: Curves.easeInOut),
+    );
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTapDown: widget.onTap != null ? (_) => _ctrl.forward() : null,
+      onTapUp: widget.onTap != null
+          ? (_) {
+              _ctrl.reverse();
+              widget.onTap!();
+            }
+          : null,
+      onTapCancel: widget.onTap != null ? () => _ctrl.reverse() : null,
+      behavior: HitTestBehavior.opaque,
+      child: ScaleTransition(
+        scale: _scale,
+        child: widget.child,
       ),
     );
   }

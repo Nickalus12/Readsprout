@@ -324,6 +324,8 @@ EXTRA_WORDS = [
     "shake", "undo", "clear", "circle", "line", "spray",
     "night", "day", "pause", "medium", "left",
     "small", "big", "eraser",
+    # Home screen UI
+    "coins", "stars", "streak", "review",
 ]
 
 # ============================================================================

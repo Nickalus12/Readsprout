@@ -15,6 +15,29 @@ class Explosion {
   const Explosion(this.x, this.y, this.radius);
 }
 
+/// Elements that must never settle (have ongoing time-based behaviors).
+/// Indexed by element type — non-zero means never settle.
+final Uint8List _neverSettle = () {
+  final t = Uint8List(32);
+  t[El.lava] = 1;     // cools into stone over time
+  t[El.fire] = 1;     // burns out over time
+  t[El.smoke] = 1;    // fades over time
+  t[El.steam] = 1;    // condenses over time
+  t[El.bubble] = 1;   // rises through water, pops
+  t[El.acid] = 1;     // dissolves over time
+  t[El.ash] = 1;      // slow-falling, interacts
+  t[El.ant] = 1;      // AI-driven movement
+  t[El.plant] = 1;    // grows over time
+  t[El.dirt] = 1;     // moisture changes over time
+  t[El.wood] = 1;     // burns, waterlogging
+  t[El.metal] = 1;    // rusts
+  t[El.oil] = 1;      // floats on water
+  t[El.mud] = 1;      // viscous flow
+  t[El.snow] = 1;     // slow fall, melting, compression
+  t[El.rainbow] = 1;  // always rising and cycling
+  return t;
+}();
+
 class SimulationEngine {
   // -- Grid dimensions -------------------------------------------------------
   int gridW = 160;
@@ -884,26 +907,41 @@ class SimulationEngine {
         final el = grid[idx];
         if (el == El.empty) continue;
 
+        // Elements with ongoing behaviors (cooling, rising, flowing) must
+        // never be settled — force them to always simulate.
         if ((flagVal & 0x40) != 0) {
-          continue;
+          if (_neverSettle[el] != 0) {
+            // Unsettle: clear bits 4-6 so this cell re-enters simulation
+            flags[idx] = flagVal & 0x80;
+          } else {
+            continue;
+          }
         }
 
         final preEl = el;
         final preIdx = idx;
+        final preLife = life[idx];
 
         // Dispatch to element behavior
         simulateElement(this, el, x, y, idx);
 
-        // Static cell detection
+        // Static cell detection — also check if life changed (e.g. lava
+        // cooling, dirt moisture, bubble rising) to prevent premature settling
         if (grid[preIdx] == preEl && (flags[preIdx] & 0x80) != currentClockBit) {
-          final oldStable = (flagVal >> 4) & 0x03;
-          final newStable = (oldStable + 1).clamp(0, 3);
-          if (newStable >= 3) {
-            flags[preIdx] = (flags[preIdx] & 0x80) | 0x70;
+          if (life[preIdx] != preLife) {
+            // Life changed without moving — reset stable counter, don't settle
+            flags[preIdx] = flags[preIdx] & 0x80;
+            markDirty(x, y);
           } else {
-            flags[preIdx] = (flags[preIdx] & 0x80) | (newStable << 4);
+            final oldStable = (flagVal >> 4) & 0x03;
+            final newStable = (oldStable + 1).clamp(0, 3);
+            if (newStable >= 3) {
+              flags[preIdx] = (flags[preIdx] & 0x80) | 0x70;
+            } else {
+              flags[preIdx] = (flags[preIdx] & 0x80) | (newStable << 4);
+            }
+            markDirty(x, y);
           }
-          markDirty(x, y);
         } else if (grid[preIdx] != preEl) {
           markDirty(x, y);
           unsettleNeighbors(x, y);

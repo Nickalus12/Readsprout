@@ -63,15 +63,17 @@ extension ElementBehaviors on SimulationEngine {
       }
     }
 
-    // Water + Oil: oil floats
-    final uy2 = y - gravityDir;
-    if (inBounds(x, uy2) && grid[uy2 * gridW + x] == El.oil && !((flags[uy2 * gridW + x] & 0x80) == (simClock ? 0x80 : 0))) {
-      final ui2 = uy2 * gridW + x;
+    // Water + Oil: water sinks below oil (oil floats up)
+    // Check if there's oil BELOW — if so, water displaces it downward
+    if (inBounds(x, by) && grid[by * gridW + x] == El.oil && !((flags[by * gridW + x] & 0x80) == (simClock ? 0x80 : 0))) {
+      final bi = by * gridW + x;
+      final oilLife = life[bi];
+      grid[bi] = El.water;
+      life[bi] = mass;
       grid[idx] = El.oil;
-      grid[ui2] = El.water;
-      life[ui2] = mass;
+      life[idx] = oilLife;
       markProcessed(idx);
-      markProcessed(ui2);
+      markProcessed(bi);
       return;
     }
 
@@ -1308,8 +1310,47 @@ extension ElementBehaviors on SimulationEngine {
   }
 
   void simMud(int x, int y, int idx) {
+    // Mud is a thick, slow-flowing liquid — falls every other frame
     if (frameCount.isOdd) return;
-    fallGranular(x, y, idx, El.mud);
+
+    final by = y + gravityDir;
+    // Fall straight down
+    if (inBounds(x, by) && grid[by * gridW + x] == El.empty) {
+      swap(idx, by * gridW + x);
+      return;
+    }
+    // Sink through water (heavier)
+    if (inBounds(x, by) && grid[by * gridW + x] == El.water) {
+      final waterMass = life[by * gridW + x];
+      grid[idx] = El.water;
+      life[idx] = waterMass < 20 ? 100 : waterMass;
+      grid[by * gridW + x] = El.mud;
+      markProcessed(idx);
+      markProcessed(by * gridW + x);
+      return;
+    }
+    // Diagonal fall
+    final dl = rng.nextBool();
+    final x1 = dl ? x - 1 : x + 1;
+    final x2 = dl ? x + 1 : x - 1;
+    if (inBounds(x1, by) && grid[by * gridW + x1] == El.empty) {
+      swap(idx, by * gridW + x1);
+      return;
+    }
+    if (inBounds(x2, by) && grid[by * gridW + x2] == El.empty) {
+      swap(idx, by * gridW + x2);
+      return;
+    }
+    // Slow sideways spread (viscous flow — every 4th frame)
+    if (frameCount % 4 == 0) {
+      if (inBounds(x1, y) && grid[y * gridW + x1] == El.empty) {
+        swap(idx, y * gridW + x1);
+        return;
+      }
+      if (inBounds(x2, y) && grid[y * gridW + x2] == El.empty) {
+        swap(idx, y * gridW + x2);
+      }
+    }
   }
 
   void simSteam(int x, int y, int idx) {

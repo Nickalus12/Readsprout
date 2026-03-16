@@ -173,8 +173,6 @@ class _ProfileScreenState extends State<ProfileScreen>
                       children: [
                         const SizedBox(height: 8),
                         _buildHeroSection(),
-                        const SizedBox(height: 16),
-                        _buildQuickActions(),
                         const SizedBox(height: 18),
                         _buildCompletionRing(),
                         const SizedBox(height: 18),
@@ -206,6 +204,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                           audioService: widget.audioService,
                         ).animate().fadeIn(delay: 500.ms, duration: 400.ms)
                             .slideY(begin: 0.05, end: 0, duration: 300.ms),
+                        const SizedBox(height: 24),
+                        if (widget.onSignOut != null)
+                          _buildSignOutButton(),
                         const SizedBox(height: 28),
                       ],
                     ),
@@ -249,7 +250,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   SizedBox(width: 6 * sf),
                   Text(
-                    'My Garden',
+                    widget.playerName.isNotEmpty
+                        ? "${widget.playerName}'s Garden"
+                        : 'My Garden',
                     textAlign: TextAlign.center,
                     style: AppFonts.fredoka(
                       fontSize: 22 * sf,
@@ -261,44 +264,7 @@ class _ProfileScreenState extends State<ProfileScreen>
               ),
             ),
           ),
-          if (widget.onSignOut != null)
-            GestureDetector(
-              onTap: () {
-                Navigator.of(context).pop();
-                widget.onSignOut!();
-              },
-              child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 10 * sf, vertical: 6 * sf),
-                decoration: BoxDecoration(
-                  color: AppColors.violet.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(14 * sf),
-                  border: Border.all(
-                    color: AppColors.violet.withValues(alpha: 0.3),
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      Icons.swap_horiz_rounded,
-                      size: 18 * sf,
-                      color: AppColors.violet.withValues(alpha: 0.8),
-                    ),
-                    SizedBox(width: 4 * sf),
-                    Text(
-                      'Switch',
-                      style: AppFonts.fredoka(
-                        fontSize: 13 * sf,
-                        fontWeight: FontWeight.w500,
-                        color: AppColors.violet.withValues(alpha: 0.8),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            )
-          else
-            SizedBox(width: 48 * sf),
+          SizedBox(width: 48 * sf),
         ],
       ),
     );
@@ -337,6 +303,7 @@ class _ProfileScreenState extends State<ProfileScreen>
                 avatar: _avatar,
                 avatarController: _avatarController,
                 level: widget.progressService.highestUnlockedLevel,
+                onEditTap: _openAvatarEditor,
               ),
             ),
 
@@ -515,53 +482,6 @@ class _ProfileScreenState extends State<ProfileScreen>
       ReadingLevel.wordChampion => Icons.emoji_events_rounded,
       ReadingLevel.readingSuperstar => Icons.star_rounded,
     };
-  }
-
-  // ── Quick Actions Row ───────────────────────────────────────────────
-
-  Widget _buildQuickActions() {
-    final screenW = MediaQuery.of(context).size.width;
-    final sf = (screenW / 400).clamp(0.7, 1.2);
-
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 20 * sf),
-      child: Row(
-        children: [
-          Expanded(
-            child: _QuickActionButton(
-              icon: Icons.play_arrow_rounded,
-              label: 'Continue',
-              gradient: [AppColors.emerald, AppColors.cyan],
-              sf: sf,
-              onTap: () => Navigator.of(context).pop(), // Returns to home where they can navigate to levels
-            ),
-          ),
-          SizedBox(width: 10 * sf),
-          Expanded(
-            child: _QuickActionButton(
-              icon: Icons.sports_esports_rounded,
-              label: 'Games',
-              gradient: [AppColors.violet, AppColors.magenta],
-              sf: sf,
-              onTap: () => Navigator.of(context).pop(), // Returns to home for games
-            ),
-          ),
-          SizedBox(width: 10 * sf),
-          Expanded(
-            child: _QuickActionButton(
-              icon: Icons.face_rounded,
-              label: 'Avatar',
-              gradient: [AppColors.electricBlue, AppColors.violet],
-              sf: sf,
-              onTap: _openAvatarEditor,
-            ),
-          ),
-        ],
-      ),
-    )
-        .animate()
-        .fadeIn(delay: 150.ms, duration: 400.ms)
-        .slideY(begin: 0.08, end: 0, duration: 300.ms);
   }
 
   // ── Completion Ring ─────────────────────────────────────────────────
@@ -877,59 +797,53 @@ class _ProfileScreenState extends State<ProfileScreen>
         .fadeIn(delay: 200.ms, duration: 400.ms)
         .slideY(begin: 0.05, end: 0, duration: 300.ms);
   }
-}
 
-// ── Quick Action Button ───────────────────────────────────────────────
+  // ── Switch Profile Button (bottom of page) ───────────────────────────
 
-class _QuickActionButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final List<Color> gradient;
-  final double sf;
-  final VoidCallback onTap;
+  Widget _buildSignOutButton() {
+    final screenW = MediaQuery.of(context).size.width;
+    final sf = (screenW / 400).clamp(0.7, 1.2);
 
-  const _QuickActionButton({
-    required this.icon,
-    required this.label,
-    required this.gradient,
-    required this.sf,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: EdgeInsets.symmetric(vertical: 10 * sf),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [
-              gradient[0].withValues(alpha: 0.15),
-              gradient[1].withValues(alpha: 0.08),
+    return Padding(
+      padding: EdgeInsets.symmetric(horizontal: 40 * sf),
+      child: GestureDetector(
+        onTap: () {
+          Navigator.of(context).pop();
+          widget.onSignOut!();
+        },
+        child: Container(
+          padding: EdgeInsets.symmetric(vertical: 10 * sf),
+          decoration: BoxDecoration(
+            color: AppColors.surface.withValues(alpha: 0.3),
+            borderRadius: BorderRadius.circular(14 * sf),
+            border: Border.all(
+              color: AppColors.border.withValues(alpha: 0.2),
+            ),
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.swap_horiz_rounded,
+                size: 18 * sf,
+                color: AppColors.secondaryText.withValues(alpha: 0.5),
+              ),
+              SizedBox(width: 6 * sf),
+              Text(
+                'Switch Profile',
+                style: AppFonts.fredoka(
+                  fontSize: 13 * sf,
+                  fontWeight: FontWeight.w500,
+                  color: AppColors.secondaryText.withValues(alpha: 0.5),
+                ),
+              ),
             ],
           ),
-          borderRadius: BorderRadius.circular(14 * sf),
-          border: Border.all(
-            color: gradient[0].withValues(alpha: 0.3),
-          ),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, size: 22 * sf, color: gradient[0]),
-            SizedBox(height: 4 * sf),
-            Text(
-              label,
-              style: AppFonts.fredoka(
-                fontSize: 11 * sf,
-                fontWeight: FontWeight.w500,
-                color: gradient[0].withValues(alpha: 0.9),
-              ),
-            ),
-          ],
         ),
       ),
-    );
+    )
+        .animate()
+        .fadeIn(delay: 600.ms, duration: 400.ms);
   }
 }
 
@@ -1333,6 +1247,7 @@ class _AvatarHomeFrame extends StatelessWidget {
   final AvatarConfig avatar;
   final AvatarController avatarController;
   final int level;
+  final VoidCallback? onEditTap;
 
   const _AvatarHomeFrame({
     required this.width,
@@ -1343,6 +1258,7 @@ class _AvatarHomeFrame extends StatelessWidget {
     required this.avatar,
     required this.avatarController,
     required this.level,
+    this.onEditTap,
   });
 
   @override
@@ -1432,27 +1348,30 @@ class _AvatarHomeFrame extends StatelessWidget {
             Positioned(
               right: -6 * sf,
               bottom: -6 * sf,
-              child: Container(
-                width: 30 * sf,
-                height: 30 * sf,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.violet,
-                  border: Border.all(
-                    color: AppColors.background,
-                    width: 2.5 * sf,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.violet.withValues(alpha: 0.4),
-                      blurRadius: 8 * sf,
+              child: GestureDetector(
+                onTap: onEditTap,
+                child: Container(
+                  width: 30 * sf,
+                  height: 30 * sf,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.violet,
+                    border: Border.all(
+                      color: AppColors.background,
+                      width: 2.5 * sf,
                     ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.edit_rounded,
-                  size: 14 * sf,
-                  color: Colors.white,
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.violet.withValues(alpha: 0.4),
+                        blurRadius: 8 * sf,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.edit_rounded,
+                    size: 14 * sf,
+                    color: Colors.white,
+                  ),
                 ),
               ),
             ),

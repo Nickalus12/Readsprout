@@ -455,8 +455,8 @@ class _FallingLettersGameState extends State<FallingLettersGame>
   static const double _powerUpChance = 0.06;
 
   static const double _shockwaveSpeed = 600.0;
-  static const double _shockwaveRadiusFraction = 0.12;
-  static const double _itemHitRadius = 16.0;
+  static const double _shockwaveRadiusFraction = 0.25;
+  static const double _itemHitRadius = 20.0;
   static const double _pushMagnitude = 0.35;
 
   bool _gameStarted = false;
@@ -813,6 +813,12 @@ class _FallingLettersGameState extends State<FallingLettersGame>
 
     _sim.shockwaves.removeWhere(
         (w) => w.opacity <= 0 || w.radius >= w.maxRadius);
+
+    // Check word completion after iteration is done — calling _onWordComplete
+    // inside the item loop would modify _sim.items during iteration.
+    if (_nextLetterIndex >= _currentWord.length && !_sim.wordCelebrating) {
+      _onWordComplete();
+    }
   }
 
   void _onShockwaveHitCorrect(_FallingItem item, _Shockwave wave) {
@@ -878,9 +884,8 @@ class _FallingLettersGameState extends State<FallingLettersGame>
 
     widget.audioService.playLetter(item.letter);
 
-    if (_nextLetterIndex >= _currentWord.length) {
-      _onWordComplete();
-    }
+    // Word completion is checked after the shockwave iteration finishes
+    // to avoid modifying _sim.items while iterating it.
     setState(() {});
   }
 

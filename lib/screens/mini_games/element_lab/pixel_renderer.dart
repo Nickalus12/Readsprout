@@ -555,15 +555,21 @@ class PixelRenderer {
       case El.dirt:
         final moisture = life[idx].clamp(0, 5);
         final mFrac = moisture / 5.0;
-        final dirtVar = (x * 3 + y * 5) % 3;
+        // Use a hash-like pattern to avoid visible stripes
+        final dirtHash = ((x * 2654435761) ^ (y * 2246822519)) & 0x7FFFFFFF;
+        final dirtVar = dirtHash % 5;
         int baseR, baseG, baseB;
         switch (dirtVar) {
           case 0: baseR = 139; baseG = 105; baseB = 20;
           case 1: baseR = 120; baseG = 85;  baseB = 18;
-          default: baseR = 145; baseG = 95;  baseB = 25;
+          case 2: baseR = 145; baseG = 95;  baseB = 25;
+          case 3: baseR = 130; baseG = 98;  baseB = 22;
+          default: baseR = 135; baseG = 90;  baseB = 16;
         }
-        _inlineR = (baseR - mFrac * 59).round().clamp(60, 150);
-        _inlineG = (baseG - mFrac * 50).round().clamp(40, 120);
+        // Add per-pixel noise from hash to break up remaining patterns
+        final dirtNoise = ((dirtHash >> 8) % 13) - 6;
+        _inlineR = (baseR + dirtNoise - mFrac * 59).round().clamp(60, 150);
+        _inlineG = (baseG + dirtNoise ~/ 2 - mFrac * 50).round().clamp(40, 120);
         _inlineB = (baseB - mFrac * 5).round().clamp(10, 50);
         _inlineA = 255;
 
