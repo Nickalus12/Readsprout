@@ -372,6 +372,10 @@ class _HomeScreenState extends State<HomeScreen>
                             StreakBadge(
                               currentStreak:
                                   widget.streakService.currentStreak,
+                              longestStreak:
+                                  widget.streakService.longestStreak,
+                              showStreakFreezeInfo:
+                                  widget.streakService.streakFreezeAvailable,
                             ),
                         ],
                       )

@@ -10,12 +10,21 @@ import '../theme/app_theme.dart';
 /// - Streak 7+:  large flame, golden with shimmer animation
 class StreakBadge extends StatelessWidget {
   final int currentStreak;
+  final int longestStreak;
+  final bool showStreakFreezeInfo;
 
-  const StreakBadge({super.key, required this.currentStreak});
+  const StreakBadge({
+    super.key,
+    required this.currentStreak,
+    this.longestStreak = 0,
+    this.showStreakFreezeInfo = false,
+  });
 
   @override
   Widget build(BuildContext context) {
     final tier = _StreakTier.fromStreak(currentStreak);
+
+    final showBest = longestStreak > currentStreak && longestStreak > 1;
 
     Widget badge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -51,6 +60,39 @@ class StreakBadge extends StatelessWidget {
               color: AppColors.secondaryText,
             ),
           ),
+          if (showBest) ...[
+            const SizedBox(width: 6),
+            Text(
+              '(Best: $longestStreak)',
+              style: AppFonts.nunito(
+                fontSize: 11,
+                color: AppColors.starGold.withValues(alpha: 0.8),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+          if (showStreakFreezeInfo) ...[
+            const SizedBox(width: 4),
+            Tooltip(
+              message: 'Streak Freeze: miss 1 day without\nlosing your streak!',
+              textStyle: AppFonts.nunito(
+                fontSize: 12,
+                color: Colors.white,
+              ),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: AppColors.border.withValues(alpha: 0.5),
+                ),
+              ),
+              child: Icon(
+                Icons.ac_unit_rounded,
+                size: 16,
+                color: AppColors.electricBlue.withValues(alpha: 0.7),
+              ),
+            ),
+          ],
         ],
       ),
     );
