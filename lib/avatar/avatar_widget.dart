@@ -587,8 +587,8 @@ class _AvatarWidgetState extends State<AvatarWidget>
                     painter: BodyPainter(
                       skinColor: _skinColor,
                       shirtColor: shirtColorOptions[
-                          (config.bgColor + 2).clamp(0, shirtColorOptions.length - 1)].color,
-                      collarStyle: 0,
+                          config.shirtColor.clamp(0, shirtColorOptions.length - 1)].color,
+                      collarStyle: config.shirtStyle.clamp(0, 2),
                       headTilt: swayAngle,
                       breathingValue: _breathingValue,
                       swayValue: _idleSwayValue,
