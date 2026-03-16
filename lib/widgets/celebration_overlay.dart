@@ -240,8 +240,8 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                   _praise,
                   textAlign: TextAlign.center,
                   style: AppFonts.fredoka(
-                    fontSize: 22,
-                    fontWeight: FontWeight.w500,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w600,
                     color: _zoneAccent,
                     shadows: [
                       Shadow(
@@ -269,11 +269,11 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
             Row(
               mainAxisSize: MainAxisSize.min,
               children: List.generate(3, (i) {
-                // Middle star is slightly larger
-                final size = i == 1 ? 28.0 : 22.0;
-                final iconSize = i == 1 ? 18.0 : 14.0;
+                // Middle star is larger and elevated for visual emphasis
+                final size = i == 1 ? 44.0 : 34.0;
+                final iconSize = i == 1 ? 30.0 : 22.0;
                 return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10),
                   child: Container(
                     width: size,
                     height: size,
@@ -282,14 +282,19 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                       gradient: RadialGradient(
                         colors: [
                           AppColors.starGold,
-                          AppColors.starGold.withValues(alpha: 0.6),
+                          AppColors.starGold.withValues(alpha: 0.7),
                         ],
                       ),
                       boxShadow: [
                         BoxShadow(
                           color: AppColors.starGold.withValues(alpha: 0.6),
-                          blurRadius: 14,
-                          spreadRadius: 2,
+                          blurRadius: 18,
+                          spreadRadius: 3,
+                        ),
+                        BoxShadow(
+                          color: AppColors.starGold.withValues(alpha: 0.2),
+                          blurRadius: 32,
+                          spreadRadius: 6,
                         ),
                       ],
                     ),
