@@ -837,6 +837,7 @@ class _ElementLabGameState extends State<ElementLabGame>
       onTap: () {
         setState(() => _input.selectedElement = El.eraser);
         Haptics.tap();
+        _speakElementName(El.eraser);
       },
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
