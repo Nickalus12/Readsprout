@@ -725,7 +725,6 @@ extension AntColonyAI on SimulationEngine {
         life[wi] = life[idx];
         velX[wi] = moveDir;
         velY[wi] = antExplorerState;
-        flags[wi] = (flags[wi] & 0xF0) | _antBridgeFlag;
         // Original ant stays and continues
         grid[idx] = El.empty;
         life[idx] = 0;
@@ -733,6 +732,8 @@ extension AntColonyAI on SimulationEngine {
         velY[idx] = 0;
         markProcessed(wi);
         markProcessed(idx);
+        // Set bridge flag AFTER markProcessed (which clears lower bits)
+        flags[wi] = flags[wi] | _antBridgeFlag;
         return;
       }
     }

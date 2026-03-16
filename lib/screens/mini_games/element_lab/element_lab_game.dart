@@ -14,6 +14,7 @@ import '../../../utils/haptics.dart';
 import 'element_registry.dart';
 import 'simulation_engine.dart';
 import 'element_behaviors.dart';
+import 'ant_colony_ai.dart';
 import 'pixel_renderer.dart';
 import 'sandbox_input_handler.dart';
 import 'element_lab_painters.dart';
@@ -318,6 +319,12 @@ class _ElementLabGameState extends State<ElementLabGame>
       _dayNightT = _dayNightT.clamp(0.0, 1.0);
     }
     _renderer.dayNightT = _dayNightT;
+
+    // Ant pheromone system (must run before step for navigation)
+    final fc = _engine.frameCount;
+    if (fc % 8 == 0) _engine.evaporatePheromones();
+    if (fc % 4 == 0) _engine.diffusePheromones();
+    if (fc % 30 == 0) _engine.updateColonyCentroid();
 
     _engine.applyWind();
     _engine.step(simulateElement);
