@@ -61,6 +61,9 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
   int _matchesFound = 0;
   bool _gameComplete = false;
 
+  // Start overlay
+  bool _showingStartOverlay = true;
+
   // Timer
   late Stopwatch _stopwatch;
   Timer? _displayTimer;
@@ -190,7 +193,7 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
     });
 
     _stopwatch.reset();
-    _stopwatch.start();
+    if (!_showingStartOverlay) _stopwatch.start();
     _displayTimer?.cancel();
     _displayTimer = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && !_gameComplete) {
@@ -227,6 +230,7 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
   }
 
   void _onCardTap(int index) {
+    if (_showingStartOverlay) return;
     if (_checkingMatch) return;
     if (_cards[index].matched) return;
     if (index == _firstFlippedIndex) return;
@@ -289,10 +293,10 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
   }
 
   Future<void> _handleMismatch(int firstIdx, int secondIdx) async {
-    widget.audioService.playError();
+    // Gentle feedback for mismatches - no harsh error sound for a 4-year-old
     Haptics.wrong();
 
-    await Future.delayed(const Duration(milliseconds: 1000));
+    await Future.delayed(const Duration(milliseconds: 1200));
     if (!mounted) return;
 
     _flipControllers[firstIdx].reverse();
@@ -340,6 +344,7 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
   void _restartGame() {
     _starsController.reset();
     _matchGlowController.reset();
+    _showingStartOverlay = false;
     _initGame();
   }
 
@@ -401,7 +406,121 @@ class _MemoryMatchGameState extends State<MemoryMatchGame>
                   ),
                 ],
               ),
+
+              // Start overlay
+              if (_showingStartOverlay) _buildStartOverlay(),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStartOverlay() {
+    return GestureDetector(
+      onTap: () {
+        setState(() => _showingStartOverlay = false);
+        _stopwatch.start();
+      },
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.7),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.all(32),
+            padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 28),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppColors.violet.withValues(alpha: 0.4),
+                width: 2,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.style_rounded,
+                  size: 48,
+                  color: AppColors.violet,
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Memory Match',
+                  style: AppFonts.fredoka(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryText,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Visual hint row
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildHintCard('?', AppColors.violet),
+                    const SizedBox(width: 8),
+                    _buildHintCard('?', AppColors.violet),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Icon(Icons.arrow_forward_rounded,
+                          color: AppColors.secondaryText, size: 20),
+                    ),
+                    _buildHintCard('cat', AppColors.starGold),
+                    const SizedBox(width: 8),
+                    _buildHintCard('cat', AppColors.starGold),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Tap cards to find matching words!',
+                  style: AppFonts.nunito(
+                    fontSize: 15,
+                    color: AppColors.secondaryText,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.violet,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Tap to Start!',
+                    style: AppFonts.fredoka(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHintCard(String text, Color color) {
+    return Container(
+      width: 40,
+      height: 48,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: color.withValues(alpha: 0.5)),
+      ),
+      child: Center(
+        child: Text(
+          text,
+          style: AppFonts.fredoka(
+            fontSize: text.length > 1 ? 11 : 18,
+            fontWeight: FontWeight.w600,
+            color: color,
           ),
         ),
       ),
