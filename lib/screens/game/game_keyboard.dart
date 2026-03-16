@@ -180,6 +180,13 @@ class _KeyboardKeyState extends State<KeyboardKey> {
               width: showHighlight ? 1.5 : 1,
             ),
             boxShadow: [
+              // Subtle bottom edge shadow for 3D depth
+              if (!_pressed)
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.25),
+                  offset: const Offset(0, 2),
+                  blurRadius: 1,
+                ),
               if (showHighlight)
                 BoxShadow(
                   color: AppColors.electricBlue.withValues(alpha: 0.3),
