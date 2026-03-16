@@ -512,12 +512,19 @@ class _LevelSelectScreenState extends State<LevelSelectScreen>
           tier: selectedTier.value,
         ),
         transitionsBuilder: (_, animation, __, child) {
+          final curved = CurvedAnimation(
+            parent: animation,
+            curve: Curves.easeOutCubic,
+          );
           return FadeTransition(
-            opacity: CurvedAnimation(
-              parent: animation,
-              curve: Curves.easeInOut,
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(
+                begin: const Offset(0, 0.04),
+                end: Offset.zero,
+              ).animate(curved),
+              child: child,
             ),
-            child: child,
           );
         },
         transitionDuration: const Duration(milliseconds: 350),
