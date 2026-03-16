@@ -960,10 +960,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                   ),
                                   if (getWordEmoji(_currentWord.text).isNotEmpty)
                                     Padding(
-                                      padding: const EdgeInsets.only(top: 4),
-                                      child: Text(
-                                        getWordEmoji(_currentWord.text),
-                                        style: TextStyle(fontSize: tight ? 22 : 28),
+                                      padding: const EdgeInsets.only(top: 6),
+                                      child: GestureDetector(
+                                        onTap: _announceCurrentWord,
+                                        child: Text(
+                                          getWordEmoji(_currentWord.text),
+                                          style: TextStyle(fontSize: tight ? 28 : 36),
+                                        ),
                                       ),
                                     ),
                                   SizedBox(height: tight ? 4 : gap1),

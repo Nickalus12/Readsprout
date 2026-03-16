@@ -21,10 +21,10 @@ class HearWordButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final screenH = MediaQuery.of(context).size.height;
     final compact = screenH < 600;
-    final hPad = compact ? 16.0 : 24.0;
-    final vPad = compact ? 8.0 : 12.0;
-    final iconSz = compact ? 20.0 : 24.0;
-    final fontSz = compact ? 15.0 : 18.0;
+    final hPad = compact ? 18.0 : 28.0;
+    final vPad = compact ? 10.0 : 14.0;
+    final iconSz = compact ? 22.0 : 28.0;
+    final fontSz = compact ? 16.0 : 20.0;
 
     final button = GestureDetector(
       onTap: onTap,
