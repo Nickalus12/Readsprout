@@ -1695,28 +1695,42 @@ extension ElementBehaviors on SimulationEngine {
       grid[idx] = El.dirt;
       life[idx] = 0;
       markProcessed(idx);
-      // Steam wisps from drying mud
       queueReactionFlash(x, y, 180, 180, 200, 2);
       return;
     }
 
-    // Mud is a thick, slow-flowing liquid — falls every other frame
-    if (frameCount.isOdd) return;
+    final g = gravityDir;
+    final by = y + g;
 
-    final by = y + gravityDir;
+    // Mud is a viscous liquid: falls 2 out of 3 frames (slower than water, faster than sand)
+    if (frameCount % 3 == 0) {
+      // Rest frame — only do sideways spread
+      final dl = rng.nextBool();
+      final x1 = dl ? x - 1 : x + 1;
+      final x2 = dl ? x + 1 : x - 1;
+      if (inBounds(x1, y) && grid[y * gridW + x1] == El.empty) {
+        swap(idx, y * gridW + x1);
+      } else if (inBounds(x2, y) && grid[y * gridW + x2] == El.empty) {
+        swap(idx, y * gridW + x2);
+      }
+      return;
+    }
+
     // Fall straight down
     if (inBounds(x, by) && grid[by * gridW + x] == El.empty) {
       swap(idx, by * gridW + x);
       return;
     }
-    // Sink through water (heavier)
+    // Sink through water (heavier than water)
     if (inBounds(x, by) && grid[by * gridW + x] == El.water) {
-      final waterMass = life[by * gridW + x];
+      final bi = by * gridW + x;
+      final waterMass = life[bi];
       grid[idx] = El.water;
       life[idx] = waterMass < 20 ? 100 : waterMass;
-      grid[by * gridW + x] = El.mud;
+      grid[bi] = El.mud;
+      life[bi] = 0;
       markProcessed(idx);
-      markProcessed(by * gridW + x);
+      markProcessed(bi);
       return;
     }
     // Diagonal fall
@@ -1731,15 +1745,13 @@ extension ElementBehaviors on SimulationEngine {
       swap(idx, by * gridW + x2);
       return;
     }
-    // Slow sideways spread (viscous flow — every 4th frame)
-    if (frameCount % 4 == 0) {
-      if (inBounds(x1, y) && grid[y * gridW + x1] == El.empty) {
-        swap(idx, y * gridW + x1);
-        return;
-      }
-      if (inBounds(x2, y) && grid[y * gridW + x2] == El.empty) {
-        swap(idx, y * gridW + x2);
-      }
+    // Sideways spread when blocked below
+    if (inBounds(x1, y) && grid[y * gridW + x1] == El.empty) {
+      swap(idx, y * gridW + x1);
+      return;
+    }
+    if (inBounds(x2, y) && grid[y * gridW + x2] == El.empty) {
+      swap(idx, y * gridW + x2);
     }
   }
 
