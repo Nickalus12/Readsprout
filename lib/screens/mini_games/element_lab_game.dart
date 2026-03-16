@@ -2635,6 +2635,21 @@ class _ElementLabGameState extends State<ElementLabGame>
       }
     }
 
+
+    // Cluster detection: scan 5x5 in each direction to prefer digging
+    // toward denser dirt areas for more interesting tunnel shapes
+    if (_rng.nextInt(4) == 0) {
+      int leftDirt = 0, rightDirt = 0;
+      for (int cdy = -2; cdy <= 2; cdy++) {
+        for (int cdx = 1; cdx <= 5; cdx++) {
+          final lx = x - cdx, rx = x + cdx, cy2 = y + cdy;
+          if (_inBounds(lx, cy2) && _grid[cy2 * _gridW + lx] == El.dirt) leftDirt++;
+          if (_inBounds(rx, cy2) && _grid[cy2 * _gridW + rx] == El.dirt) rightDirt++;
+        }
+      }
+      if (leftDirt > rightDirt + 3) _velX[idx] = -1;
+      else if (rightDirt > leftDirt + 3) _velX[idx] = 1;
+    }
     // Try to dig downward first (create vertical shafts)
     if (_inBounds(x, by) && _grid[by * _gridW + x] == El.dirt) {
       if (_rng.nextInt(3) == 0) {
@@ -2678,10 +2693,12 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Create chambers — occasionally dig a wider space
+    // Create chambers — occasionally dig a wider space (3x3 or 5x5)
     if (underground && _rng.nextInt(12) == 0) {
-      for (int dy = -1; dy <= 1; dy++) {
-        for (int dx = -1; dx <= 1; dx++) {
+      // 1 in 4 chance of a larger 5x5 chamber
+      final chamberSize = _rng.nextInt(4) == 0 ? 2 : 1;
+      for (int dy = -chamberSize; dy <= chamberSize; dy++) {
+        for (int dx = -chamberSize; dx <= chamberSize; dx++) {
           final cx = x + dx, cy = y + dy;
           if (_inBounds(cx, cy) && _grid[cy * _gridW + cx] == El.dirt) {
             _grid[cy * _gridW + cx] = El.empty;
