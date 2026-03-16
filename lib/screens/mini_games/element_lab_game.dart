@@ -923,6 +923,18 @@ class _ElementLabGameState extends State<ElementLabGame>
           _life[ni] = 150; // melting visual
           _flags[ni] = 1;
         }
+        if (neighbor == El.snow) {
+          // Snow melts into water (not just disappears)
+          _grid[ni] = El.water;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+        }
+        if (neighbor == El.bubble) {
+          // Bubble pops into steam when touching fire
+          _grid[ni] = El.steam;
+          _life[ni] = 0;
+          _flags[ni] = 1;
+        }
         if (neighbor == El.tnt) {
           _pendingExplosions.add(_Explosion(nx, ny, _calculateTNTRadius(nx, ny)));
           _grid[idx] = El.empty;
@@ -1043,7 +1055,7 @@ class _ElementLabGameState extends State<ElementLabGame>
   int _plantType(int idx) => _velX[idx] & 0x0F;
   int _plantStage(int idx) => (_velX[idx] >> 4) & 0x0F;
   void _setPlantData(int idx, int t, int s) => _velX[idx] = ((s & 0xF) << 4) | (t & 0xF);
-  static const _plantMaxH = [0, 3, 6, 15, 3, 12];
+  static const _plantMaxH = [0, 4, 10, 25, 4, 15];
   static const _plantMinMoist = [0, 1, 2, 3, 4, 2];
   static const _plantGrowRate = [0, 25, 35, 20, 40, 30];
   int _selectedSeedType = 1; // kPlantGrass
@@ -1378,8 +1390,10 @@ class _ElementLabGameState extends State<ElementLabGame>
   // ── Plant growth patterns (Task #6) ──────────────────────────────────
 
   void _growGrass(int x, int y, int idx, int curSize) {
-    // Grass: 2-3 tall, spreads sideways
-    if (curSize < 3) {
+    // Grass: 2-4 tall, spreads sideways aggressively, varied heights
+    // Vary max height per blade (2-4) based on position for natural look
+    final bladeMaxH = 2 + (idx % 3); // 2, 3, or 4
+    if (curSize < bladeMaxH) {
       final uy = y - _gravityDir;
       if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
         final ni = uy * _gridW + x;
@@ -1389,76 +1403,158 @@ class _ElementLabGameState extends State<ElementLabGame>
         _velY[idx] = (curSize + 1);
       }
     }
-    // Spread sideways on dirt surface
-    if (_rng.nextInt(40) == 0) {
+    // Spread sideways more aggressively — both directions, higher chance
+    if (_rng.nextInt(20) == 0) {
+      // Try both sides for denser turf
+      for (final side in [x - 1, x + 1]) {
+        if (_rng.nextInt(2) == 0) continue; // 50% chance each side
+        final by = y + _gravityDir;
+        if (_inBounds(side, y) && _grid[y * _gridW + side] == El.empty &&
+            _inBounds(side, by) && _grid[by * _gridW + side] == El.dirt) {
+          final ni = y * _gridW + side;
+          _grid[ni] = El.plant; _life[ni] = _life[idx];
+          _setPlantData(ni, kPlantGrass, kStSprout); _velY[ni] = 1;
+          _flags[ni] = 1;
+        }
+      }
+    }
+    // Fill in density: grow additional blades in gaps adjacent to existing grass
+    if (_rng.nextInt(30) == 0 && curSize >= 2) {
       final side = _rng.nextBool() ? x - 1 : x + 1;
-      final by = y + _gravityDir;
-      if (_inBounds(side, y) && _grid[y * _gridW + side] == El.empty &&
-          _inBounds(side, by) && _grid[by * _gridW + side] == El.dirt) {
-        final ni = y * _gridW + side;
+      final uy = y - _gravityDir;
+      if (_inBounds(side, uy) && _grid[uy * _gridW + side] == El.empty &&
+          _inBounds(side, y) && _grid[y * _gridW + side] == El.plant) {
+        final ni = uy * _gridW + side;
         _grid[ni] = El.plant; _life[ni] = _life[idx];
-        _setPlantData(ni, kPlantGrass, kStSprout); _velY[ni] = 1;
+        _setPlantData(ni, kPlantGrass, kStGrowing); _velY[ni] = 2;
         _flags[ni] = 1;
       }
     }
   }
 
   void _growFlower(int x, int y, int idx, int curSize) {
-    // Flower: grows up 4-6 cells, bloom at top
-    if (curSize < 6) {
+    // Flower: grows up 7-10 cells, leaves along stem, multi-cell bloom at top
+    if (curSize < 10) {
       final uy = y - _gravityDir;
       if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
         final ni = uy * _gridW + x;
         _grid[ni] = El.plant; _life[ni] = _life[idx];
-        // Top 1-2 cells are bloom (stage = mature marks bloom)
         final newSize = curSize + 1;
-        _setPlantData(ni, kPlantFlower, newSize >= 4 ? kStMature : kStGrowing);
+        // Top 2-3 cells are bloom (mature stage marks bloom)
+        _setPlantData(ni, kPlantFlower, newSize >= 7 ? kStMature : kStGrowing);
         _velY[ni] = newSize;
         _flags[ni] = 1;
         _velY[idx] = newSize;
+      }
+      // Add leaves along the stem every 3-4 cells, alternating left/right
+      if (curSize >= 3 && curSize % 3 == 0) {
+        final leafSide = (curSize ~/ 3) % 2 == 0 ? x - 1 : x + 1;
+        if (_inBounds(leafSide, y) && _grid[y * _gridW + leafSide] == El.empty) {
+          final ni = y * _gridW + leafSide;
+          _grid[ni] = El.plant; _life[ni] = _life[idx];
+          // Use kStSprout to mark leaf cells (distinct from stem/bloom)
+          _setPlantData(ni, kPlantFlower, kStSprout); _velY[ni] = curSize;
+          _flags[ni] = 1;
+        }
+      }
+    }
+    // Bloom expansion: at mature height, spread bloom sideways (2-3 cells wide)
+    if (curSize >= 8 && _rng.nextInt(3) == 0) {
+      for (final side in [x - 1, x + 1]) {
+        if (_inBounds(side, y) && _grid[y * _gridW + side] == El.empty) {
+          final ni = y * _gridW + side;
+          _grid[ni] = El.plant; _life[ni] = _life[idx];
+          _setPlantData(ni, kPlantFlower, kStMature); _velY[ni] = curSize;
+          _flags[ni] = 1;
+        }
       }
     }
   }
 
   void _growTree(int x, int y, int idx, int curSize) {
-    // Tree: 8-15 tall, trunk then canopy
-    if (curSize < 15) {
+    // Tree: 10-25 tall, trunk with branches, wide canopy, root system
+    if (curSize < 25) {
       final uy = y - _gravityDir;
       if (_inBounds(x, uy) && _grid[uy * _gridW + x] == El.empty) {
         final ni = uy * _gridW + x;
         _grid[ni] = El.plant; _life[ni] = _life[idx];
         final newSize = curSize + 1;
-        // Canopy starts at ~50% height
-        final isTrunk = newSize < 7;
+        // Canopy starts at ~50% height (12 of 25)
+        final isTrunk = newSize < 12;
         _setPlantData(ni, kPlantTree, isTrunk ? kStGrowing : kStMature);
         _velY[ni] = newSize;
         _flags[ni] = 1;
         _velY[idx] = newSize;
       }
-      // Canopy: spread sideways — wider spread at greater height
-      if (curSize >= 6) {
-        // Try both sides for a fuller canopy
+      // Root system: at early growth, grow roots downward into dirt
+      if (curSize <= 4 && curSize >= 2 && _rng.nextInt(8) == 0) {
+        final rootX = x + (_rng.nextBool() ? -1 : 1);
+        final rootY = y + _gravityDir;
+        if (_inBounds(rootX, rootY) && _grid[rootY * _gridW + rootX] == El.dirt) {
+          final ni = rootY * _gridW + rootX;
+          _grid[ni] = El.plant; _life[ni] = _life[idx];
+          _setPlantData(ni, kPlantTree, kStSprout); _velY[ni] = 1;
+          _flags[ni] = 1;
+        }
+      }
+      // Branches: at height 8-11, spawn side branches (2-4 cells long)
+      if (curSize >= 8 && curSize < 12 && _rng.nextInt(10) < 3) {
+        final branchDir = _rng.nextBool() ? -1 : 1;
+        final branchLen = 2 + _rng.nextInt(3);
+        for (int b = 1; b <= branchLen; b++) {
+          final bx = x + branchDir * b;
+          final by = y - (_gravityDir * (b > 2 ? 1 : 0));
+          if (_inBounds(bx, by) && _grid[by * _gridW + bx] == El.empty) {
+            final ni = by * _gridW + bx;
+            _grid[ni] = El.plant; _life[ni] = _life[idx];
+            _setPlantData(ni, kPlantTree, kStGrowing); _velY[ni] = curSize;
+            _flags[ni] = 1;
+          } else {
+            break;
+          }
+        }
+      }
+      // Canopy: spread sideways, wider at greater height (up to 4 cells)
+      if (curSize >= 12) {
         for (final side in [x - 1, x + 1]) {
-          if (_rng.nextInt(2) == 0) continue; // 50% chance each side
-          // Spread at current level and one above
+          if (_rng.nextInt(3) == 0) continue;
           for (final sy in [y, y - _gravityDir]) {
             if (_inBounds(side, sy) && _grid[sy * _gridW + side] == El.empty) {
               final ni = sy * _gridW + side;
               _grid[ni] = El.plant; _life[ni] = _life[idx];
               _setPlantData(ni, kPlantTree, kStMature); _velY[ni] = curSize;
               _flags[ni] = 1;
-              break; // one per side per tick
+              break;
             }
           }
         }
-        // At tall heights, spread 2 cells wide for a rounder canopy
-        if (curSize >= 10 && _rng.nextInt(3) == 0) {
+        if (curSize >= 16 && _rng.nextInt(3) == 0) {
           for (final side in [x - 2, x + 2]) {
             if (_inBounds(side, y) && _grid[y * _gridW + side] == El.empty) {
               final ni = y * _gridW + side;
               _grid[ni] = El.plant; _life[ni] = _life[idx];
               _setPlantData(ni, kPlantTree, kStMature); _velY[ni] = curSize;
               _flags[ni] = 1;
+            }
+          }
+        }
+        if (curSize >= 20 && _rng.nextInt(4) == 0) {
+          for (final side in [x - 3, x + 3]) {
+            if (_inBounds(side, y) && _grid[y * _gridW + side] == El.empty) {
+              final ni = y * _gridW + side;
+              _grid[ni] = El.plant; _life[ni] = _life[idx];
+              _setPlantData(ni, kPlantTree, kStMature); _velY[ni] = curSize;
+              _flags[ni] = 1;
+            }
+          }
+          if (curSize >= 23) {
+            for (final side in [x - 4, x + 4]) {
+              if (_inBounds(side, y) && _grid[y * _gridW + side] == El.empty) {
+                final ni = y * _gridW + side;
+                _grid[ni] = El.plant; _life[ni] = _life[idx];
+                _setPlantData(ni, kPlantTree, kStMature); _velY[ni] = curSize;
+                _flags[ni] = 1;
+              }
             }
           }
         }
@@ -2251,34 +2347,69 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Fire — flee or die
+    // Fire — flee (search 5 cells in all directions) or die
     if (_checkAdjacent(x, y, El.fire)) {
-      for (int dy = -1; dy <= 1; dy++) {
-        for (int dx = -1; dx <= 1; dx++) {
+      int bestDist = 999;
+      int bestIdx = -1;
+      for (int dy = -5; dy <= 5; dy++) {
+        for (int dx = -5; dx <= 5; dx++) {
           final nx2 = x + dx, ny2 = y + dy;
           if (!_inBounds(nx2, ny2)) continue;
+          final dist = dx.abs() + dy.abs();
+          if (dist >= bestDist) continue;
           if (_grid[ny2 * _gridW + nx2] == El.empty && !_checkAdjacent(nx2, ny2, El.fire)) {
-            _swap(idx, ny2 * _gridW + nx2);
-            return;
+            bestDist = dist;
+            bestIdx = ny2 * _gridW + nx2;
           }
+        }
+      }
+      if (bestIdx >= 0) {
+        // Move one step toward safe cell
+        final safeX = bestIdx % _gridW;
+        final safeY = bestIdx ~/ _gridW;
+        final stepX = (safeX - x).sign;
+        final stepY = (safeY - y).sign;
+        final nx2 = x + stepX;
+        final ny2 = y + stepY;
+        if (_inBounds(nx2, ny2) && _grid[ny2 * _gridW + nx2] == El.empty) {
+          _swap(idx, ny2 * _gridW + nx2);
+          return;
+        }
+        if (_inBounds(nx2, y) && _grid[y * _gridW + nx2] == El.empty) {
+          _swap(idx, y * _gridW + nx2);
+          return;
+        }
+        if (_inBounds(x, ny2) && _grid[ny2 * _gridW + x] == El.empty) {
+          _swap(idx, ny2 * _gridW + x);
+          return;
         }
       }
       _grid[idx] = El.empty; _life[idx] = 0; _velY[idx] = 0;
       return;
     }
 
-    // Drowning in water
+    // Drowning in water — swim toward nearest surface
     if (_checkAdjacent(x, y, El.water)) {
       if (state < 10) {
         _velY[idx] = 10; // enter drowning state
         state = 10;
       }
-      // Swim upward
-      if (_inBounds(x, uy) && _rng.nextInt(3) == 0) {
+      // Actively swim upward toward surface (check cells above, prefer empty)
+      if (_inBounds(x, uy)) {
         final ac = _grid[uy * _gridW + x];
-        if (ac == El.empty || ac == El.water) { _swap(idx, uy * _gridW + x); return; }
+        if (ac == El.empty) { _swap(idx, uy * _gridW + x); return; }
+        if (ac == El.water && _rng.nextInt(2) == 0) { _swap(idx, uy * _gridW + x); return; }
       }
-      // Try sideways escape
+      // Try diagonal up — find closest path to surface
+      for (final dir in [1, -1]) {
+        final sx = x + dir;
+        if (_inBounds(sx, uy)) {
+          final diagCell = _grid[uy * _gridW + sx];
+          if (diagCell == El.empty) { _swap(idx, uy * _gridW + sx); return; }
+          if (diagCell == El.water && _rng.nextInt(2) == 0) { _swap(idx, uy * _gridW + sx); return; }
+        }
+      }
+      // Try sideways escape to empty cell
       for (final dir in [1, -1]) {
         final sx = x + dir;
         if (_inBounds(sx, y) && _grid[y * _gridW + sx] == El.empty) {
@@ -2528,20 +2659,37 @@ class _ElementLabGameState extends State<ElementLabGame>
         (_grid[uy * _gridW + x] == El.empty && !_isUnderground(x, y));
 
     if (atSurface || !_inBounds(x, uy)) {
-      // Build mound: deposit dirt near the colony entrance
-      // Try to place dirt beside or above current position (building up)
-      final depositY = uy; // place above ant
-      // Try placing at the mound center (home X) first
+      // Structured mound building: prefer to deposit next to existing dirt
+      // to create a cohesive mound shape rather than scattered deposits
+      final depositY = uy;
       final toHome = (homeX - x).sign;
-      for (final depositX in [x + toHome, x, x - toHome]) {
-        if (_inBounds(depositX, depositY) && _grid[depositY * _gridW + depositX] == El.empty) {
-          _grid[depositY * _gridW + depositX] = El.dirt;
-          _life[depositY * _gridW + depositX] = 0;
-          _velY[idx] = 3; // switch to returning
-          return;
+
+      int bestX = -1;
+      int bestScore = -1;
+      for (final depositX in [x + toHome, x, x - toHome, x + toHome * 2, x - toHome * 2]) {
+        if (!_inBounds(depositX, depositY) || _grid[depositY * _gridW + depositX] != El.empty) continue;
+        int score = 0;
+        for (int ddx = -1; ddx <= 1; ddx++) {
+          final checkX = depositX + ddx;
+          if (_inBounds(checkX, depositY) && _grid[depositY * _gridW + checkX] == El.dirt) score += 3;
+          final checkBelow = depositY + g;
+          if (_inBounds(checkX, checkBelow) && _grid[checkBelow * _gridW + checkX] == El.dirt) score += 5;
+        }
+        score += (5 - (depositX - homeX).abs().clamp(0, 5));
+        if (score > bestScore) {
+          bestScore = score;
+          bestX = depositX;
         }
       }
-      // Can't place above, try sideways
+
+      if (bestX >= 0) {
+        _grid[depositY * _gridW + bestX] = El.dirt;
+        _life[depositY * _gridW + bestX] = 0;
+        _velY[idx] = 3; // switch to returning
+        return;
+      }
+
+      // Fallback: try sideways
       for (final dx in [1, -1]) {
         final sx = x + dx;
         if (_inBounds(sx, y) && _grid[y * _gridW + sx] == El.empty) {
@@ -2570,16 +2718,28 @@ class _ElementLabGameState extends State<ElementLabGame>
     final toHome = (homeX - x).sign;
 
     // If near home X, head back underground
-    if ((x - homeX).abs() <= 2) {
+    if ((x - homeX).abs() <= 3) {
       // Try to go down into the tunnels
       if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
         _swap(idx, by * _gridW + x);
         _velY[idx] = 0; // back to explorer once underground
         return;
       }
-      // Look for a tunnel entrance nearby
-      for (final dx in [0, 1, -1, 2, -2]) {
+      // Look for a tunnel entrance nearby — check for entrance markers (life==250)
+      for (final dx in [0, 1, -1, 2, -2, 3, -3]) {
         final tx = x + dx;
+        // Check for entrance-marked dirt cells
+        if (_inBounds(tx, y) && _grid[y * _gridW + tx] == El.dirt && _life[y * _gridW + tx] == 250) {
+          // Found an entrance marker — move toward it
+          if (dx != 0) {
+            final moveToward = dx.sign;
+            final mx = x + moveToward;
+            if (_inBounds(mx, y) && _grid[y * _gridW + mx] == El.empty) {
+              _swap(idx, y * _gridW + mx);
+              return;
+            }
+          }
+        }
         if (_inBounds(tx, by) && _grid[by * _gridW + tx] == El.empty) {
           if (_inBounds(tx, y) && _grid[y * _gridW + tx] == El.empty) {
             _swap(idx, y * _gridW + tx);
@@ -2591,16 +2751,70 @@ class _ElementLabGameState extends State<ElementLabGame>
       return;
     }
 
-    // Walk toward home
-    final moveDir = toHome != 0 ? toHome : _velX[idx];
+    // Follow pheromone trails back toward home
+    int moveDir = toHome != 0 ? toHome : _velX[idx];
+    // Check if there's a strong pheromone trail to follow
+    for (final sd in [toHome, -toHome]) {
+      if (sd == 0) continue;
+      final sx = x + sd;
+      if (_inBounds(sx, y) && _grid[y * _gridW + sx] == El.empty) {
+        final pheromone = _life[y * _gridW + sx];
+        if (pheromone > 80) {
+          moveDir = sd;
+          break;
+        }
+      }
+    }
     _antMove(x, y, idx, moveDir);
   }
 
-  /// Shared ant movement: walk, climb, reverse. Avoids hazards.
+  /// Shared ant movement: walk, climb, wall-follow, hazard-avoid.
   void _antMove(int x, int y, int idx, int moveDir) {
     final g = _gravityDir;
     final uy = y - g;
+    final by = y + g;
     final nx = x + moveDir;
+
+    // Hazard lookahead: check 2 cells ahead for fire/acid/lava
+    for (int look = 1; look <= 2; look++) {
+      final lx = x + moveDir * look;
+      if (!_inBounds(lx, y)) break;
+      final lookCell = _grid[y * _gridW + lx];
+      if (lookCell == El.fire || lookCell == El.acid) {
+        _velX[idx] = -moveDir;
+        // Try to move away
+        final escX = x - moveDir;
+        if (_inBounds(escX, y) && _grid[y * _gridW + escX] == El.empty) {
+          _swap(idx, y * _gridW + escX);
+        }
+        return;
+      }
+      // Lava has larger avoidance — treat any lava within 2 cells as danger
+      if (lookCell == El.lava) {
+        _velX[idx] = -moveDir;
+        final escX = x - moveDir;
+        if (_inBounds(escX, y) && _grid[y * _gridW + escX] == El.empty) {
+          _swap(idx, y * _gridW + escX);
+        }
+        return;
+      }
+    }
+    // Also check lava diagonally (larger avoidance radius)
+    for (int dy = -2; dy <= 2; dy++) {
+      for (int ddx = -2; ddx <= 2; ddx++) {
+        if (ddx == 0 && dy == 0) continue;
+        final lx = x + ddx, ly = y + dy;
+        if (_inBounds(lx, ly) && _grid[ly * _gridW + lx] == El.lava) {
+          // Move away from lava
+          _velX[idx] = ddx > 0 ? -1 : 1;
+          final escX = x + _velX[idx];
+          if (_inBounds(escX, y) && _grid[y * _gridW + escX] == El.empty) {
+            _swap(idx, y * _gridW + escX);
+          }
+          return;
+        }
+      }
+    }
 
     // Walk along surface
     if (_inBounds(nx, y) && _grid[y * _gridW + nx] == El.empty) {
@@ -2624,9 +2838,139 @@ class _ElementLabGameState extends State<ElementLabGame>
       }
     }
 
-    // Blocked — reverse direction
+    // Wall following: instead of random reversal, try to follow the wall
+    // Try going down along the wall (clockwise/counterclockwise)
+    if (_inBounds(x, by) && _grid[by * _gridW + x] == El.empty) {
+      _swap(idx, by * _gridW + x);
+      return;
+    }
+    // Try the opposite side going up
+    final ox = x - moveDir;
+    if (_inBounds(ox, uy) && _grid[uy * _gridW + ox] == El.empty) {
+      _velX[idx] = -moveDir;
+      _swap(idx, uy * _gridW + ox);
+      return;
+    }
+
+    // Truly blocked — reverse direction
     _velX[idx] = -moveDir;
     if (_rng.nextInt(6) == 0) _velX[idx] = _rng.nextBool() ? 1 : -1;
+  }
+
+  /// Deposit pheromones on adjacent empty cells as the ant walks.
+  /// Carriers and foragers deposit stronger pheromones (~200) than explorers (~100).
+  void _antDepositPheromone(int x, int y, int state) {
+    final intensity = (state == 2 || state == 4) ? 200 : (state == 3 ? 150 : 100);
+    // Deposit on current position's neighboring empty cells
+    for (int dy = -1; dy <= 1; dy++) {
+      for (int dx = -1; dx <= 1; dx++) {
+        if (dx == 0 && dy == 0) continue;
+        final nx = x + dx, ny = y + dy;
+        if (!_inBounds(nx, ny)) continue;
+        final ni = ny * _gridW + nx;
+        if (_grid[ni] == El.empty && _life[ni] < intensity) {
+          _life[ni] = intensity;
+        }
+      }
+    }
+  }
+
+  /// Forager behavior: carry a seed to moist dirt and plant it.
+  void _antForage(int x, int y, int idx, int homeX) {
+    final g = _gravityDir;
+    final dir = _velX[idx];
+
+    // Search for moist dirt (moisture >= 2) within scanning range
+    int bestDx = 0;
+    int bestDy = 0;
+    int bestDist = 999;
+    for (int scanY = -5; scanY <= 5; scanY++) {
+      for (int scanX = -5; scanX <= 5; scanX++) {
+        final nx = x + scanX, ny = y + scanY;
+        if (!_inBounds(nx, ny)) continue;
+        final ni = ny * _gridW + nx;
+        if (_grid[ni] == El.dirt && _life[ni] >= 2) {
+          // Found moist dirt — check if there's an empty cell adjacent to it
+          for (int pdy = -1; pdy <= 1; pdy++) {
+            for (int pdx = -1; pdx <= 1; pdx++) {
+              final px = nx + pdx, py = ny + pdy;
+              if (!_inBounds(px, py)) continue;
+              if (_grid[py * _gridW + px] == El.empty) {
+                final dist = (px - x).abs() + (py - y).abs();
+                if (dist < bestDist) {
+                  bestDist = dist;
+                  bestDx = (px - x).sign;
+                  bestDy = (py - y).sign;
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // If we're adjacent to moist dirt, plant the seed
+    if (bestDist <= 2) {
+      for (int pdy = -1; pdy <= 1; pdy++) {
+        for (int pdx = -1; pdx <= 1; pdx++) {
+          final px = x + pdx, py = y + pdy;
+          if (!_inBounds(px, py)) continue;
+          final pi = py * _gridW + px;
+          if (_grid[pi] == El.empty) {
+            // Check if this empty cell is adjacent to moist dirt
+            bool nearMoistDirt = false;
+            for (int cdy = -1; cdy <= 1; cdy++) {
+              for (int cdx = -1; cdx <= 1; cdx++) {
+                final cx = px + cdx, cy = py + cdy;
+                if (!_inBounds(cx, cy)) continue;
+                final ci = cy * _gridW + cx;
+                if (_grid[ci] == El.dirt && _life[ci] >= 2) {
+                  nearMoistDirt = true;
+                  break;
+                }
+              }
+              if (nearMoistDirt) break;
+            }
+            if (nearMoistDirt) {
+              _grid[pi] = El.seed;
+              _life[pi] = 0;
+              _velY[idx] = 0; // back to explorer
+              return;
+            }
+          }
+        }
+      }
+    }
+
+    // Move toward the best target
+    if (bestDist < 999) {
+      final moveDir = bestDx != 0 ? bestDx : dir;
+      _antMove(x, y, idx, moveDir);
+      return;
+    }
+
+    // No moist dirt found — wander toward home area
+    final toHome = (homeX - x).sign;
+    final moveDir = toHome != 0 ? toHome : dir;
+    _antMove(x, y, idx, moveDir);
+
+    // If wandering too long without finding moist dirt, drop the seed
+    // (Use a probabilistic timeout — 1 in 60 chance per step)
+    if (_rng.nextInt(60) == 0) {
+      // Drop seed at current position if empty neighbor exists
+      for (int dy = -1; dy <= 1; dy++) {
+        for (int dx = -1; dx <= 1; dx++) {
+          final nx = x + dx, ny = y + dy;
+          if (!_inBounds(nx, ny)) continue;
+          if (_grid[ny * _gridW + nx] == El.empty) {
+            _grid[ny * _gridW + nx] = El.seed;
+            _life[ny * _gridW + nx] = 0;
+            _velY[idx] = 0; // back to explorer
+            return;
+          }
+        }
+      }
+    }
   }
 
   void _simOil(int x, int y, int idx) {
@@ -2797,12 +3141,28 @@ class _ElementLabGameState extends State<ElementLabGame>
         _swap(idx, below);
         return;
       }
-      // Sink through water
+      // Sink through water — with splash effect
       if ((elType == El.sand || elType == El.dirt || elType == El.seed) && belowEl == El.water) {
         _grid[idx] = El.water;
         _grid[below] = elType;
         _flags[idx] = 1;
         _flags[below] = 1;
+        // Splash: convert 1-2 water cells above impact to bubble (visual splash)
+        if (_rng.nextInt(3) == 0) {
+          final splashCount = 1 + _rng.nextInt(2);
+          for (int s = 0; s < splashCount; s++) {
+            final sy = y - _gravityDir * (s + 1);
+            final sx = x + _rng.nextInt(3) - 1;
+            if (_inBounds(sx, sy)) {
+              final si = sy * _gridW + sx;
+              if (_grid[si] == El.water) {
+                _grid[si] = El.bubble;
+                _life[si] = 0;
+                _flags[si] = 1;
+              }
+            }
+          }
+        }
         return;
       }
     }
@@ -3051,6 +3411,17 @@ class _ElementLabGameState extends State<ElementLabGame>
   }
 
   Color _getElementColor(int el, int idx) {
+    // Pheromone visualization for empty cells
+    if (el == El.empty && _life[idx] > 0) {
+      // Subtle warm amber tint showing ant trails
+      final life = _life[idx];
+      final a = (life ~/ 10).clamp(0, 25);
+      if (a > 0) {
+        return Color.fromARGB(a, 255, 180, 60);
+      }
+      return const Color(0x00000000);
+    }
+
     // Slight random hue variation per particle using idx as seed
     final variation = ((idx * 7 + idx ~/ _gridW * 3) % 11) - 5; // -5 to +5
 
@@ -3111,19 +3482,44 @@ class _ElementLabGameState extends State<ElementLabGame>
             255,
           );
         }
-        // Water shimmer — top edge is lighter
+        // Water with depth-based darkening
         final wx = idx % _gridW;
         final wy = idx ~/ _gridW;
         final isTop = wy > 0 && _grid[(wy - 1) * _gridW + wx] != El.water &&
             _grid[(wy - 1) * _gridW + wx] != El.oil;
         if (isTop) {
-          return Color.fromARGB(255, (80 + variation).clamp(50, 110), 180, 255);
+          // Surface water — bright highlight
+          return Color.fromARGB(255, (90 + variation).clamp(60, 120), 190, 255);
         }
-        return Color.fromARGB(255, (30 + variation).clamp(10, 60), (100 + variation).clamp(80, 130), 255);
+        // Depth-based darkening: count water cells above (capped at 5)
+        int depthAbove = 0;
+        for (int dy = 1; dy <= 5; dy++) {
+          final cy = wy - dy;
+          if (cy < 0) break;
+          final ce = _grid[cy * _gridW + wx];
+          if (ce == El.water || ce == El.oil) {
+            depthAbove++;
+          } else {
+            break;
+          }
+        }
+        // Deeper = darker blue (each depth level darkens by ~8)
+        final depthDarken = depthAbove * 8;
+        return Color.fromARGB(255,
+            (30 + variation - depthDarken).clamp(5, 60),
+            (100 + variation - depthDarken).clamp(50, 130),
+            (255 - depthDarken * 2).clamp(180, 255));
 
       case El.sand:
-        final v = ((idx % 7) * 3 + variation).clamp(0, 30);
-        return Color.fromARGB(255, 222 - v, 184 - v, 135 - v);
+        // 5-shade variation: tan, golden, darker grains, light, warm
+        final sandShade = (idx * 7 + idx ~/ _gridW * 3) % 5;
+        switch (sandShade) {
+          case 0: return Color.fromARGB(255, (222 + variation).clamp(200, 240), (184 + variation).clamp(160, 200), (135 + variation).clamp(110, 155)); // tan
+          case 1: return Color.fromARGB(255, (235 + variation).clamp(215, 250), (200 + variation).clamp(180, 220), (120 + variation).clamp(100, 145)); // golden
+          case 2: return Color.fromARGB(255, (190 + variation).clamp(170, 210), (155 + variation).clamp(135, 175), (110 + variation).clamp(90, 130)); // darker grain
+          case 3: return Color.fromARGB(255, (230 + variation).clamp(210, 250), (195 + variation).clamp(175, 215), (145 + variation).clamp(125, 165)); // light
+          default: return Color.fromARGB(255, (215 + variation).clamp(195, 235), (175 + variation).clamp(155, 195), (125 + variation).clamp(105, 145)); // warm
+        }
 
       case El.tnt:
         final tx = idx % _gridW;
@@ -3133,6 +3529,10 @@ class _ElementLabGameState extends State<ElementLabGame>
 
       case El.ant:
         final antState = _velY[idx];
+        if (antState == 4) {
+          // Forager — greenish tint (carrying a seed)
+          return const Color(0xFF2B3D1F);
+        }
         if (antState == 2) {
           // Carrier — brownish tint (carrying dirt)
           return const Color(0xFF3D2B1F);
@@ -3148,17 +3548,45 @@ class _ElementLabGameState extends State<ElementLabGame>
 
       case El.seed:
         final v = ((idx % 5) * 4 + variation).clamp(0, 25);
-        return Color.fromARGB(255, (139 - v).clamp(100, 150), (115 - v).clamp(80, 130), (85 - v).clamp(50, 100));
+        final seedType = _velX[idx].clamp(1, 5);
+        switch (seedType) {
+          case kPlantGrass:
+            // Light green-brown
+            return Color.fromARGB(255, (120 - v).clamp(90, 130), (135 - v).clamp(100, 145), (70 - v).clamp(40, 80));
+          case kPlantFlower:
+            // Pink/magenta tint seed coat
+            return Color.fromARGB(255, (165 - v).clamp(130, 175), (95 - v).clamp(70, 110), (120 - v).clamp(90, 135));
+          case kPlantTree:
+            // Dark brown acorn-like
+            return Color.fromARGB(255, (95 - v).clamp(60, 105), (65 - v).clamp(35, 75), (30 - v).clamp(10, 40));
+          case kPlantMushroom:
+            // Pale cream/white ghostly spore
+            return Color.fromARGB(230, (235 - v).clamp(210, 245), (230 - v).clamp(205, 240), (215 - v).clamp(190, 225));
+          case kPlantVine:
+            // Green-brown with slight green tint
+            return Color.fromARGB(255, (110 - v).clamp(80, 120), (125 - v).clamp(95, 135), (65 - v).clamp(35, 75));
+          default:
+            return Color.fromARGB(255, (139 - v).clamp(100, 150), (115 - v).clamp(80, 130), (85 - v).clamp(50, 100));
+        }
 
       case El.dirt:
-        // Moisture gradient: 0=dry sandy brown, 5=dark rich brown/muddy
+        // Rich earth tones with moisture gradient and 5-shade variation
         final moisture = _life[idx].clamp(0, 5);
         final mFrac = moisture / 5.0;
-        final v = ((idx % 5) * 5 + variation).clamp(0, 30);
-        // Dry: (139,105,20) → Moist: (80,55,15) (darker, richer)
-        final dr = (139 - mFrac * 59 - v).round().clamp(60, 150);
-        final dg = (105 - mFrac * 50 - v).round().clamp(40, 120);
-        final db = (20 + v - mFrac * 5).round().clamp(10, 50);
+        final dirtShade = (idx * 7 + idx ~/ _gridW * 3) % 5;
+        // Base colors per shade: dark brown, reddish-brown, lighter fleck, warm, cool
+        int baseR, baseG, baseB;
+        switch (dirtShade) {
+          case 0: baseR = 139; baseG = 105; baseB = 22; // standard brown
+          case 1: baseR = 148; baseG = 90;  baseB = 28; // reddish-brown
+          case 2: baseR = 155; baseG = 120; baseB = 35; // lighter fleck
+          case 3: baseR = 135; baseG = 100; baseB = 18; // warm earth
+          default: baseR = 125; baseG = 95;  baseB = 30; // cool earth
+        }
+        // Moisture darkens: dry -> normal, wet -> much darker and richer
+        final dr = (baseR - mFrac * 55 + variation).round().clamp(55, 165);
+        final dg = (baseG - mFrac * 45 + variation).round().clamp(35, 130);
+        final db = (baseB - mFrac * 10 + variation).round().clamp(8, 50);
         return Color.fromARGB(255, dr, dg, db);
 
       case El.plant:
@@ -3211,8 +3639,15 @@ class _ElementLabGameState extends State<ElementLabGame>
         return Color.fromARGB(255, (170 + variation).clamp(150, 200), (221 + variation).clamp(200, 240), 255);
 
       case El.stone:
-        final v = ((idx % 3) * 10 + variation).clamp(0, 40);
-        return Color.fromARGB(255, 120 + v, 120 + v, 120 + v);
+        // 5-shade natural variation: grey, dark grey, lighter speckles
+        final stoneShade = (idx * 7 + idx ~/ _gridW * 3) % 5;
+        switch (stoneShade) {
+          case 0: return Color.fromARGB(255, (130 + variation).clamp(110, 155), (130 + variation).clamp(110, 155), (135 + variation).clamp(115, 160)); // medium grey
+          case 1: return Color.fromARGB(255, (105 + variation).clamp(85, 125), (105 + variation).clamp(85, 125), (110 + variation).clamp(90, 130)); // dark grey
+          case 2: return Color.fromARGB(255, (150 + variation).clamp(130, 175), (150 + variation).clamp(130, 175), (155 + variation).clamp(135, 180)); // lighter speckle
+          case 3: return Color.fromARGB(255, (118 + variation).clamp(98, 140), (115 + variation).clamp(95, 137), (120 + variation).clamp(100, 142)); // cool grey
+          default: return Color.fromARGB(255, (138 + variation).clamp(118, 160), (136 + variation).clamp(116, 158), (140 + variation).clamp(120, 162)); // warm grey
+        }
 
       case El.mud:
         final v = ((idx % 5) * 5 + variation).clamp(0, 30);
@@ -4098,20 +4533,35 @@ class _ElementLabGameState extends State<ElementLabGame>
               mainAxisAlignment: MainAxisAlignment.center,
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
                   width: dotSz, height: dotSz,
                   decoration: BoxDecoration(
                     color: seedColors[_selectedSeedType.clamp(1, 5)],
                     shape: BoxShape.circle,
-                    border: Border.all(color: Colors.white.withValues(alpha: 0.3), width: 1),
+                    border: Border.all(
+                      color: isSelected
+                          ? Colors.white.withValues(alpha: 0.7)
+                          : Colors.white.withValues(alpha: 0.3),
+                      width: isSelected ? 2 : 1,
+                    ),
+                    boxShadow: isSelected ? [
+                      BoxShadow(
+                        color: seedColors[_selectedSeedType.clamp(1, 5)].withValues(alpha: 0.6),
+                        blurRadius: 6,
+                        spreadRadius: 1,
+                      ),
+                    ] : null,
                   ),
                   child: Icon(Icons.eco_rounded, size: iconSz, color: Colors.white),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Seed',
+                  seedNames[_selectedSeedType.clamp(1, 5)],
                   style: AppFonts.fredoka(fontSize: labelSz, fontWeight: FontWeight.w500,
-                    color: isSelected ? color : AppColors.secondaryText),
+                    color: isSelected
+                        ? seedColors[_selectedSeedType.clamp(1, 5)]
+                        : AppColors.secondaryText),
                 ),
               ],
             ),
