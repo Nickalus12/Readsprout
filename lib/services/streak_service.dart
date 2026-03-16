@@ -131,6 +131,11 @@ class StreakService {
       _longestStreak = _currentStreak;
     }
 
+    // Award a streak freeze at 7-day milestones (7, 14, 21, ...)
+    if (_currentStreak >= 7 && _currentStreak % 7 == 0 && !_streakFreezeAvailable) {
+      _streakFreezeAvailable = true;
+    }
+
     await _save();
     return _milestoneMessage(_currentStreak);
   }
