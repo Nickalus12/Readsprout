@@ -170,6 +170,7 @@ class _LetterDropGameState extends State<LetterDropGame>
   // Game state
   bool _gameOver = false;
   bool _roundComplete = false;
+  bool _showingStartOverlay = true;
   int _score = 0;
   late int _lives;
   int _wordsCompleted = 0;
@@ -874,11 +875,16 @@ class _LetterDropGameState extends State<LetterDropGame>
           ),
         ),
         child: SafeArea(
-          child: _gameOver
-              ? _buildGameOver()
-              : _roundComplete
-                  ? _buildRoundComplete()
-                  : _buildGameArea(),
+          child: Stack(
+            children: [
+              _gameOver
+                  ? _buildGameOver()
+                  : _roundComplete
+                      ? _buildRoundComplete()
+                      : _buildGameArea(),
+              if (_showingStartOverlay) _buildStartOverlay(),
+            ],
+          ),
         ),
       ),
     );
@@ -898,7 +904,132 @@ class _LetterDropGameState extends State<LetterDropGame>
     _sim.scale = _scale;
 
     _createWalls();
+    if (!_showingStartOverlay) _startGame();
+  }
+
+  void _dismissStartOverlay() {
+    setState(() => _showingStartOverlay = false);
     _startGame();
+  }
+
+  Widget _buildStartOverlay() {
+    return GestureDetector(
+      onTap: _dismissStartOverlay,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.7),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.all(32),
+            padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 28),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppColors.electricBlue.withValues(alpha: 0.4),
+                width: 2,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.arrow_downward_rounded,
+                  size: 48,
+                  color: AppColors.electricBlue,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Letter Drop',
+                  style: AppFonts.fredoka(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryText,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: AppColors.electricBlue.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppColors.electricBlue.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'c',
+                          style: AppFonts.fredoka(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.electricBlue,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.arrow_downward_rounded,
+                        color: AppColors.secondaryText, size: 18),
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 36,
+                      height: 28,
+                      decoration: BoxDecoration(
+                        color: AppColors.starGold.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppColors.starGold.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          '_',
+                          style: AppFonts.fredoka(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.starGold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Drag letters down into\nthe right slots to spell!',
+                  style: AppFonts.nunito(
+                    fontSize: 15,
+                    color: AppColors.secondaryText,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.electricBlue,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Tap to Start!',
+                    style: AppFonts.fredoka(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   Widget _buildGameArea() {
