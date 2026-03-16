@@ -3,6 +3,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'theme/app_theme.dart';
 import 'screens/home_screen.dart';
 import 'screens/name_setup_screen.dart';
+import 'screens/onboarding_tutorial_screen.dart';
 import 'screens/profile_picker_screen.dart';
 import 'services/progress_service.dart';
 import 'services/audio_service.dart';
@@ -41,7 +42,11 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
   late final AvatarPersonalityService _personalityService;
   late final AdaptiveDifficultyService _adaptiveDifficultyService;
   late final AdaptiveMusicService _adaptiveMusicService;
+  late SharedPreferences _prefs;
   bool _initialized = false;
+  bool _showOnboarding = false;
+
+  static const _hasSeenTutorialKey = 'has_seen_onboarding_tutorial';
 
   @override
   void initState() {
@@ -81,6 +86,7 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
 
     // Get SharedPreferences once, share across all services
     final prefs = await SharedPreferences.getInstance();
+    _prefs = prefs;
 
     // Initialize all services in parallel for faster startup
     final initSw = Stopwatch()..start();
@@ -152,9 +158,18 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
 
   void _onNameSubmitted(String name) async {
     await _settingsService.setPlayerName(name);
-    setState(() {});
+    // Show onboarding tutorial if this is the user's first time
+    final hasSeenTutorial = _prefs.getBool(_hasSeenTutorialKey) ?? false;
+    setState(() {
+      _showOnboarding = !hasSeenTutorial;
+    });
     // Generate personalized phrases in background (if Deepgram is configured)
     _generatePhrasesInBackground(name);
+  }
+
+  void _onOnboardingComplete() async {
+    await _prefs.setBool(_hasSeenTutorialKey, true);
+    setState(() => _showOnboarding = false);
   }
 
   void _onChangeName() {
@@ -260,6 +275,14 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
     if (!_settingsService.setupComplete && _settingsService.profiles.isEmpty) {
       return NameSetupScreen(
         onNameSubmitted: _onNameSubmitted,
+        audioService: _audioService,
+      );
+    }
+
+    // Show onboarding tutorial after first name setup
+    if (_showOnboarding) {
+      return OnboardingTutorialScreen(
+        onComplete: _onOnboardingComplete,
         audioService: _audioService,
       );
     }
