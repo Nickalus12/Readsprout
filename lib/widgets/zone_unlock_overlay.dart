@@ -22,6 +22,7 @@ class ZoneUnlockOverlay extends StatefulWidget {
   final int masteredZoneIndex;
   final int newZoneIndex;
   final String playerName;
+  final bool isAllComplete;
   final VoidCallback? onComplete;
 
   const ZoneUnlockOverlay({
@@ -29,6 +30,7 @@ class ZoneUnlockOverlay extends StatefulWidget {
     required this.masteredZoneIndex,
     required this.newZoneIndex,
     this.playerName = '',
+    this.isAllComplete = false,
     this.onComplete,
   });
 
@@ -37,6 +39,7 @@ class ZoneUnlockOverlay extends StatefulWidget {
     BuildContext context, {
     required int masteredZoneIndex,
     required int newZoneIndex,
+    bool isAllComplete = false,
     String playerName = '',
   }) {
     return showGeneralDialog(
@@ -48,6 +51,7 @@ class ZoneUnlockOverlay extends StatefulWidget {
           masteredZoneIndex: masteredZoneIndex,
           newZoneIndex: newZoneIndex,
           playerName: playerName,
+          isAllComplete: isAllComplete,
           onComplete: () => Navigator.of(context).pop(),
         );
       },
@@ -293,20 +297,23 @@ class _ZoneUnlockOverlayState extends State<ZoneUnlockOverlay>
 
                       SizedBox(height: 32 * sf),
 
-                      // ── New zone icon reveal ──
+                      // ── New zone icon reveal (or crown for all complete) ──
                       AnimatedBuilder(
                         animation: _glowController,
                         builder: (context, child) {
+                          final accent = widget.isAllComplete
+                              ? AppColors.starGold
+                              : _newAccent;
                           final glowColor = _lerpThroughColors(
                             _glowController.value,
-                            [_newAccent, AppColors.electricBlue, _newAccent],
+                            [accent, AppColors.electricBlue, accent],
                           );
                           return Container(
                             width: 96 * sf,
                             height: 96 * sf,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: _newAccent.withValues(alpha: 0.12),
+                              color: accent.withValues(alpha: 0.12),
                               border: Border.all(
                                 color: glowColor.withValues(alpha: 0.6),
                                 width: 2.5,
@@ -318,7 +325,7 @@ class _ZoneUnlockOverlayState extends State<ZoneUnlockOverlay>
                                   spreadRadius: 8,
                                 ),
                                 BoxShadow(
-                                  color: _newAccent.withValues(alpha: 0.2),
+                                  color: accent.withValues(alpha: 0.2),
                                   blurRadius: 80,
                                   spreadRadius: 15,
                                 ),
@@ -329,7 +336,7 @@ class _ZoneUnlockOverlayState extends State<ZoneUnlockOverlay>
                           );
                         },
                         child: Text(
-                          _newZone.icon,
+                          widget.isAllComplete ? '\u{1F3C6}' : _newZone.icon,
                           style: TextStyle(fontSize: 48 * sf),
                         ),
                       )
@@ -350,17 +357,24 @@ class _ZoneUnlockOverlayState extends State<ZoneUnlockOverlay>
 
                       SizedBox(height: 16 * sf),
 
-                      // ── "Welcome to [new zone]!" ──
+                      // ── "Welcome to [new zone]!" or "All zones complete!" ──
                       Text(
-                        '${_newZone.name} awaits$nameText!',
+                        widget.isAllComplete
+                            ? 'Reading Champion$nameText!'
+                            : '${_newZone.name} awaits$nameText!',
                         textAlign: TextAlign.center,
                         style: AppFonts.fredoka(
                           fontSize: 24 * sf,
                           fontWeight: FontWeight.w700,
-                          color: _newAccent,
+                          color: widget.isAllComplete
+                              ? AppColors.starGold
+                              : _newAccent,
                           shadows: [
                             Shadow(
-                              color: _newAccent.withValues(alpha: 0.5),
+                              color: (widget.isAllComplete
+                                      ? AppColors.starGold
+                                      : _newAccent)
+                                  .withValues(alpha: 0.5),
                               blurRadius: 16,
                             ),
                           ],

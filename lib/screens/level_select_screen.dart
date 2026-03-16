@@ -500,13 +500,9 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
       if (!widget.progressService.isZoneFullyMastered(z.startLevel, z.endLevel)) {
         continue;
       }
-      // Zone i was just mastered! Show celebration if there's a next zone.
-      final nextZoneIndex = i + 1;
-      if (nextZoneIndex >= DolchWords.zones.length) {
-        // Last zone mastered — show mastery celebration without a "next zone"
-        // (could be extended later; for now, celebrate with same zone)
-        continue;
-      }
+      // Zone i was just mastered!
+      final isLastZone = i + 1 >= DolchWords.zones.length;
+      final nextZoneIndex = isLastZone ? i : i + 1;
 
       // Play level complete sound as zone unlock fanfare
       widget.audioService.playLevelCompleteEffect();
@@ -517,6 +513,7 @@ class _LevelSelectScreenState extends State<LevelSelectScreen> {
         masteredZoneIndex: i,
         newZoneIndex: nextZoneIndex,
         playerName: widget.playerName,
+        isAllComplete: isLastZone,
       );
 
       // Only show one celebration at a time
