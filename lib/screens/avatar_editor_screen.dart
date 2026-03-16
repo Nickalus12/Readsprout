@@ -210,9 +210,10 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen>
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                AppColors.violet.withValues(alpha: 0.4),
-                AppColors.magenta.withValues(alpha: 0.3),
-                AppColors.electricBlue.withValues(alpha: 0.3),
+                AppColors.violet.withValues(alpha: 0.45),
+                AppColors.magenta.withValues(alpha: 0.35),
+                AppColors.electricBlue.withValues(alpha: 0.35),
+                AppColors.violet.withValues(alpha: 0.45),
               ],
             ),
           ),
@@ -224,15 +225,16 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen>
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  AppColors.violet.withValues(alpha: 0.08),
+                  AppColors.violet.withValues(alpha: 0.06),
+                  AppColors.surface,
                   AppColors.surface,
                 ],
               ),
               boxShadow: [
                 BoxShadow(
                   color: AppColors.violet.withValues(alpha: 0.20),
-                  blurRadius: 20,
-                  spreadRadius: 2,
+                  blurRadius: 24,
+                  spreadRadius: 4,
                 ),
               ],
             ),
@@ -259,7 +261,27 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen>
               ),
             ),
           ),
-        ),
+        )
+            .animate(onPlay: (c) => c.repeat(reverse: true))
+            .custom(
+              duration: 2500.ms,
+              builder: (context, value, child) {
+                return Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(30),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.violet
+                            .withValues(alpha: 0.10 + 0.08 * value),
+                        blurRadius: 20 + 8 * value,
+                        spreadRadius: 2 + 2 * value,
+                      ),
+                    ],
+                  ),
+                  child: child,
+                );
+              },
+            ),
       ),
     );
   }
@@ -1459,21 +1481,50 @@ class _OptionTileContent extends StatelessWidget {
     final starCount = hint != null
         ? RegExp(r'\d+').firstMatch(hint!)?.group(0)
         : null;
+    final isTreasure = hint == 'Treasure!';
 
     return Stack(
       children: [
-        Opacity(opacity: 0.3, child: child),
+        Opacity(opacity: 0.25, child: child),
         Positioned.fill(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.lock_rounded,
-                size: 18,
-                color: AppColors.secondaryText.withValues(alpha: 0.7),
+              // Sparkle-lock icon instead of plain lock
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  Icon(
+                    Icons.lock_rounded,
+                    size: 20,
+                    color: isTreasure
+                        ? AppColors.starGold.withValues(alpha: 0.6)
+                        : AppColors.secondaryText.withValues(alpha: 0.6),
+                  ),
+                  Positioned(
+                    top: 0,
+                    right: -2,
+                    child: Icon(
+                      Icons.auto_awesome,
+                      size: 10,
+                      color: isTreasure
+                          ? AppColors.starGold.withValues(alpha: 0.8)
+                          : AppColors.violet.withValues(alpha: 0.7),
+                    ),
+                  ),
+                ],
               ),
-              if (starCount != null) ...[
-                const SizedBox(height: 2),
+              const SizedBox(height: 2),
+              if (isTreasure)
+                Text(
+                  'Treasure!',
+                  style: AppFonts.fredoka(
+                    fontSize: 8,
+                    color: AppColors.starGold.withValues(alpha: 0.7),
+                    fontWeight: FontWeight.w500,
+                  ),
+                )
+              else if (starCount != null)
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   mainAxisSize: MainAxisSize.min,
@@ -1494,7 +1545,6 @@ class _OptionTileContent extends StatelessWidget {
                     ),
                   ],
                 ),
-              ],
             ],
           ),
         ),
