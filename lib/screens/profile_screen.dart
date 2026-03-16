@@ -250,7 +250,9 @@ class _ProfileScreenState extends State<ProfileScreen>
                   ),
                   SizedBox(width: 6 * sf),
                   Text(
-                    'My Garden',
+                    widget.playerName.isNotEmpty
+                        ? "${widget.playerName}'s Garden"
+                        : 'My Garden',
                     textAlign: TextAlign.center,
                     style: AppFonts.fredoka(
                       fontSize: 22 * sf,
