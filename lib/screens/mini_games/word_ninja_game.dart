@@ -150,6 +150,7 @@ class _WordNinjaGameState extends State<WordNinjaGame>
   // Swipe tracking for slash trails
   final List<Offset> _swipePoints = [];
   bool _isSwiping = false;
+  bool _showingStartOverlay = true;
 
   // Timers
   Timer? _clockTimer;
@@ -195,6 +196,11 @@ class _WordNinjaGameState extends State<WordNinjaGame>
     _wordPool = unlocked;
 
     _pickNewTarget();
+    if (!_showingStartOverlay) _startTimers();
+  }
+
+  void _dismissStartOverlay() {
+    setState(() => _showingStartOverlay = false);
     _startTimers();
   }
 
@@ -545,6 +551,7 @@ class _WordNinjaGameState extends State<WordNinjaGame>
     _gameOver = false;
     _isNewBest = false;
     _doublePointsActive = false;
+    _showingStartOverlay = false;
 
     _gameLoop.repeat();
     _initGame();
@@ -674,7 +681,119 @@ class _WordNinjaGameState extends State<WordNinjaGame>
                   if (_gameOver) _buildGameOver(),
                 ],
               ),
+
+              if (_showingStartOverlay) _buildStartOverlay(),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStartOverlay() {
+    return GestureDetector(
+      onTap: _dismissStartOverlay,
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.7),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.all(32),
+            padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 28),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: AppColors.error.withValues(alpha: 0.4),
+                width: 2,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '\u{1F977}',
+                  style: AppFonts.fredoka(fontSize: 40),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Word Ninja',
+                  style: AppFonts.fredoka(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryText,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.volume_up_rounded,
+                        color: AppColors.starGold, size: 28),
+                    const SizedBox(width: 6),
+                    Text(
+                      '"cat"',
+                      style: AppFonts.fredoka(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.starGold,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    const Icon(Icons.arrow_forward_rounded,
+                        color: AppColors.secondaryText, size: 18),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 10, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                          color: AppColors.success.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Text(
+                        'cat',
+                        style: AppFonts.fredoka(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.success,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 4),
+                    const Icon(Icons.touch_app_rounded,
+                        color: AppColors.success, size: 22),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Listen to the word, then\ntap the matching word!',
+                  style: AppFonts.nunito(
+                    fontSize: 15,
+                    color: AppColors.secondaryText,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.error,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Tap to Start!',
+                    style: AppFonts.fredoka(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

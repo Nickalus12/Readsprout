@@ -109,6 +109,7 @@ class _WordTrainGameState extends State<WordTrainGame>
   int _streak = 0;
   bool _gameOver = false;
   bool _isNewBest = false;
+  bool _showingStartOverlay = true;
 
   // Timer
   late Stopwatch _wordTimer;
@@ -344,6 +345,7 @@ class _WordTrainGameState extends State<WordTrainGame>
     _trainMoveController.reset();
     _sim.reset();
     _smokeController.repeat();
+    _showingStartOverlay = false;
     _initGame();
     if (mounted) setState(() {});
   }
@@ -374,16 +376,142 @@ class _WordTrainGameState extends State<WordTrainGame>
           ),
         ),
         child: SafeArea(
-          child: Column(
+          child: Stack(
             children: [
-              _buildHeader(),
-              if (!_gameOver) _buildWordProgress(),
-              if (!_gameOver) _buildFuelGauge(),
-              if (!_gameOver) Expanded(flex: 3, child: _buildTrainArea()),
-              if (!_gameOver)
-                Expanded(flex: 2, child: _buildStationLetters()),
-              if (_gameOver) Expanded(child: _buildGameOver()),
+              Column(
+                children: [
+                  _buildHeader(),
+                  if (!_gameOver) _buildWordProgress(),
+                  if (!_gameOver) _buildFuelGauge(),
+                  if (!_gameOver) Expanded(flex: 3, child: _buildTrainArea()),
+                  if (!_gameOver)
+                    Expanded(flex: 2, child: _buildStationLetters()),
+                  if (_gameOver) Expanded(child: _buildGameOver()),
+                ],
+              ),
+              if (_showingStartOverlay) _buildStartOverlay(),
             ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildStartOverlay() {
+    return GestureDetector(
+      onTap: () => setState(() => _showingStartOverlay = false),
+      child: Container(
+        color: Colors.black.withValues(alpha: 0.7),
+        child: Center(
+          child: Container(
+            margin: const EdgeInsets.all(32),
+            padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 28),
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(
+                color: const Color(0xFF4A90D9).withValues(alpha: 0.4),
+                width: 2,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '\u{1F682}',
+                  style: AppFonts.fredoka(fontSize: 40),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Word Train',
+                  style: AppFonts.fredoka(
+                    fontSize: 24,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.primaryText,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Visual hint: drag letter to train car
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Container(
+                      width: 36,
+                      height: 36,
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4A90D9).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color:
+                              const Color(0xFF4A90D9).withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'c',
+                          style: AppFonts.fredoka(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                            color: const Color(0xFF4A90D9),
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    const Icon(Icons.arrow_forward_rounded,
+                        color: AppColors.secondaryText, size: 18),
+                    const SizedBox(width: 6),
+                    Container(
+                      width: 40,
+                      height: 30,
+                      decoration: BoxDecoration(
+                        color: AppColors.starGold.withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: AppColors.starGold.withValues(alpha: 0.5),
+                        ),
+                      ),
+                      child: Center(
+                        child: Text(
+                          'c',
+                          style: AppFonts.fredoka(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.starGold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Text(
+                  'Drag letters to the train\ncars to spell words!',
+                  style: AppFonts.nunito(
+                    fontSize: 15,
+                    color: AppColors.secondaryText,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 20),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 28, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4A90D9),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: Text(
+                    'Tap to Start!',
+                    style: AppFonts.fredoka(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),
