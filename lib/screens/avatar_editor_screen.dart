@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 
 import '../avatar/data/avatar_options.dart';
@@ -80,6 +82,10 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen>
     setState(() => _config = newConfig);
     // Auto-save on every change
     widget.profileService.setAvatar(newConfig);
+    // Light haptic tap feedback on mobile
+    if (Platform.isAndroid || Platform.isIOS) {
+      HapticFeedback.selectionClick();
+    }
   }
 
   void _showLockedHint(String hint) {
