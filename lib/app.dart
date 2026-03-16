@@ -183,8 +183,8 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
     final nav = _navigatorKey.currentState;
     if (nav == null) return;
     nav.push(
-      MaterialPageRoute(
-        builder: (_) => NameSetupScreen(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => NameSetupScreen(
           onNameSubmitted: (name) async {
             final profileId = _settingsService.activeProfileId;
             if (profileId != null) {
@@ -200,6 +200,16 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
           onBack: () => nav.pop(),
           audioService: _audioService,
         ),
+        transitionsBuilder: (_, animation, __, child) {
+          final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(curved),
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }

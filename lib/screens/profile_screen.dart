@@ -128,12 +128,22 @@ class _ProfileScreenState extends State<ProfileScreen>
   void _openAvatarEditor() async {
     final result = await Navigator.push<AvatarConfig>(
       context,
-      MaterialPageRoute(
-        builder: (_) => AvatarEditorScreen(
+      PageRouteBuilder<AvatarConfig>(
+        pageBuilder: (_, __, ___) => AvatarEditorScreen(
           profileService: widget.profileService,
           wordsMastered: _wordCount,
           streakDays: _streak,
         ),
+        transitionsBuilder: (_, animation, __, child) {
+          final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(curved),
+              child: child,
+            ),
+          );
+        },
       ),
     );
     if (result != null && mounted) {

@@ -1158,10 +1158,20 @@ class _ParentDashboardScreenState extends State<ParentDashboardScreen> {
   void _replayTutorial(BuildContext context) {
     Navigator.push(
       context,
-      MaterialPageRoute(
-        builder: (_) => OnboardingTutorialScreen(
+      PageRouteBuilder(
+        pageBuilder: (_, __, ___) => OnboardingTutorialScreen(
           onComplete: () => Navigator.pop(context),
         ),
+        transitionsBuilder: (_, animation, __, child) {
+          final curved = CurvedAnimation(parent: animation, curve: Curves.easeOutCubic);
+          return FadeTransition(
+            opacity: curved,
+            child: SlideTransition(
+              position: Tween<Offset>(begin: const Offset(0, 0.04), end: Offset.zero).animate(curved),
+              child: child,
+            ),
+          );
+        },
       ),
     );
   }
