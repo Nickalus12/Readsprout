@@ -925,12 +925,13 @@ extension ElementBehaviors on SimulationEngine {
           grid[ni] = El.steam;
           life[ni] = 0;
           markProcessed(ni);
-          // Steam burst particles for dramatic lava+water reaction
-          queueReactionFlash(x, y, 220, 220, 255, 6);
-          final extraSteam = 2 + rng.nextInt(2);
+          // Dramatic steam burst with white-hot flash
+          queueReactionFlash(x, y, 255, 255, 255, 8);
+          queueReactionFlash(nx, ny, 200, 220, 255, 5);
+          final extraSteam = 3 + rng.nextInt(3);
           for (int s = 0; s < extraSteam; s++) {
-            final sx = x + rng.nextInt(5) - 2;
-            final sy = y - gravityDir * (1 + rng.nextInt(2));
+            final sx = x + rng.nextInt(7) - 3;
+            final sy = y - gravityDir * (1 + rng.nextInt(3));
             if (inBounds(sx, sy) && grid[sy * gridW + sx] == El.empty) {
               grid[sy * gridW + sx] = El.steam;
               life[sy * gridW + sx] = 0;
