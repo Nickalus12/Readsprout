@@ -3,6 +3,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../services/audio_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/name_validator.dart';
 import '../widgets/floating_hearts_bg.dart';
 
 /// First-launch screen where the parent enters their child's name.
@@ -29,14 +30,18 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
   final _controller = TextEditingController();
   final _focusNode = FocusNode();
   bool _hasText = false;
+  String? _errorText;
 
   @override
   void initState() {
     super.initState();
     _controller.addListener(() {
       final hasText = _controller.text.trim().isNotEmpty;
-      if (hasText != _hasText) {
-        setState(() => _hasText = hasText);
+      if (hasText != _hasText || _errorText != null) {
+        setState(() {
+          _hasText = hasText;
+          _errorText = null;
+        });
       }
     });
     // Auto-focus the text field
@@ -54,9 +59,14 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
 
   void _submit() {
     final name = _controller.text.trim();
-    if (name.isNotEmpty) {
-      widget.onNameSubmitted(name);
+    if (name.isEmpty) return;
+    final error = NameValidator.validate(name);
+    if (error != null) {
+      setState(() => _errorText = error);
+      return;
     }
+    setState(() => _errorText = null);
+    widget.onNameSubmitted(NameValidator.formatName(name));
   }
 
   void _playAppName() {
@@ -219,6 +229,20 @@ class _NameSetupScreenState extends State<NameSetupScreen> {
                         onSubmitted: (_) => _submit(),
                       ),
                     ).animate().fadeIn(delay: 600.ms, duration: 500.ms),
+
+                    // Validation error message
+                    if (_errorText != null) ...[
+                      SizedBox(height: 8 * sf),
+                      Text(
+                        _errorText!,
+                        textAlign: TextAlign.center,
+                        style: AppFonts.nunito(
+                          fontSize: 14 * sf,
+                          fontWeight: FontWeight.w600,
+                          color: AppColors.error,
+                        ),
+                      ),
+                    ],
 
                     SizedBox(height: 24 * sf),
 

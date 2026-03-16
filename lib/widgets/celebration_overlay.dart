@@ -199,7 +199,10 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
     final showStreakBadge = widget.inLevelStreak >= 3;
     final isGoldenCelebration = widget.isPerfectChampionRun;
 
-    return Container(
+    return Semantics(
+      label: '$_praise Word: ${widget.word}',
+      liveRegion: true,
+      child: Container(
       color: Color(isGoldenCelebration ? 0xFF1A1400 : 0xFF0A0A1A)
           .withValues(alpha: isGoldenCelebration ? 0.92 : 0.88),
       child: Stack(
@@ -481,7 +484,7 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
           ),
         ],
       ),
-    )
+    ))
         .animate()
         .fadeIn(duration: 200.ms);
   }

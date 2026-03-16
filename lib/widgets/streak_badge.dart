@@ -5,9 +5,9 @@ import '../theme/app_theme.dart';
 /// A compact badge showing a flame icon and the current streak count.
 ///
 /// The flame grows and turns golden as the streak increases:
-/// - Streak 1-2: small flame, orange
-/// - Streak 3-6: medium flame, bright orange
-/// - Streak 7+:  large flame, golden with shimmer animation
+/// - Streak 1-2: small warm flame, soft orange glow
+/// - Streak 3-6: medium flame, bright orange with warm border
+/// - Streak 7+:  large golden flame with shimmer animation
 class StreakBadge extends StatelessWidget {
   final int currentStreak;
   final int longestStreak;
@@ -29,11 +29,25 @@ class StreakBadge extends StatelessWidget {
     Widget badge = Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       decoration: BoxDecoration(
-        color: AppColors.surface.withValues(alpha: 0.7),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.surface.withValues(alpha: 0.75),
+            tier.flameColor.withValues(alpha: 0.06),
+          ],
+        ),
         borderRadius: BorderRadius.circular(16),
         border: Border.all(
-          color: tier.borderColor.withValues(alpha: 0.5),
+          color: tier.borderColor.withValues(alpha: 0.45),
         ),
+        boxShadow: [
+          BoxShadow(
+            color: tier.flameColor.withValues(alpha: 0.1),
+            blurRadius: 8,
+            spreadRadius: 1,
+          ),
+        ],
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -42,6 +56,12 @@ class StreakBadge extends StatelessWidget {
             Icons.local_fire_department_rounded,
             size: tier.iconSize,
             color: tier.flameColor,
+            shadows: [
+              Shadow(
+                color: tier.flameColor.withValues(alpha: 0.5),
+                blurRadius: 8,
+              ),
+            ],
           ),
           const SizedBox(width: 6),
           Text(
@@ -141,8 +161,8 @@ class _StreakTier {
     }
     return const _StreakTier(
       iconSize: 20,
-      flameColor: Color(0xFFFF6B35), // orange
-      borderColor: AppColors.border,
+      flameColor: Color(0xFFFF6B35), // warm orange
+      borderColor: Color(0xFFFF6B35),
     );
   }
 }

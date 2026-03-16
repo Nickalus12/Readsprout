@@ -221,9 +221,9 @@ class _TierOptionCard extends StatelessWidget {
       case WordTier.explorer:
         return null;
       case WordTier.adventurer:
-        return 'Complete Explorer first';
+        return 'Finish Explorer to unlock!';
       case WordTier.champion:
-        return 'Complete Adventurer first';
+        return 'Finish Adventurer to unlock!';
     }
   }
 
@@ -234,7 +234,18 @@ class _TierOptionCard extends StatelessWidget {
     final wordsCompleted = tierProg?.wordsCompleted ?? 0;
     final accentColor = tier.color;
 
-    return Padding(
+    final semanticStatus = isComplete
+        ? 'completed'
+        : unlocked
+            ? 'available'
+            : 'locked';
+
+    return Semantics(
+      label: '${tier.displayName} tier, $semanticStatus',
+      hint: unlocked ? 'Tap to play this tier' : 'Complete previous tier to unlock',
+      button: unlocked,
+      enabled: unlocked,
+      child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
       child: GestureDetector(
         onTap: unlocked ? onTap : null,
@@ -487,12 +498,23 @@ class _TierOptionCard extends StatelessWidget {
                 // Right side: play button or lock
                 if (unlocked)
                   Container(
+                    constraints: const BoxConstraints(minHeight: 42),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 9,
                     ),
                     decoration: BoxDecoration(
-                      color: accentColor.withValues(alpha: 0.15),
+                      gradient: isSuggested && !isComplete
+                          ? LinearGradient(
+                              colors: [
+                                accentColor.withValues(alpha: 0.2),
+                                accentColor.withValues(alpha: 0.12),
+                              ],
+                            )
+                          : null,
+                      color: isSuggested && !isComplete
+                          ? null
+                          : accentColor.withValues(alpha: 0.15),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(
                         color: accentColor.withValues(alpha: 0.35),
@@ -500,8 +522,9 @@ class _TierOptionCard extends StatelessWidget {
                       boxShadow: [
                         if (isSuggested && !isComplete)
                           BoxShadow(
-                            color: accentColor.withValues(alpha: 0.15),
-                            blurRadius: 10,
+                            color: accentColor.withValues(alpha: 0.18),
+                            blurRadius: 12,
+                            spreadRadius: 1,
                           ),
                       ],
                     ),
@@ -512,7 +535,7 @@ class _TierOptionCard extends StatelessWidget {
                           isComplete
                               ? Icons.replay_rounded
                               : Icons.play_arrow_rounded,
-                          size: 16,
+                          size: 18,
                           color: accentColor,
                         ),
                         const SizedBox(width: 4),
@@ -549,6 +572,7 @@ class _TierOptionCard extends StatelessWidget {
             ),
           ),
         ),
+      ),
       ),
     );
   }

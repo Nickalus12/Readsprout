@@ -230,24 +230,28 @@ class _HomeScreenState extends State<HomeScreen>
           ),
 
           // ── Floating hearts + cloud physics layer ───────────
-          Positioned.fill(
-            child: FloatingHeartsBackground(
-              key: _heartsKey,
-              cloudZoneHeight: 0.18,
+          ExcludeSemantics(
+            child: Positioned.fill(
+              child: FloatingHeartsBackground(
+                key: _heartsKey,
+                cloudZoneHeight: 0.18,
+              ),
             ),
           ),
 
           // ── Floating stars (IgnorePointer — taps pass through) ──
-          Positioned.fill(
-            child: IgnorePointer(
-              child: RepaintBoundary(
-                child: LayoutBuilder(builder: (context, constraints) {
-                  _starSim.size = constraints.biggest;
-                  return CustomPaint(
-                    size: constraints.biggest,
-                    painter: _StarPainter(sim: _starSim),
-                  );
-                }),
+          ExcludeSemantics(
+            child: Positioned.fill(
+              child: IgnorePointer(
+                child: RepaintBoundary(
+                  child: LayoutBuilder(builder: (context, constraints) {
+                    _starSim.size = constraints.biggest;
+                    return CustomPaint(
+                      size: constraints.biggest,
+                      painter: _StarPainter(sim: _starSim),
+                    );
+                  }),
+                ),
               ),
             ),
           ),
@@ -257,19 +261,24 @@ class _HomeScreenState extends State<HomeScreen>
             Positioned(
               top: MediaQuery.of(context).padding.top + 8,
               right: 12,
-              child: GestureDetector(
-                onTap: () => _showParentGate(context),
-                child: Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: AppColors.surface.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Icon(
-                    Icons.insights_rounded,
-                    size: 18,
-                    color: AppColors.secondaryText.withValues(alpha: 0.4),
+              child: Semantics(
+                label: 'Parent dashboard',
+                hint: 'Opens parent settings and stats',
+                button: true,
+                child: GestureDetector(
+                  onTap: () => _showParentGate(context),
+                  child: Container(
+                    width: 44,
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: AppColors.surface.withValues(alpha: 0.3),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      Icons.insights_rounded,
+                      size: 20,
+                      color: AppColors.secondaryText.withValues(alpha: 0.4),
+                    ),
                   ),
                 ),
               ),
@@ -287,7 +296,11 @@ class _HomeScreenState extends State<HomeScreen>
                     SizedBox(height: MediaQuery.of(context).size.height * 0.06),
 
                     // ── Logo (tappable with bounce + glow) ──
-                    GestureDetector(
+                    Semantics(
+                      label: 'Reading Sprout logo',
+                      hint: 'Tap to hear the app name',
+                      button: true,
+                      child: GestureDetector(
                       onTap: _onLogoTap,
                       child: AnimatedBuilder(
                         animation: _logoController,
@@ -321,7 +334,7 @@ class _HomeScreenState extends State<HomeScreen>
                           height: (widget.profileService != null ? 120 : 160) * sf,
                         ),
                       ),
-                    )
+                    ))
                         .animate()
                         .fadeIn(duration: 600.ms)
                         .scale(
@@ -335,16 +348,20 @@ class _HomeScreenState extends State<HomeScreen>
 
                     // ── Hero: Player name (tappable letters) ──
                     if (hasName)
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        children: [
-                          for (int i = 0; i < widget.playerName.length; i++)
-                            _TappableNameLetter(
-                              letter: widget.playerName[i],
-                              index: i,
-                              audioService: widget.audioService,
-                            ),
-                        ],
+                      Semantics(
+                        label: 'Player name: ${widget.playerName}',
+                        hint: 'Tap each letter to hear it',
+                        child: Wrap(
+                          alignment: WrapAlignment.center,
+                          children: [
+                            for (int i = 0; i < widget.playerName.length; i++)
+                              _TappableNameLetter(
+                                letter: widget.playerName[i],
+                                index: i,
+                                audioService: widget.audioService,
+                              ),
+                          ],
+                        ),
                       )
                           .animate()
                           .fadeIn(duration: 800.ms)
@@ -540,24 +557,28 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
 
                     // ── Adventure Mode button ────────────────
-                    GestureDetector(
-                      onTap: () => Navigator.push(
-                        context,
-                        _smoothRoute(LevelSelectScreen(
-                          progressService: widget.progressService,
-                          audioService: widget.audioService,
-                          profileService: widget.profileService,
-                          statsService: widget.statsService,
-                          streakService: widget.streakService,
-                          personalityService: widget.personalityService,
-                          reviewService: widget.reviewService,
-                          adaptiveDifficultyService: widget.adaptiveDifficultyService,
-                          musicService: widget.musicService,
-                          settingsService: widget.settingsService,
-                          playerName: widget.playerName,
-                          profileId: widget.profileId,
-                        )),
-                      ),
+                    Semantics(
+                      label: 'Adventure Mode',
+                      hint: 'Begin your word journey',
+                      button: true,
+                      child: GestureDetector(
+                        onTap: () => Navigator.push(
+                          context,
+                          _smoothRoute(LevelSelectScreen(
+                            progressService: widget.progressService,
+                            audioService: widget.audioService,
+                            profileService: widget.profileService,
+                            statsService: widget.statsService,
+                            streakService: widget.streakService,
+                            personalityService: widget.personalityService,
+                            reviewService: widget.reviewService,
+                            adaptiveDifficultyService: widget.adaptiveDifficultyService,
+                            musicService: widget.musicService,
+                            settingsService: widget.settingsService,
+                            playerName: widget.playerName,
+                            profileId: widget.profileId,
+                          )),
+                        ),
                       child: Container(
                         padding: EdgeInsets.symmetric(
                             horizontal: 16 * sf, vertical: 10 * sf),
@@ -636,7 +657,7 @@ class _HomeScreenState extends State<HomeScreen>
                           ],
                         ),
                       ),
-                    )
+                    ))
                         .animate(
                           onPlay: (controller) =>
                               controller.repeat(reverse: true),
@@ -670,6 +691,7 @@ class _HomeScreenState extends State<HomeScreen>
                         if (widget.profileService != null)
                           _MenuIconButton(
                             icon: Icons.local_florist_rounded,
+                            semanticLabel: 'My Profile',
                             onTap: () => Navigator.push(
                               context,
                               _smoothRoute(ProfileScreen(
@@ -686,6 +708,7 @@ class _HomeScreenState extends State<HomeScreen>
                           const SizedBox(width: 20),
                         _MenuIconButton(
                           icon: Icons.abc_rounded,
+                          semanticLabel: 'Alphabet Practice',
                           onTap: () => Navigator.push(
                             context,
                             _smoothRoute(AlphabetScreen(
@@ -696,6 +719,7 @@ class _HomeScreenState extends State<HomeScreen>
                         const SizedBox(width: 20),
                         _MenuIconButton(
                           icon: Icons.sports_esports_rounded,
+                          semanticLabel: 'Mini Games',
                           onTap: () => Navigator.push(
                             context,
                             _smoothRoute(MiniGamesScreen(
@@ -1182,33 +1206,79 @@ class _TappableTagWordState extends State<_TappableTagWord>
 
 // ── Icon-only menu button ──────────────────────────────────────────────
 
-class _MenuIconButton extends StatelessWidget {
+class _MenuIconButton extends StatefulWidget {
   final IconData icon;
   final VoidCallback onTap;
+  final String? semanticLabel;
 
   const _MenuIconButton({
     required this.icon,
     required this.onTap,
+    this.semanticLabel,
   });
 
   @override
+  State<_MenuIconButton> createState() => _MenuIconButtonState();
+}
+
+class _MenuIconButtonState extends State<_MenuIconButton>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _pressController;
+
+  @override
+  void initState() {
+    super.initState();
+    _pressController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 120),
+    );
+  }
+
+  @override
+  void dispose() {
+    _pressController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: 52,
-        height: 52,
-        decoration: BoxDecoration(
-          color: AppColors.surface.withValues(alpha: 0.6),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(
-            color: AppColors.border.withValues(alpha: 0.4),
+    return Semantics(
+      label: widget.semanticLabel,
+      button: true,
+      child: GestureDetector(
+        onTap: widget.onTap,
+        onTapDown: (_) => _pressController.forward(),
+        onTapUp: (_) => _pressController.reverse(),
+        onTapCancel: () => _pressController.reverse(),
+        child: AnimatedBuilder(
+          animation: _pressController,
+          builder: (context, child) {
+            final scale = 1.0 - _pressController.value * 0.08;
+            return Transform.scale(scale: scale, child: child);
+          },
+          child: Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              color: AppColors.surface.withValues(alpha: 0.7),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: AppColors.border.withValues(alpha: 0.45),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.violet.withValues(alpha: 0.06),
+                  blurRadius: 8,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: Icon(
+              widget.icon,
+              size: 26,
+              color: AppColors.secondaryText,
+            ),
           ),
-        ),
-        child: Icon(
-          icon,
-          size: 24,
-          color: AppColors.secondaryText,
         ),
       ),
     );
