@@ -30,6 +30,9 @@ class _OnboardingTutorialScreenState extends State<OnboardingTutorialScreen>
 
   static const _totalPages = 4;
 
+  /// Phrases to speak on each page.
+  static const _pageWords = ['listen', 'tap', 'you', 'ready'];
+
   @override
   void initState() {
     super.initState();
@@ -42,6 +45,16 @@ class _OnboardingTutorialScreenState extends State<OnboardingTutorialScreen>
       vsync: this,
       duration: const Duration(milliseconds: 800),
     )..repeat(reverse: true);
+    // Speak the first page after a brief delay
+    Future.delayed(const Duration(milliseconds: 600), () {
+      if (mounted) _speakCurrentPage();
+    });
+  }
+
+  void _speakCurrentPage() {
+    if (_currentPage < _pageWords.length) {
+      widget.audioService?.playWord(_pageWords[_currentPage]);
+    }
   }
 
   @override
@@ -116,18 +129,24 @@ class _OnboardingTutorialScreenState extends State<OnboardingTutorialScreen>
                 ),
               ),
 
-              // Tutorial pages
+              // Tutorial pages — tap anywhere to advance
               Expanded(
-                child: PageView(
-                  controller: _pageController,
-                  onPageChanged: (page) =>
-                      setState(() => _currentPage = page),
-                  children: [
-                    _buildListenPage(sf),
-                    _buildTapPage(sf),
-                    _buildCompletePage(sf),
-                    _buildCelebratePage(sf),
-                  ],
+                child: GestureDetector(
+                  onTap: _nextPage,
+                  behavior: HitTestBehavior.opaque,
+                  child: PageView(
+                    controller: _pageController,
+                    onPageChanged: (page) {
+                      setState(() => _currentPage = page);
+                      _speakCurrentPage();
+                    },
+                    children: [
+                      _buildListenPage(sf),
+                      _buildTapPage(sf),
+                      _buildCompletePage(sf),
+                      _buildCelebratePage(sf),
+                    ],
+                  ),
                 ),
               ),
 
@@ -223,33 +242,36 @@ class _OnboardingTutorialScreenState extends State<OnboardingTutorialScreen>
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          // Speaker icon with pulsing glow
-          AnimatedBuilder(
-            animation: _glowController,
-            builder: (context, child) {
-              final pulse = _glowController.value;
-              return Container(
-                width: 100 * sf,
-                height: 100 * sf,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: AppColors.electricBlue.withValues(alpha: 0.15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: AppColors.electricBlue
-                          .withValues(alpha: 0.1 + pulse * 0.2),
-                      blurRadius: 20 + pulse * 20,
-                      spreadRadius: pulse * 8,
-                    ),
-                  ],
-                ),
-                child: Icon(
-                  Icons.volume_up_rounded,
-                  size: 48 * sf,
-                  color: AppColors.electricBlue,
-                ),
-              );
-            },
+          // Speaker icon with pulsing glow — tappable to hear word
+          GestureDetector(
+            onTap: () => widget.audioService?.playWord('cat'),
+            child: AnimatedBuilder(
+              animation: _glowController,
+              builder: (context, child) {
+                final pulse = _glowController.value;
+                return Container(
+                  width: 100 * sf,
+                  height: 100 * sf,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.electricBlue.withValues(alpha: 0.15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.electricBlue
+                            .withValues(alpha: 0.1 + pulse * 0.2),
+                        blurRadius: 20 + pulse * 20,
+                        spreadRadius: pulse * 8,
+                      ),
+                    ],
+                  ),
+                  child: Icon(
+                    Icons.volume_up_rounded,
+                    size: 48 * sf,
+                    color: AppColors.electricBlue,
+                  ),
+                );
+              },
+            ),
           ),
           SizedBox(height: 32 * sf),
 
@@ -321,6 +343,7 @@ class _OnboardingTutorialScreenState extends State<OnboardingTutorialScreen>
                     isRevealed: letter == 'c',
                     isActive: letter == 'a',
                     sf: sf,
+                    audioService: widget.audioService,
                   ),
                 ),
             ],
@@ -419,6 +442,7 @@ class _OnboardingTutorialScreenState extends State<OnboardingTutorialScreen>
                     isRevealed: true,
                     isActive: false,
                     sf: sf,
+                    audioService: widget.audioService,
                   ),
                 ),
             ],
@@ -543,17 +567,21 @@ class _DemoLetterTile extends StatelessWidget {
   final bool isRevealed;
   final bool isActive;
   final double sf;
+  final AudioService? audioService;
 
   const _DemoLetterTile({
     required this.letter,
     required this.isRevealed,
     required this.isActive,
     required this.sf,
+    this.audioService,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+    return GestureDetector(
+      onTap: () => audioService?.playLetter(letter),
+      child: Container(
       width: 52 * sf,
       height: 62 * sf,
       decoration: BoxDecoration(
@@ -595,6 +623,6 @@ class _DemoLetterTile extends StatelessWidget {
           ),
         ),
       ),
-    );
+    ));
   }
 }
