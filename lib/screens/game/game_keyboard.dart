@@ -139,10 +139,10 @@ class _KeyboardKeyState extends State<KeyboardKey> {
     final screenH = MediaQuery.of(context).size.height;
     final shortScreen = screenH < 600;
     final keyMargin = (screenW / 200).clamp(1.5, 3.0);
-    final keyWidth = ((screenW - 16) / 10 - keyMargin * 2).clamp(24.0, 38.0);
-    final maxKeyH = shortScreen ? 38.0 : 50.0;
-    final keyHeight = (keyWidth * 1.3).clamp(28.0, maxKeyH);
-    final fontSize = (keyWidth * 0.5).clamp(12.0, 20.0);
+    final keyWidth = ((screenW - 16) / 10 - keyMargin * 2).clamp(28.0, 44.0);
+    final maxKeyH = shortScreen ? 44.0 : 56.0;
+    final keyHeight = (keyWidth * 1.3).clamp(34.0, maxKeyH);
+    final fontSize = (keyWidth * 0.5).clamp(14.0, 22.0);
 
     return GestureDetector(
       onTapDown: (_) => setState(() => _pressed = true),
@@ -168,7 +168,7 @@ class _KeyboardKeyState extends State<KeyboardKey> {
                     : _pressed
                         ? AppColors.electricBlue.withValues(alpha: 0.12)
                         : AppColors.surface.withValues(alpha: 0.7),
-            borderRadius: BorderRadius.circular(10),
+            borderRadius: BorderRadius.circular(12),
             border: Border.all(
               color: showHighlight
                   ? AppColors.electricBlue
