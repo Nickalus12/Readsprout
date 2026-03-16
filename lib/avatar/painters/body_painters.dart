@@ -533,79 +533,47 @@ class ShoulderPainter extends CustomPainter {
       // Align with torso shoulder dome (0.46 matches torso bezier endpoint)
       final sCx = cx + side * shoulderW * 0.46;
       final sCy = shoulderY + dy * h;
-      // Rounder, taller cap for child-like plumpness
-      final capW = w * 0.15;
-      final capH = h * 0.080;
 
-      // Cap top overlaps torso dome for seamless blend
-      final capTop = sCy - capH * 0.35;
-      // Cap bottom meets arm start
-      final capBottom = sCy + h * 0.035;
+      // Simple rounded bump — wide enough to cover torso dome top and arm top.
+      // For a cartoon child, simple is better than anatomically complex.
+      final capW = w * 0.13;
+      final capTop = sCy - h * 0.022; // just above torso dome endpoint
+      final capBottom = sCy + h * 0.038; // blends into arm top
 
       final capRect = Rect.fromLTRB(
-        sCx - capW * 0.6, capTop,
-        sCx + capW * 0.6, capBottom,
+        sCx - capW, capTop,
+        sCx + capW, capBottom,
       );
 
-      // Plump rounded dome — taller and rounder for cartoon child look
-      final capPath = Path();
-      // Start at inner-bottom (torso side)
-      capPath.moveTo(sCx - side * capW * 0.45, capBottom);
-      // Rise up inner edge with generous dome
-      capPath.cubicTo(
-        sCx - side * capW * 0.40, sCy - capH * 0.15,
-        sCx - side * capW * 0.15, capTop - capH * 0.05,
-        sCx, capTop,
-      );
-      // Dome peak down to outer edge
-      capPath.cubicTo(
-        sCx + side * capW * 0.15, capTop - capH * 0.05,
-        sCx + side * capW * 0.40, sCy - capH * 0.08,
-        sCx + side * capW * 0.45, capBottom,
-      );
-      // Smooth bottom connecting to arm
-      capPath.quadraticBezierTo(
-        sCx, capBottom + capH * 0.06,
-        sCx - side * capW * 0.45, capBottom,
-      );
-      capPath.close();
+      // Simple oval bump path
+      final capPath = Path()
+        ..addOval(Rect.fromCenter(
+          center: Offset(sCx, (capTop + capBottom) / 2),
+          width: capW * 2,
+          height: capBottom - capTop,
+        ));
 
-      // 3D curvature: radial-like effect via top-to-bottom + side gradient
+      // 3D curvature gradient
       final capPaint = Paint()
         ..shader = LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [shirtHL, shirtMid, shirtColor, shirtSH],
-          stops: const [0.0, 0.35, 0.7, 1.0],
+          stops: const [0.0, 0.30, 0.65, 1.0],
         ).createShader(capRect);
       canvas.drawPath(capPath, capPaint);
 
-      // Side highlight for 3D curvature (light catches top-outer edge)
-      final sideHLPaint = Paint()
-        ..shader = LinearGradient(
-          begin: side < 0 ? Alignment.centerRight : Alignment.centerLeft,
-          end: side < 0 ? Alignment.centerLeft : Alignment.centerRight,
+      // Subtle top highlight for 3D roundness
+      final hlPaint = Paint()
+        ..shader = RadialGradient(
+          center: Alignment.topCenter,
+          radius: 0.8,
           colors: [
-            shirtHL.withValues(alpha: 0.3),
+            shirtHL.withValues(alpha: 0.35),
             Colors.transparent,
           ],
-          stops: const [0.0, 0.5],
         ).createShader(capRect);
-      canvas.drawPath(capPath, sideHLPaint);
-
-      // Soft seam line at shoulder-torso junction (blended, not harsh)
-      final seamPaint = Paint()
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 0.8
-        ..color = shirtSH.withValues(alpha: 0.25)
-        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 1.5);
-      final seamPath = Path()
-        ..moveTo(sCx - side * capW * 0.35, capBottom - 1)
-        ..quadraticBezierTo(
-          sCx, capBottom + capH * 0.04,
-          sCx + side * capW * 0.35, capBottom - 1,
-        );
-      canvas.drawPath(seamPath, seamPaint);
+      canvas.drawPath(capPath, hlPaint);
     }
   }
 
