@@ -163,8 +163,16 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
     nav.push(
       MaterialPageRoute(
         builder: (_) => NameSetupScreen(
-          onNameSubmitted: (name) {
-            _onNameSubmitted(name);
+          onNameSubmitted: (name) async {
+            final profileId = _settingsService.activeProfileId;
+            if (profileId != null) {
+              // Rename the active profile instead of creating a new one
+              await _settingsService.renameProfile(profileId, name);
+            } else {
+              await _settingsService.setPlayerName(name);
+            }
+            setState(() {});
+            _generatePhrasesInBackground(name);
             nav.pop();
           },
           onBack: () => nav.pop(),
