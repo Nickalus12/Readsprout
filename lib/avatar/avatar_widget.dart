@@ -854,7 +854,7 @@ class _AvatarWidgetState extends State<AvatarWidget>
                 ),
               ),
 
-              // Cheeks
+              // Cheeks — pass expression for blush intensity changes
               if (config.cheekStyle > 0)
                 Positioned(
                   left: headSize * 0.18,
@@ -865,6 +865,8 @@ class _AvatarWidgetState extends State<AvatarWidget>
                     painter: CheekPainter(
                       style: config.cheekStyle,
                       skinColor: _skinColor,
+                      expression: widget.controller?.expression ??
+                          AvatarExpression.neutral,
                     ),
                   ),
                 ),
