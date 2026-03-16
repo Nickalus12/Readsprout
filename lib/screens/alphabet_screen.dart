@@ -69,8 +69,10 @@ class AlphabetScreen extends StatelessWidget {
           ),
 
           // Floating hearts background
-          const Positioned.fill(
-            child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
+          const ExcludeSemantics(
+            child: Positioned.fill(
+              child: FloatingHeartsBackground(cloudZoneHeight: 0.18),
+            ),
           ),
 
           // Foreground content
@@ -82,12 +84,17 @@ class AlphabetScreen extends StatelessWidget {
                   padding: EdgeInsets.fromLTRB(8 * sf, 8 * sf, 16 * sf, 0),
                   child: Row(
                     children: [
-                      IconButton(
-                        onPressed: () => Navigator.pop(context),
-                        icon: Icon(
-                          Icons.arrow_back_rounded,
-                          color: AppColors.primaryText,
-                          size: 28 * sf,
+                      Semantics(
+                        label: 'Go back',
+                        hint: 'Return to home screen',
+                        button: true,
+                        child: IconButton(
+                          onPressed: () => Navigator.pop(context),
+                          icon: Icon(
+                            Icons.arrow_back_rounded,
+                            color: AppColors.primaryText,
+                            size: 28 * sf,
+                          ),
                         ),
                       ),
                       SizedBox(width: 4 * sf),

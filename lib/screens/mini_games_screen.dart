@@ -101,7 +101,9 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
           ),
 
           // Floating particles
-          const Positioned.fill(child: _MiniGameParticles()),
+          const ExcludeSemantics(
+            child: Positioned.fill(child: _MiniGameParticles()),
+          ),
 
           // Content
           SafeArea(
@@ -319,11 +321,16 @@ class _MiniGamesScreenState extends State<MiniGamesScreen> {
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
       child: Row(
         children: [
-          IconButton(
-            onPressed: () => Navigator.of(context).pop(),
-            icon: const Icon(Icons.arrow_back_rounded),
-            color: AppColors.primaryText,
-            iconSize: 28,
+          Semantics(
+            label: 'Go back',
+            hint: 'Return to home screen',
+            button: true,
+            child: IconButton(
+              onPressed: () => Navigator.of(context).pop(),
+              icon: const Icon(Icons.arrow_back_rounded),
+              color: AppColors.primaryText,
+              iconSize: 28,
+            ),
           ),
           Expanded(
             child: GestureDetector(
