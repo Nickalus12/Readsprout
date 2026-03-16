@@ -120,6 +120,7 @@ class _ReadingSproutAppState extends State<ReadingSproutApp> {
         debugPrint('ShaderLoader init failed: $e');
       }),
     ]);
+    debugPrint('All services initialized in ${initSw.elapsedMilliseconds}ms');
 
     // Connect Deepgram TTS to AudioService for runtime phrase playback
     _audioService.setDeepgramTts(_deepgramTtsService);

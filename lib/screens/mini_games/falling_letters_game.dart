@@ -1446,8 +1446,8 @@ class _FallingLettersGameState extends State<FallingLettersGame>
       _calculateSlotRects();
     });
 
-    final celebrating = _wordCelebrating;
-    final celebrateProgress = _wordCelebrateT.clamp(0.0, 1.0);
+    final celebrating = _sim.wordCelebrating;
+    final celebrateProgress = _sim.wordCelebrateT.clamp(0.0, 1.0);
 
     return Container(
       key: _slotRowKey,
@@ -1699,7 +1699,8 @@ class _EffectsPainter extends CustomPainter {
     required this.sparkles,
     required this.disintegrationParticles,
     required this.shockwaves,
-  });
+    Listenable? repaintSignal,
+  }) : super(repaint: repaintSignal);
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1801,7 +1802,7 @@ class _EffectsPainter extends CustomPainter {
   }
 
   @override
-  bool shouldRepaint(covariant _EffectsPainter old) => true;
+  bool shouldRepaint(covariant _EffectsPainter old) => false;
 }
 
 // ─── Star field painter ──────────────────────────────────────────────────────
