@@ -25,6 +25,7 @@ import '../../utils/haptics.dart';
 import '../../avatar/avatar_widget.dart';
 import '../../widgets/celebration_overlay.dart';
 import '../../widgets/zone_background.dart';
+import '../../data/word_context.dart';
 import 'game_hud.dart';
 import 'game_board.dart';
 import 'game_keyboard.dart';
@@ -850,12 +851,20 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                                       ),
                                     ),
 
-                                  // Hear word button
+                                  // Hear word button + emoji hint
                                   HearWordButton(
                                     isPlayingAudio: _isPlayingAudio,
                                     onTap: _announceCurrentWord,
                                   ),
-                                  SizedBox(height: gap1),
+                                  if (getWordEmoji(_currentWord.text).isNotEmpty)
+                                    Padding(
+                                      padding: const EdgeInsets.only(top: 4),
+                                      child: Text(
+                                        getWordEmoji(_currentWord.text),
+                                        style: TextStyle(fontSize: tight ? 22 : 28),
+                                      ),
+                                    ),
+                                  SizedBox(height: tight ? 4 : gap1),
 
                                   // Letter tiles
                                   GameLetterTiles(

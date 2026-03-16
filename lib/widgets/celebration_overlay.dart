@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../theme/app_theme.dart';
 import '../data/phrase_templates.dart';
+import '../data/word_context.dart';
 class CelebrationOverlay extends StatefulWidget {
   final String word;
   final String playerName;
@@ -213,7 +214,48 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
                   color: _zoneAccent.withValues(alpha: 0.3),
                 ),
 
-            const SizedBox(height: 20),
+            // ── Emoji + context sentence ───────────────
+            if (getWordContext(widget.word) != null) ...[
+              const SizedBox(height: 12),
+              Text(
+                getWordEmoji(widget.word),
+                style: const TextStyle(fontSize: 36),
+              )
+                  .animate()
+                  .scaleXY(
+                    begin: 0.0,
+                    end: 1.0,
+                    delay: 300.ms,
+                    duration: 500.ms,
+                    curve: Curves.elasticOut,
+                  )
+                  .fadeIn(delay: 300.ms, duration: 200.ms),
+              const SizedBox(height: 6),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 32),
+                child: Text(
+                  getWordSentence(widget.word),
+                  textAlign: TextAlign.center,
+                  style: AppFonts.nunito(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white.withValues(alpha: 0.85),
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              )
+                  .animate()
+                  .fadeIn(delay: 500.ms, duration: 400.ms)
+                  .slideY(
+                    begin: 0.2,
+                    end: 0,
+                    delay: 500.ms,
+                    duration: 400.ms,
+                    curve: Curves.easeOut,
+                  ),
+            ],
+
+            const SizedBox(height: 16),
 
             // ── Zone-aware praise in a pill badge ─────────
             Padding(
