@@ -425,6 +425,13 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       // Check if word is complete — delay so last letter sound plays
       if (_currentLetterIndex >= _targetText.length) {
         Future.delayed(const Duration(milliseconds: 500), _onWordComplete);
+      } else {
+        // Quick happy flash + nod for each correct letter
+        _avatarController.setExpression(
+          AvatarExpression.happy,
+          duration: const Duration(milliseconds: 800),
+        );
+        _avatarController.playAnimation('nod');
       }
     } else {
       // Wrong letter — shake and retry
@@ -459,8 +466,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // 2nd+ wrong tap → briefly reveal the answer letter with bounce
 
     if (_totalWrongTapsThisWord == 1) {
-      // 1st wrong: avatar thinks + highlight correct key on keyboard
+      // 1st wrong: avatar gentle head shake + think + highlight correct key
       _avatarController.setExpression(AvatarExpression.thinking, duration: const Duration(seconds: 2));
+      _avatarController.playAnimation('headShake');
       setState(() => _nudgeKey = expected);
       _nudgeController.forward(from: 0);
     } else if (_totalWrongTapsThisWord >= 2) {
