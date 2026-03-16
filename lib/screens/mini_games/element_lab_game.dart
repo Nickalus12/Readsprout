@@ -2578,6 +2578,12 @@ class _ElementLabGameState extends State<ElementLabGame>
           bestPheromone = _life[si];
           pheromoneDir = sd;
         }
+        // Avoid danger pheromones (> 240) — flee in opposite direction
+        if (sc == El.empty && _life[si] >= 240) {
+          if (sd == dir) targetDir = -dir;
+          foundTarget = true;
+          break;
+        }
         // Also follow other ants (social behavior)
         if (sc == El.ant && _rng.nextInt(3) == 0) {
           targetDir = sd;
