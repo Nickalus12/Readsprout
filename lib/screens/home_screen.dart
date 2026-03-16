@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import '../data/dolch_words.dart';
+import '../models/word.dart';
 import '../theme/app_theme.dart';
 import '../services/profile_service.dart';
 import '../services/progress_service.dart';
@@ -18,6 +19,7 @@ import '../avatar/avatar_widget.dart';
 import '../widgets/floating_hearts_bg.dart';
 import '../widgets/streak_badge.dart';
 import 'level_select_screen.dart';
+import 'game_screen.dart';
 import 'alphabet_screen.dart';
 import 'mini_games_screen.dart';
 import 'parent_dashboard_screen.dart';
@@ -111,6 +113,35 @@ class _HomeScreenState extends State<HomeScreen>
   void _onLogoTap() {
     widget.audioService.playWord('reading_sprout');
     _logoController.forward(from: 0);
+  }
+
+  void _onContinue() {
+    final settings = widget.settingsService;
+    if (settings == null || !settings.hasContinue) return;
+    final level = settings.lastPlayedLevel!;
+    final tier = settings.lastPlayedTier ?? 1;
+
+    // Record this as last-played again (in case tier suggestion changed)
+    settings.setLastPlayed(level, tier);
+
+    Navigator.push(
+      context,
+      _smoothRoute(GameScreen(
+        level: level,
+        tier: tier,
+        progressService: widget.progressService,
+        audioService: widget.audioService,
+        profileService: widget.profileService,
+        statsService: widget.statsService,
+        streakService: widget.streakService,
+        personalityService: widget.personalityService,
+        reviewService: widget.reviewService,
+        adaptiveDifficultyService: widget.adaptiveDifficultyService,
+        musicService: widget.musicService,
+        playerName: widget.playerName,
+        profileId: widget.profileId,
+      )),
+    );
   }
 
   void _showMilestone(String message) {
@@ -510,7 +541,12 @@ class _HomeScreenState extends State<HomeScreen>
                           curve: Curves.easeOutCubic,
                         ),
 
-                    const SizedBox(height: 16),
+                    const SizedBox(height: 12),
+
+                    // ── Review Pile button (or "All caught up!") ──
+                    _buildReviewSection(sf),
+
+                    const SizedBox(height: 12),
 
                     // ── Garden & Mini Games icons ────────────
                     Row(
@@ -582,6 +618,138 @@ class _HomeScreenState extends State<HomeScreen>
         ],
       ),
       ),
+    );
+  }
+
+  Widget _buildReviewSection(double sf) {
+    if (widget.reviewService == null) return const SizedBox.shrink();
+
+    final overdueCount = widget.reviewService!.getOverdueCount();
+
+    if (overdueCount == 0) {
+      // Show "All caught up!" when nothing is due
+      return Text(
+        'All caught up! \u{1F31F}',
+        style: AppFonts.nunito(
+          fontSize: 14 * sf,
+          fontWeight: FontWeight.w600,
+          color: AppColors.starGold.withValues(alpha: 0.8),
+        ),
+      )
+          .animate()
+          .fadeIn(delay: 600.ms, duration: 500.ms);
+    }
+
+    return GestureDetector(
+      onTap: _launchReviewMode,
+      child: Container(
+        padding: EdgeInsets.symmetric(
+            horizontal: 16 * sf, vertical: 8 * sf),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [
+              AppColors.violet.withValues(alpha: 0.18),
+              AppColors.magenta.withValues(alpha: 0.12),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(
+            color: AppColors.violet.withValues(alpha: 0.5),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.violet.withValues(alpha: 0.12),
+              blurRadius: 16,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '\u{1F4DA}',
+              style: TextStyle(fontSize: 18 * sf),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              'Review ($overdueCount due)',
+              style: AppFonts.fredoka(
+                fontSize: 16 * sf,
+                fontWeight: FontWeight.w600,
+                color: Colors.white,
+              ),
+            ),
+          ],
+        ),
+      ),
+    )
+        .animate()
+        .fadeIn(delay: 600.ms, duration: 500.ms)
+        .slideY(
+          begin: 0.2,
+          end: 0,
+          delay: 600.ms,
+          duration: 400.ms,
+          curve: Curves.easeOut,
+        );
+  }
+
+  void _launchReviewMode() {
+    if (widget.reviewService == null) return;
+
+    final overdueWordTexts = widget.reviewService!.getOverdueWords();
+    if (overdueWordTexts.isEmpty) return;
+
+    // Convert overdue word strings to Word objects
+    // Find the matching Word from DolchWords to preserve level info
+    final allWords = DolchWords.allWords;
+    final wordMap = <String, Word>{};
+    for (final w in allWords) {
+      wordMap[w.text.toLowerCase()] = w;
+    }
+
+    final reviewWords = <Word>[];
+    for (final text in overdueWordTexts) {
+      final match = wordMap[text.toLowerCase()];
+      if (match != null) {
+        reviewWords.add(match);
+      } else {
+        // Word not in Dolch list — create a review Word with level 0
+        reviewWords.add(Word(
+          id: 'review_$text',
+          text: text,
+          level: 0,
+        ));
+      }
+    }
+
+    if (reviewWords.isEmpty) return;
+
+    // Use level from the first word (for zone theming), tier 1 (Explorer)
+    final firstLevel = reviewWords.first.level > 0 ? reviewWords.first.level : 1;
+
+    Navigator.push(
+      context,
+      _smoothRoute(GameScreen(
+        level: firstLevel,
+        tier: 1,
+        progressService: widget.progressService,
+        audioService: widget.audioService,
+        profileService: widget.profileService,
+        statsService: widget.statsService,
+        streakService: widget.streakService,
+        personalityService: widget.personalityService,
+        reviewService: widget.reviewService,
+        adaptiveDifficultyService: widget.adaptiveDifficultyService,
+        musicService: widget.musicService,
+        playerName: widget.playerName,
+        profileId: widget.profileId,
+        reviewWords: reviewWords,
+      )),
     );
   }
 
