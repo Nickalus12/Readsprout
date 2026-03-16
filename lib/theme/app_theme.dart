@@ -17,7 +17,7 @@ class AppColors {
 
   // Feedback
   static const Color success = Color(0xFF00E68A);
-  static const Color error = Color(0xFFFF4757);
+  static const Color error = Color(0xFFFF6B7A); // Softer coral-pink, gentler for kids
   static const Color starGold = Color(0xFFFFD700);
 
   // Tier colors
@@ -160,6 +160,55 @@ class AppFonts {
       decoration: decoration,
       decorationColor: decorationColor,
     ).copyWith(fontFamilyFallback: const ['Nunito']);
+  }
+}
+
+/// Shared spacing values for consistent layout across screens.
+class AppSpacing {
+  AppSpacing._();
+
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 16;
+  static const double lg = 24;
+  static const double xl = 32;
+  static const double xxl = 48;
+
+  /// Standard border radius for cards and containers.
+  static const double cardRadius = 16;
+  /// Rounded pill radius for badges and buttons.
+  static const double pillRadius = 24;
+  /// Minimum touch target size (Android accessibility).
+  static const double minTouchTarget = 48;
+}
+
+/// Reusable decoration helpers for consistent card / container styling.
+class AppDecorations {
+  AppDecorations._();
+
+  /// Standard card decoration with subtle glow on dark background.
+  static BoxDecoration card({
+    Color? color,
+    Color? borderColor,
+    double borderRadius = AppSpacing.cardRadius,
+    Color? glowColor,
+  }) {
+    return BoxDecoration(
+      color: color ?? AppColors.surface.withValues(alpha: 0.75),
+      borderRadius: BorderRadius.circular(borderRadius),
+      border: Border.all(
+        color: borderColor ?? AppColors.border.withValues(alpha: 0.5),
+      ),
+      boxShadow: glowColor != null
+          ? [
+              BoxShadow(
+                color: glowColor.withValues(alpha: 0.12),
+                blurRadius: 12,
+                spreadRadius: 1,
+              ),
+            ]
+          : null,
+    );
   }
 }
 
