@@ -548,11 +548,17 @@ class _GameButtonState extends State<_GameButton> {
                 clipBehavior: Clip.none,
                 children: [
                   Container(
-                    width: 68,
-                    height: 68,
+                    width: 72,
+                    height: 72,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: AppColors.surface,
+                      gradient: RadialGradient(
+                        center: const Alignment(-0.3, -0.3),
+                        colors: [
+                          widget.glowColor.withValues(alpha: 0.08),
+                          AppColors.surface,
+                        ],
+                      ),
                       border: Border.all(
                         color: widget.glowColor.withValues(alpha: _hovering ? 0.8 : 0.4),
                         width: 2,
@@ -568,7 +574,7 @@ class _GameButtonState extends State<_GameButton> {
                     ),
                     child: CustomPaint(
                       painter: widget.painter,
-                      size: const Size(68, 68),
+                      size: const Size(72, 72),
                     ),
                   ),
                   if (widget.coinCost != null)
@@ -617,7 +623,7 @@ class _GameButtonState extends State<_GameButton> {
               Text(
                 widget.label,
                 style: AppFonts.fredoka(
-                  fontSize: 11,
+                  fontSize: 12,
                   fontWeight: FontWeight.w600,
                   color: AppColors.primaryText.withValues(alpha: 0.9),
                 ),
