@@ -106,6 +106,25 @@ class StatsService {
     await _save();
   }
 
+  /// Record daily accuracy data point (call during gameplay).
+  Future<void> recordDailyAccuracy(String date, {required int correct, required int wrong}) async {
+    final existing = _stats.dailySessions[date];
+    if (existing != null) {
+      _stats.dailySessions[date] = DailySessionStats(
+        wordsPlayed: existing.wordsPlayed,
+        minutesPlayed: existing.minutesPlayed,
+        correctTaps: existing.correctTaps + correct,
+        wrongTaps: existing.wrongTaps + wrong,
+      );
+    } else {
+      _stats.dailySessions[date] = DailySessionStats(
+        correctTaps: correct,
+        wrongTaps: wrong,
+      );
+    }
+    await _save();
+  }
+
   /// Record a daily session snapshot (call at end of each play session).
   Future<void> recordDailySession(String date, int wordsPlayed, int minutesPlayed) async {
     final existing = _stats.dailySessions[date];
@@ -113,6 +132,8 @@ class StatsService {
       _stats.dailySessions[date] = DailySessionStats(
         wordsPlayed: existing.wordsPlayed + wordsPlayed,
         minutesPlayed: existing.minutesPlayed + minutesPlayed,
+        correctTaps: existing.correctTaps,
+        wrongTaps: existing.wrongTaps,
       );
     } else {
       _stats.dailySessions[date] = DailySessionStats(
@@ -373,20 +394,35 @@ class MiniGameAttemptStats {
 class DailySessionStats {
   final int wordsPlayed;
   final int minutesPlayed;
+  final int correctTaps;
+  final int wrongTaps;
 
   const DailySessionStats({
     this.wordsPlayed = 0,
     this.minutesPlayed = 0,
+    this.correctTaps = 0,
+    this.wrongTaps = 0,
   });
+
+  /// Daily accuracy as a fraction (0.0 to 1.0). Returns 1.0 if no taps recorded.
+  double get accuracy {
+    final total = correctTaps + wrongTaps;
+    if (total == 0) return 1.0;
+    return correctTaps / total;
+  }
 
   Map<String, dynamic> toJson() => {
         'wordsPlayed': wordsPlayed,
         'minutesPlayed': minutesPlayed,
+        'correctTaps': correctTaps,
+        'wrongTaps': wrongTaps,
       };
 
   factory DailySessionStats.fromJson(Map<String, dynamic> json) =>
       DailySessionStats(
         wordsPlayed: json['wordsPlayed'] as int? ?? 0,
         minutesPlayed: json['minutesPlayed'] as int? ?? 0,
+        correctTaps: json['correctTaps'] as int? ?? 0,
+        wrongTaps: json['wrongTaps'] as int? ?? 0,
       );
 }
