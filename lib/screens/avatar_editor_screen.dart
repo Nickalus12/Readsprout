@@ -632,152 +632,66 @@ class _AvatarEditorScreenState extends State<AvatarEditorScreen>
 
   // ── Shirt Tab (Color + Style) ───────────────────────────────────────
 
+  int _shirtSubIndex = 0; // 0=color, 1=style
+
   Widget _buildShirtTab() {
-    return SingleChildScrollView(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          _SectionHeader(label: 'Color'),
-          const SizedBox(height: 8),
-          _buildShirtColorGrid(),
-          const SizedBox(height: 16),
-          _SectionHeader(label: 'Style'),
-          const SizedBox(height: 8),
-          _buildShirtStyleRow(),
-        ],
-      ),
+    return _SubTabLayout(
+      subTabs: const ['Color', 'Style'],
+      selectedIndex: _shirtSubIndex,
+      onSubTabChanged: (i) => setState(() => _shirtSubIndex = i),
+      children: [
+        _buildShirtColorGrid(),
+        _buildShirtStyleGrid(),
+      ],
     );
   }
 
   Widget _buildShirtColorGrid() {
-    return Wrap(
-      spacing: 10,
-      runSpacing: 10,
-      children: List.generate(shirtColorOptions.length, (index) {
+    return _optionGrid(
+      itemCount: shirtColorOptions.length,
+      selectedIndex: _config.shirtColor,
+      labelForIndex: (i) => shirtColorOptions[i].label,
+      builder: (index) {
         final opt = shirtColorOptions[index];
-        final selected = index == _config.shirtColor;
-        return GestureDetector(
-          onTap: () => _updateConfig(_config.copyWith(shirtColor: index)),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 200),
-            width: 60,
-            height: 60,
+        return Center(
+          child: Container(
+            width: 42,
+            height: 42,
             decoration: BoxDecoration(
-              color: selected
-                  ? AppColors.violet.withValues(alpha: 0.20)
-                  : AppColors.surface,
-              borderRadius: BorderRadius.circular(14),
+              color: opt.color,
+              shape: BoxShape.circle,
               border: Border.all(
-                color: selected ? AppColors.violet : AppColors.border,
-                width: selected ? 2.5 : 1,
+                color: Colors.white.withValues(alpha: 0.2),
+                width: 1,
               ),
-              boxShadow: selected
-                  ? [
-                      BoxShadow(
-                        color: AppColors.violet.withValues(alpha: 0.30),
-                        blurRadius: 8,
-                      ),
-                    ]
-                  : null,
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 34,
-                  height: 34,
-                  decoration: BoxDecoration(
-                    color: opt.color,
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: 0.2),
-                      width: 1,
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 2),
-                Text(
-                  opt.label,
-                  style: AppFonts.fredoka(
-                    fontSize: 8,
-                    color: selected
-                        ? AppColors.violet
-                        : AppColors.secondaryText,
-                    fontWeight:
-                        selected ? FontWeight.w600 : FontWeight.w400,
-                  ),
-                ),
-              ],
             ),
           ),
         );
-      }),
+      },
+      onTap: (index) => _updateConfig(_config.copyWith(shirtColor: index)),
     );
   }
 
-  Widget _buildShirtStyleRow() {
-    return Row(
-      children: List.generate(shirtStyleOptions.length, (index) {
-        final opt = shirtStyleOptions[index];
-        final selected = index == _config.shirtStyle;
-        return Expanded(
-          child: GestureDetector(
-            onTap: () => _updateConfig(_config.copyWith(shirtStyle: index)),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              margin: EdgeInsets.only(
-                  right: index < shirtStyleOptions.length - 1 ? 8 : 0),
-              height: 72,
-              decoration: BoxDecoration(
-                color: selected
-                    ? AppColors.violet.withValues(alpha: 0.20)
-                    : AppColors.surface,
-                borderRadius: BorderRadius.circular(14),
-                border: Border.all(
-                  color: selected ? AppColors.violet : AppColors.border,
-                  width: selected ? 2.5 : 1,
-                ),
-                boxShadow: selected
-                    ? [
-                        BoxShadow(
-                          color: AppColors.violet.withValues(alpha: 0.30),
-                          blurRadius: 8,
-                        ),
-                      ]
-                    : null,
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  SizedBox(
-                    width: 40,
-                    height: 40,
-                    child: AvatarWidget(
-                      animateEffects: false,
-                      config: _config.copyWith(shirtStyle: index),
-                      size: 40,
-                      showBackground: false,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    opt.label,
-                    style: AppFonts.fredoka(
-                      fontSize: 9,
-                      color: selected
-                          ? AppColors.violet
-                          : AppColors.secondaryText,
-                      fontWeight:
-                          selected ? FontWeight.w600 : FontWeight.w400,
-                    ),
-                  ),
-                ],
-              ),
+  Widget _buildShirtStyleGrid() {
+    return _optionGrid(
+      itemCount: shirtStyleOptions.length,
+      selectedIndex: _config.shirtStyle,
+      labelForIndex: (i) => shirtStyleOptions[i].label,
+      builder: (index) {
+        return Center(
+          child: SizedBox(
+            width: 48,
+            height: 48,
+            child: AvatarWidget(
+              animateEffects: false,
+              config: _config.copyWith(shirtStyle: index),
+              size: 48,
+              showBackground: false,
             ),
           ),
         );
-      }),
+      },
+      onTap: (index) => _updateConfig(_config.copyWith(shirtStyle: index)),
     );
   }
 
