@@ -77,10 +77,10 @@ class _TierSelectionSheetState extends State<TierSelectionSheet> {
       constraints: BoxConstraints(
         maxHeight: MediaQuery.of(context).size.height * 0.85,
       ),
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         color: AppColors.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-        border: const Border(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        border: Border(
           top: BorderSide(color: AppColors.border, width: 1),
           left: BorderSide(color: AppColors.border, width: 1),
           right: BorderSide(color: AppColors.border, width: 1),
