@@ -720,9 +720,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             child: Stack(
               children: [
                 // ── Zone-themed animated background ──────
-                Positioned.fill(
-                  child: ZoneBackground(
-                    zone: zoneIndexForLevel(widget.level),
+                ExcludeSemantics(
+                  child: Positioned.fill(
+                    child: ZoneBackground(
+                      zone: zoneIndexForLevel(widget.level),
+                    ),
                   ),
                 ),
 
@@ -924,56 +926,65 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   Widget _buildHeader(List<Color> levelColors) {
     final zone = DolchWords.zoneForLevel(widget.level);
     final tierColor = _wordTier.color;
+    final levelName = DolchWords.levelName(widget.level);
 
     return Padding(
       padding: const EdgeInsets.fromLTRB(8, 8, 16, 0),
       child: Row(
         children: [
-          IconButton(
-            onPressed: _savingProgress ? null : () => Navigator.pop(context),
-            icon: Icon(
-              Icons.arrow_back_rounded,
-              color: _savingProgress
-                  ? AppColors.secondaryText
-                  : AppColors.primaryText,
+          Semantics(
+            label: 'Go back',
+            hint: 'Return to level select',
+            button: true,
+            child: IconButton(
+              onPressed: _savingProgress ? null : () => Navigator.pop(context),
+              icon: Icon(
+                Icons.arrow_back_rounded,
+                color: _savingProgress
+                    ? AppColors.secondaryText
+                    : AppColors.primaryText,
+              ),
             ),
           ),
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Level name
-                Text(
-                  DolchWords.levelName(widget.level),
-                  style: AppFonts.fredoka(
-                    fontSize: 18,
-                    fontWeight: FontWeight.w600,
-                    color: AppColors.primaryText,
+            child: Semantics(
+              label: '${zone.name}, $levelName, ${_wordTier.displayName} tier',
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Level name
+                  Text(
+                    levelName,
+                    style: AppFonts.fredoka(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primaryText,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-                // Zone name + tier badge
-                Row(
-                  children: [
-                    Text(
-                      '${zone.icon} ${zone.name}',
-                      style: AppFonts.nunito(
-                        fontSize: 11,
-                        color: AppColors.secondaryText,
+                  // Zone name + tier badge
+                  Row(
+                    children: [
+                      Text(
+                        '${zone.icon} ${zone.name}',
+                        style: AppFonts.nunito(
+                          fontSize: 11,
+                          color: AppColors.secondaryText,
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '${_wordTier.icon} ${_wordTier.displayName}',
-                      style: AppFonts.fredoka(
-                        fontSize: 11,
-                        fontWeight: FontWeight.w500,
-                        color: tierColor,
+                      const SizedBox(width: 8),
+                      Text(
+                        '${_wordTier.icon} ${_wordTier.displayName}',
+                        style: AppFonts.fredoka(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w500,
+                          color: tierColor,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
           // Small avatar with reactions
@@ -988,21 +999,24 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               ),
             ),
           // Word counter
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: AppColors.surface.withValues(alpha: 0.7),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: AppColors.border.withValues(alpha: 0.5),
+          Semantics(
+            label: 'Word ${_currentWordIndex + 1} of ${_words.length}',
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+              decoration: BoxDecoration(
+                color: AppColors.surface.withValues(alpha: 0.7),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: AppColors.border.withValues(alpha: 0.5),
+                ),
               ),
-            ),
-            child: Text(
-              '${_currentWordIndex + 1}/${_words.length}',
-              style: AppFonts.fredoka(
-                fontSize: 15,
-                fontWeight: FontWeight.w600,
-                color: AppColors.primaryText,
+              child: Text(
+                '${_currentWordIndex + 1}/${_words.length}',
+                style: AppFonts.fredoka(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.primaryText,
+                ),
               ),
             ),
           ),
@@ -1086,7 +1100,11 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     final iconSz = compact ? 20.0 : 24.0;
     final fontSz = compact ? 15.0 : 18.0;
 
-    final button = GestureDetector(
+    final button = Semantics(
+      label: 'Hear the word',
+      hint: 'Tap to listen to the current word',
+      button: true,
+      child: GestureDetector(
       onTap: _announceCurrentWord,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
@@ -1131,7 +1149,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           ],
         ),
       ),
-    );
+    ));
 
     if (_isPlayingAudio) {
       return button
