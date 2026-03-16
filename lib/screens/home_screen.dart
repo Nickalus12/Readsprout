@@ -333,7 +333,7 @@ class _HomeScreenState extends State<HomeScreen>
 
                     const SizedBox(height: 12),
 
-                    // ── Hero: Player name (tappable letters) ──
+                    // ── Hero: Player name (letter-by-letter entrance) ──
                     if (hasName)
                       Wrap(
                         alignment: WrapAlignment.center,
@@ -343,17 +343,21 @@ class _HomeScreenState extends State<HomeScreen>
                               letter: widget.playerName[i],
                               index: i,
                               audioService: widget.audioService,
-                            ),
+                            )
+                                .animate()
+                                .fadeIn(
+                                  delay: Duration(milliseconds: 300 + i * 60),
+                                  duration: 400.ms,
+                                )
+                                .slideY(
+                                  begin: 0.4,
+                                  end: 0,
+                                  delay: Duration(milliseconds: 300 + i * 60),
+                                  duration: 400.ms,
+                                  curve: Curves.easeOutBack,
+                                ),
                         ],
-                      )
-                          .animate()
-                          .fadeIn(duration: 800.ms)
-                          .slideY(
-                            begin: 0.2,
-                            end: 0,
-                            curve: Curves.easeOutCubic,
-                            duration: 800.ms,
-                          ),
+                      ),
 
                     const SizedBox(height: 6),
 
