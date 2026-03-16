@@ -159,10 +159,14 @@ final Uint8List windSensitivity = () {
 
 /// Element names that have dedicated word audio files.
 /// Others will be spelled letter-by-letter.
+/// Element names that have dedicated word audio files in assets/audio/words/.
+/// Others will be spelled letter-by-letter until TTS audio is generated.
 const Set<String> speakableWords = {
   'sand', 'water', 'fire', 'ice', 'plant', 'stone',
   'mud', 'steam', 'ant', 'oil', 'acid', 'glass', 'rainbow',
-  'seed', 'dirt', 'lava', 'snow', 'wood', 'metal', 'smoke', 'bubble', 'ash',
+  'snow', 'lightning', 'tnt',
+  // Missing audio (spelled letter-by-letter for now):
+  // seed, dirt, lava, wood, metal, smoke, bubble, ash
 };
 
 // ── Plant data constants ─────────────────────────────────────────────
