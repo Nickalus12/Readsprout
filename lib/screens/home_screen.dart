@@ -115,6 +115,15 @@ class _HomeScreenState extends State<HomeScreen>
     _logoController.forward(from: 0);
   }
 
+  String get _continueSubtitle {
+    final settings = widget.settingsService;
+    if (settings == null || !settings.hasContinue) return '';
+    final level = settings.lastPlayedLevel!;
+    final tier = settings.lastPlayedTier ?? 1;
+    final tierNames = const {1: 'Explorer', 2: 'Adventurer', 3: 'Champion'};
+    return 'Level $level \u2022 ${tierNames[tier] ?? 'Explorer'}';
+  }
+
   void _onContinue() {
     final settings = widget.settingsService;
     if (settings == null || !settings.hasContinue) return;
@@ -426,6 +435,107 @@ class _HomeScreenState extends State<HomeScreen>
                           .fadeIn(delay: 700.ms, duration: 600.ms),
 
                     const SizedBox(height: 24),
+
+                    // ── Continue button (if last-played exists) ──
+                    if (widget.settingsService?.hasContinue == true)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: GestureDetector(
+                          onTap: _onContinue,
+                          child: Container(
+                            padding: EdgeInsets.symmetric(
+                                horizontal: 20 * sf, vertical: 12 * sf),
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  AppColors.electricBlue.withValues(alpha: 0.22),
+                                  AppColors.violet.withValues(alpha: 0.16),
+                                  AppColors.magenta.withValues(alpha: 0.12),
+                                ],
+                                stops: const [0.0, 0.5, 1.0],
+                              ),
+                              borderRadius: BorderRadius.circular(32),
+                              border: Border.all(
+                                color: AppColors.electricBlue.withValues(alpha: 0.6),
+                                width: 1.5,
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: AppColors.electricBlue.withValues(alpha: 0.2),
+                                  blurRadius: 24,
+                                  spreadRadius: 2,
+                                ),
+                                BoxShadow(
+                                  color: AppColors.violet.withValues(alpha: 0.1),
+                                  blurRadius: 40,
+                                  spreadRadius: 4,
+                                ),
+                              ],
+                            ),
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  Icons.play_arrow_rounded,
+                                  size: 28 * sf,
+                                  color: AppColors.electricBlue,
+                                ),
+                                const SizedBox(width: 8),
+                                Flexible(child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      'Continue',
+                                      style: AppFonts.fredoka(
+                                        fontSize: 20 * sf,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    Text(
+                                      _continueSubtitle,
+                                      style: AppFonts.nunito(
+                                        fontSize: 11 * sf,
+                                        color: AppColors.electricBlue
+                                            .withValues(alpha: 0.8),
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                )),
+                                const SizedBox(width: 8),
+                                Icon(
+                                  Icons.arrow_forward_rounded,
+                                  size: 20 * sf,
+                                  color: AppColors.electricBlue.withValues(alpha: 0.6),
+                                ),
+                              ],
+                            ),
+                          ),
+                        )
+                            .animate(
+                              onPlay: (controller) =>
+                                  controller.repeat(reverse: true),
+                            )
+                            .scaleXY(
+                              begin: 1.0,
+                              end: 1.02,
+                              duration: 1800.ms,
+                              curve: Curves.easeInOut,
+                            )
+                            .animate()
+                            .fadeIn(delay: 400.ms, duration: 500.ms)
+                            .slideY(
+                              begin: 0.3,
+                              end: 0,
+                              curve: Curves.easeOutCubic,
+                              delay: 400.ms,
+                              duration: 500.ms,
+                            ),
+                      ),
 
                     // ── Adventure Mode button ────────────────
                     GestureDetector(
