@@ -37,6 +37,16 @@ class GameLevelComplete extends StatelessWidget {
   bool get _isChampion => tier == 3;
   bool get _isAdventurer => tier == 2;
 
+  String _totalWordsMessage() {
+    final total = progressService.totalWordsCompleted;
+    if (total >= 200) return "You've learned $total words! Amazing!";
+    if (total >= 100) return "You've learned $total words! Keep going!";
+    if (total >= 50) return "$total words learned so far!";
+    if (total >= 20) return "$total words and counting!";
+    if (total >= 10) return "You know $total words now!";
+    return "Great start!";
+  }
+
   /// Get champion words that still need to pass (bestMistakes > 1).
   List<String> _getChampionRemainingWords() {
     if (!_isChampion) return [];
@@ -329,7 +339,24 @@ class GameLevelComplete extends StatelessWidget {
                   .fadeIn(delay: 800.ms, duration: 400.ms)
                   .slideY(begin: 0.2, end: 0, delay: 800.ms, duration: 400.ms),
 
-            const SizedBox(height: 32),
+            // Total words learned milestone
+            if (!championNotDone)
+              Padding(
+                padding: const EdgeInsets.only(top: 10, bottom: 6),
+                child: Text(
+                  _totalWordsMessage(),
+                  textAlign: TextAlign.center,
+                  style: AppFonts.nunito(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.secondaryText.withValues(alpha: 0.8),
+                  ),
+                ),
+              )
+                  .animate()
+                  .fadeIn(delay: 850.ms, duration: 400.ms),
+
+            const SizedBox(height: 24),
 
             // Action buttons
             Row(
@@ -344,26 +371,28 @@ class GameLevelComplete extends StatelessWidget {
                       ? AppColors.electricBlue
                       : AppColors.secondaryText,
                   onTap: onReplay,
+                  size: championNotDone ? 88.0 : 72.0,
                 )
                     .animate()
-                    .fadeIn(delay: 750.ms, duration: 300.ms)
-                    .slideY(begin: 0.3, end: 0, delay: 750.ms, duration: 300.ms),
+                    .fadeIn(delay: 900.ms, duration: 300.ms)
+                    .slideY(begin: 0.3, end: 0, delay: 900.ms, duration: 300.ms),
                 if (!championNotDone && onNext != null) ...[
-                  const SizedBox(width: 24),
+                  const SizedBox(width: 28),
                   RoundButton(
                     label: 'Next',
                     icon: Icons.arrow_forward_rounded,
                     color: AppColors.success,
                     onTap: onNext!,
+                    size: 96.0,
                   )
                       .animate()
-                      .fadeIn(delay: 850.ms, duration: 300.ms)
-                      .slideY(begin: 0.3, end: 0, delay: 850.ms, duration: 300.ms)
+                      .fadeIn(delay: 1000.ms, duration: 300.ms)
+                      .slideY(begin: 0.3, end: 0, delay: 1000.ms, duration: 300.ms)
                       .then(delay: 600.ms)
                       .animate(onPlay: (c) => c.repeat(reverse: true))
                       .scaleXY(
                         begin: 1.0,
-                        end: 1.06,
+                        end: 1.08,
                         duration: 1200.ms,
                         curve: Curves.easeInOut,
                       ),
@@ -384,6 +413,7 @@ class RoundButton extends StatefulWidget {
   final IconData icon;
   final Color color;
   final VoidCallback onTap;
+  final double size;
 
   const RoundButton({
     super.key,
@@ -391,6 +421,7 @@ class RoundButton extends StatefulWidget {
     required this.icon,
     required this.color,
     required this.onTap,
+    this.size = 80.0,
   });
 
   @override
@@ -417,8 +448,8 @@ class _RoundButtonState extends State<RoundButton> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 80,
-              height: 80,
+              width: widget.size,
+              height: widget.size,
               decoration: BoxDecoration(
                 color: widget.color.withValues(alpha: _pressed ? 0.2 : 0.12),
                 shape: BoxShape.circle,
@@ -432,7 +463,7 @@ class _RoundButtonState extends State<RoundButton> {
                   ),
                 ],
               ),
-              child: Icon(widget.icon, color: widget.color, size: 36),
+              child: Icon(widget.icon, color: widget.color, size: widget.size * 0.45),
             ),
             const SizedBox(height: 8),
             Text(
