@@ -5,6 +5,7 @@ import '../services/audio_service.dart';
 import '../services/player_settings_service.dart';
 import '../services/profile_service.dart';
 import '../theme/app_theme.dart';
+import '../utils/name_validator.dart';
 import '../widgets/floating_hearts_bg.dart';
 
 /// "Who's Playing?" profile picker screen.
@@ -36,6 +37,7 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen>
   final _nameController = TextEditingController();
   final _nameFocus = FocusNode();
   bool _hasText = false;
+  String? _nameError;
   late AnimationController _addButtonGlowController;
   late AnimationController _addButtonRotateController;
 
@@ -44,7 +46,12 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen>
     super.initState();
     _nameController.addListener(() {
       final hasText = _nameController.text.trim().isNotEmpty;
-      if (hasText != _hasText) setState(() => _hasText = hasText);
+      if (hasText != _hasText || _nameError != null) {
+        setState(() {
+          _hasText = hasText;
+          _nameError = null;
+        });
+      }
     });
 
     _addButtonGlowController = AnimationController(
@@ -95,9 +102,14 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen>
 
   void _submitNewName() {
     final name = _nameController.text.trim();
-    if (name.isNotEmpty) {
-      widget.onNewProfile(name);
+    if (name.isEmpty) return;
+    final error = NameValidator.validate(name);
+    if (error != null) {
+      setState(() => _nameError = error);
+      return;
     }
+    setState(() => _nameError = null);
+    widget.onNewProfile(NameValidator.formatName(name));
   }
 
   void _showProfileOptions(PlayerEntry profile) {
@@ -126,81 +138,113 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen>
   void _showRenameDialog(PlayerEntry profile) {
     final renameController = TextEditingController(text: profile.name);
     final sf = (MediaQuery.of(context).size.width / 400).clamp(0.7, 1.2);
+    String? renameError;
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: AppColors.surface,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20 * sf),
-          side: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
-        ),
-        title: Text(
-          'Rename Player',
-          style: AppFonts.fredoka(
-            fontSize: 22 * sf,
-            fontWeight: FontWeight.w600,
-            color: AppColors.primaryText,
-          ),
-        ),
-        content: Container(
-          decoration: BoxDecoration(
-            color: AppColors.background.withValues(alpha: 0.5),
-            borderRadius: BorderRadius.circular(12 * sf),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: TextField(
-            controller: renameController,
-            autofocus: true,
-            textCapitalization: TextCapitalization.words,
-            textAlign: TextAlign.center,
-            style: AppFonts.fredoka(
-              fontSize: 22 * sf,
-              fontWeight: FontWeight.w500,
-              color: AppColors.primaryText,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setDialogState) {
+          return AlertDialog(
+            backgroundColor: AppColors.surface,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(20 * sf),
+              side: BorderSide(color: AppColors.border.withValues(alpha: 0.5)),
             ),
-            decoration: InputDecoration(
-              border: InputBorder.none,
-              contentPadding: EdgeInsets.symmetric(
-                horizontal: 16 * sf,
-                vertical: 12 * sf,
+            title: Text(
+              'Rename Player',
+              style: AppFonts.fredoka(
+                fontSize: 22 * sf,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primaryText,
               ),
             ),
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Cancel',
-              style: AppFonts.nunito(
-                fontSize: 16 * sf,
-                color: AppColors.secondaryText,
-              ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  decoration: BoxDecoration(
+                    color: AppColors.background.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(12 * sf),
+                    border: Border.all(color: AppColors.border),
+                  ),
+                  child: TextField(
+                    controller: renameController,
+                    autofocus: true,
+                    textCapitalization: TextCapitalization.words,
+                    textAlign: TextAlign.center,
+                    style: AppFonts.fredoka(
+                      fontSize: 22 * sf,
+                      fontWeight: FontWeight.w500,
+                      color: AppColors.primaryText,
+                    ),
+                    decoration: InputDecoration(
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.symmetric(
+                        horizontal: 16 * sf,
+                        vertical: 12 * sf,
+                      ),
+                    ),
+                    onChanged: (_) {
+                      if (renameError != null) {
+                        setDialogState(() => renameError = null);
+                      }
+                    },
+                  ),
+                ),
+                if (renameError != null) ...[
+                  SizedBox(height: 8 * sf),
+                  Text(
+                    renameError!,
+                    textAlign: TextAlign.center,
+                    style: AppFonts.nunito(
+                      fontSize: 13 * sf,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.error,
+                    ),
+                  ),
+                ],
+              ],
             ),
-          ),
-          TextButton(
-            onPressed: () async {
-              final newName = renameController.text.trim();
-              if (newName.isNotEmpty) {
-                await widget.settingsService.renameProfile(profile.id, newName);
-                if (ctx.mounted) {
-                  Navigator.pop(ctx);
-                }
-                if (mounted) {
-                  setState(() {});
-                }
-              }
-            },
-            child: Text(
-              'Save',
-              style: AppFonts.nunito(
-                fontSize: 16 * sf,
-                fontWeight: FontWeight.w700,
-                color: AppColors.electricBlue,
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(
+                  'Cancel',
+                  style: AppFonts.nunito(
+                    fontSize: 16 * sf,
+                    color: AppColors.secondaryText,
+                  ),
+                ),
               ),
-            ),
-          ),
-        ],
+              TextButton(
+                onPressed: () async {
+                  final newName = renameController.text.trim();
+                  if (newName.isEmpty) return;
+                  final error = NameValidator.validate(newName);
+                  if (error != null) {
+                    setDialogState(() => renameError = error);
+                    return;
+                  }
+                  final formatted = NameValidator.formatName(newName);
+                  await widget.settingsService.renameProfile(profile.id, formatted);
+                  if (ctx.mounted) {
+                    Navigator.pop(ctx);
+                  }
+                  if (mounted) {
+                    setState(() {});
+                  }
+                },
+                child: Text(
+                  'Save',
+                  style: AppFonts.nunito(
+                    fontSize: 16 * sf,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.electricBlue,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -605,6 +649,20 @@ class _ProfilePickerScreenState extends State<ProfilePickerScreen>
             onSubmitted: (_) => _submitNewName(),
           ),
         ),
+
+        // Validation error message
+        if (_nameError != null) ...[
+          SizedBox(height: 8 * sf),
+          Text(
+            _nameError!,
+            textAlign: TextAlign.center,
+            style: AppFonts.nunito(
+              fontSize: 14 * sf,
+              fontWeight: FontWeight.w600,
+              color: AppColors.error,
+            ),
+          ),
+        ],
 
         SizedBox(height: 8 * sf),
 
