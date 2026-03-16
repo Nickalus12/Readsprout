@@ -509,11 +509,13 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
           isHero = false; // 2 stars: equal size
         }
 
-        final size = isHero ? 44.0 : (count == 2 ? 36.0 : 30.0);
-        final iconSize = isHero ? 28.0 : (count == 2 ? 22.0 : 18.0);
+        final size = isHero ? 52.0 : (count == 2 ? 40.0 : 34.0);
+        final iconSize = isHero ? 32.0 : (count == 2 ? 26.0 : 22.0);
+        // Dramatic staggered reveal: each star appears one at a time
+        final starDelay = 400 + (i * 280);
 
         return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 10),
           child: Container(
             width: size,
             height: size,
@@ -528,8 +530,8 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
               boxShadow: [
                 BoxShadow(
                   color: color.withValues(alpha: glowIntensity),
-                  blurRadius: widget.tier >= 3 ? 20 : 14,
-                  spreadRadius: widget.tier >= 3 ? 4 : 2,
+                  blurRadius: widget.tier >= 3 ? 24 : 16,
+                  spreadRadius: widget.tier >= 3 ? 6 : 3,
                 ),
               ],
             ),
@@ -542,16 +544,23 @@ class _CelebrationOverlayState extends State<CelebrationOverlay>
               .animate()
               .scaleXY(
                 begin: 0,
+                end: 1.3,
+                delay: Duration(milliseconds: starDelay),
+                duration: 400.ms,
+                curve: Curves.easeOut,
+              )
+              .then()
+              .scaleXY(
+                begin: 1.3,
                 end: 1.0,
-                delay: Duration(milliseconds: 300 + (i * 140)),
-                duration: 600.ms,
-                curve: Curves.elasticOut,
+                duration: 300.ms,
+                curve: Curves.bounceOut,
               )
               .rotate(
-                begin: -0.1,
+                begin: -0.15,
                 end: 0,
-                delay: Duration(milliseconds: 300 + (i * 140)),
-                duration: 600.ms,
+                delay: Duration(milliseconds: starDelay),
+                duration: 500.ms,
                 curve: Curves.elasticOut,
               ),
         );
