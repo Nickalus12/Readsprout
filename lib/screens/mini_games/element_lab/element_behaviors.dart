@@ -1415,27 +1415,65 @@ extension ElementBehaviors on SimulationEngine {
     }
 
     final by = y + gravityDir;
+    final uy = y - gravityDir;
+    final notProcessed = (simClock ? 0x80 : 0);
+
+    // Oil is lighter than water — always float upward through water
+    // Check below: if water is below, swap (oil rises, water sinks)
+    if (inBounds(x, by) && grid[by * gridW + x] == El.water &&
+        (flags[by * gridW + x] & 0x80) != notProcessed) {
+      final bi = by * gridW + x;
+      final waterMass = life[bi];
+      grid[bi] = El.oil;
+      life[bi] = life[idx];
+      grid[idx] = El.water;
+      life[idx] = waterMass < 20 ? 100 : waterMass;
+      markProcessed(bi);
+      markProcessed(idx);
+      return;
+    }
+
+    // Fall through empty space
     if (inBounds(x, by) && grid[by * gridW + x] == El.empty) {
       swap(idx, by * gridW + x);
       return;
     }
 
-    final uy = y - gravityDir;
-    if (inBounds(x, uy) && grid[uy * gridW + x] == El.water && ((flags[uy * gridW + x] & 0x80) != (simClock ? 0x80 : 0))) {
+    // Buoyancy: swap with water above (oil pushes up past water on top)
+    if (inBounds(x, uy) && grid[uy * gridW + x] == El.water &&
+        (flags[uy * gridW + x] & 0x80) != notProcessed) {
       final ui = uy * gridW + x;
-      final waterMass3 = life[ui];
+      final waterMass = life[ui];
       grid[ui] = El.oil;
       life[ui] = life[idx];
       grid[idx] = El.water;
-      life[idx] = waterMass3 < 20 ? 100 : waterMass3;
+      life[idx] = waterMass < 20 ? 100 : waterMass;
       markProcessed(ui);
       markProcessed(idx);
       return;
     }
 
+    // Diagonal buoyancy: swap with water diagonally below
     final dl = rng.nextBool();
     final x1 = dl ? x - 1 : x + 1;
     final x2 = dl ? x + 1 : x - 1;
+
+    for (final sx in [x1, x2]) {
+      if (inBounds(sx, by) && grid[by * gridW + sx] == El.water &&
+          (flags[by * gridW + sx] & 0x80) != notProcessed) {
+        final si = by * gridW + sx;
+        final waterMass = life[si];
+        grid[si] = El.oil;
+        life[si] = life[idx];
+        grid[idx] = El.water;
+        life[idx] = waterMass < 20 ? 100 : waterMass;
+        markProcessed(si);
+        markProcessed(idx);
+        return;
+      }
+    }
+
+    // Diagonal fall through empty
     if (inBounds(x1, by) && grid[by * gridW + x1] == El.empty) {
       swap(idx, by * gridW + x1);
       return;
@@ -1445,6 +1483,7 @@ extension ElementBehaviors on SimulationEngine {
       return;
     }
 
+    // Lateral spread (slower than water)
     if (frameCount.isEven) {
       if (inBounds(x1, y) && grid[y * gridW + x1] == El.empty) {
         swap(idx, y * gridW + x1);
