@@ -16,7 +16,6 @@ import '../services/avatar_personality_service.dart';
 import '../services/adaptive_music_service.dart';
 import '../services/review_service.dart';
 import '../services/player_settings_service.dart';
-import '../avatar/avatar_widget.dart';
 import '../widgets/floating_hearts_bg.dart';
 import '../widgets/streak_badge.dart';
 import 'level_select_screen.dart';
@@ -79,10 +78,6 @@ class _HomeScreenState extends State<HomeScreen>
   late Ticker _starTicker;
   late _StarSim _starSim;
   final _heartsKey = GlobalKey<FloatingHeartsBackgroundState>();
-  final AvatarController _avatarController = AvatarController();
-  double _avatarEnergy = 0.5;
-  int _avatarTapCount = 0;
-
   @override
   void initState() {
     super.initState();
@@ -92,8 +87,6 @@ class _HomeScreenState extends State<HomeScreen>
     );
     _starSim = _StarSim();
     _starTicker = createTicker(_starSim.tick)..start();
-    // Bind avatar lip sync to audio amplitude
-    _avatarController.bindAmplitude(widget.audioService.mouthAmplitude);
     // Check streak status on app open
     widget.streakService.checkStreak();
     // Check if we should show first-time adventure hint
@@ -102,56 +95,19 @@ class _HomeScreenState extends State<HomeScreen>
       _showAdventureHint = true;
     }
 
-    // Compute personality-driven mood for avatar
-    AvatarMood? mood;
-    if (widget.personalityService != null && widget.profileId.isNotEmpty) {
-      mood = widget.personalityService!.computeMood(widget.profileId);
-      _avatarEnergy = mood.energyLevel;
-    }
-
-    // Play welcome phrase on first load with mood-driven greeting
+    // Play welcome phrase on first load
     if (widget.playerName.isNotEmpty && !_hasPlayedWelcome) {
       _hasPlayedWelcome = true;
       Future.delayed(const Duration(milliseconds: 800), () {
         if (mounted) {
           widget.audioService.playWelcome(widget.playerName);
-          // Expression matches mood
-          final expr = mood?.defaultExpression ?? AvatarExpression.happy;
-          _avatarController.setExpression(
-            expr == AvatarExpression.neutral ? AvatarExpression.happy : expr,
-            duration: const Duration(seconds: 3),
-          );
-          // Play mood-appropriate greeting animation
-          final clipName = mood?.greetingClip ?? 'wave';
-          _avatarController.playAnimation(clipName);
         }
       });
     }
   }
 
-  /// Avatar tap reaction — cycles through fun expressions and animations
-  void _onAvatarTap() {
-    _avatarTapCount++;
-    const expressions = [
-      AvatarExpression.excited,
-      AvatarExpression.happy,
-      AvatarExpression.surprised,
-      AvatarExpression.excited,
-      AvatarExpression.happy,
-    ];
-    const animations = ['wave', 'giggle', 'surprise', 'clap', 'nod'];
-    final idx = _avatarTapCount % expressions.length;
-    _avatarController.setExpression(
-      expressions[idx],
-      duration: const Duration(milliseconds: 1500),
-    );
-    _avatarController.playAnimation(animations[idx]);
-    widget.audioService.playSuccess();
-  }
-
   @override
   void dispose() {
-    _avatarController.dispose();
     _starTicker.dispose();
     _starSim.dispose();
     _logoController.dispose();
@@ -378,8 +334,8 @@ class _HomeScreenState extends State<HomeScreen>
                         },
                         child: Image.asset(
                           'assets/images/logo.png',
-                          width: (widget.profileService != null ? 120 : 160) * sf,
-                          height: (widget.profileService != null ? 120 : 160) * sf,
+                          width: 160 * sf,
+                          height: 160 * sf,
                         ),
                       ),
                     ))
@@ -393,31 +349,6 @@ class _HomeScreenState extends State<HomeScreen>
                         ),
 
                     const SizedBox(height: 12),
-
-                    // ── Avatar companion (tappable) ──────────
-                    if (widget.profileService != null)
-                      GestureDetector(
-                        onTap: _onAvatarTap,
-                        child: AvatarWidget(
-                          config: widget.profileService!.avatar,
-                          size: 90 * sf,
-                          showBackground: false,
-                          controller: _avatarController,
-                          energyLevel: _avatarEnergy,
-                        ),
-                      )
-                          .animate()
-                          .fadeIn(delay: 200.ms, duration: 500.ms)
-                          .scaleXY(
-                            begin: 0.8,
-                            end: 1.0,
-                            delay: 200.ms,
-                            duration: 500.ms,
-                            curve: Curves.easeOutBack,
-                          ),
-
-                    if (widget.profileService != null)
-                      const SizedBox(height: 4),
 
                     // ── Hero: Player name (letter-by-letter entrance) ──
                     if (hasName)
